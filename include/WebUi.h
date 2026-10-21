@@ -6,7 +6,7 @@ static const char LEVI_HTML[] PROGMEM=R"LEVIHTML(<!doctype html><html lang="de">
 .shell{background:#f3f3f3;border-radius:24px;padding:20px 17px 13px;width:min(100%,430px)}
 header{text-align:center;padding:5px 0 20px}h1{font-size:36px;letter-spacing:-1.3px;margin:0;font-weight:760;display:flex;align-items:center;justify-content:center;gap:8px}
 svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{display:flex;justify-content:center;gap:9px;margin-top:16px}.branddots i{width:15px;height:15px;border-radius:50%}
-.calib{margin-top:16px;border:1px solid #ededed;box-shadow:0 4px 20px #00000009}
+.calib{margin-top:16px}
 .calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
 .calib button:active{background:#f3f3f3}
 .card{background:white;border-radius:20px;padding:21px 20px 22px;box-shadow:0 4px 20px #00000007}
