@@ -38,6 +38,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(
 <div class="divider"></div><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></main>
 <section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
 <p class="muted" id="calCurrent">Lade Kalibrierung …</p>
+<textarea id="calOut" readonly rows="4" style="width:100%;box-sizing:border-box;font:13px ui-monospace,Menlo,monospace;border:1px solid #e1e1e1;border-radius:12px;padding:10px;background:#fafafa;color:#171717;resize:none"></textarea>
+<div class="center"><button id="calCopy">Kopieren</button></div>
 <div class="divider"></div>
 <div class="center"><button class="power" id="calStart">Kalibrierung starten</button> <button id="calReset">Zurücksetzen</button></div>
 <div id="calBox" style="display:none">
@@ -67,7 +69,7 @@ render();refresh();setInterval(refresh,1000);
 const CAL=[['Rot','#ff0000'],['Orange','#ff8000'],['Gelb','#ffff00'],['Grün','#00ff00'],['Türkis','#00ffff'],['Blau','#0000ff'],['Violett','#8000ff'],['Pink','#ff00aa'],['Weiß','#ffffff']];
 let calIdx=0,calMatches=[],calCur=[0,0,0],calTimer=null,calGamma=2.2;
 function hexToRgb(h){return [1,3,5].map(i=>parseInt(h.substr(i,2),16))}
-function calLoadCurrent(){fetch('/api/calib',{cache:'no-store'}).then(r=>r.json()).then(j=>{calGamma=j.gamma;$('calCurrent').textContent=`Aktuell: R ${j.gr.toFixed(3)} · G ${j.gg.toFixed(3)} · B ${j.gb.toFixed(3)} · Gamma ${j.gamma.toFixed(2)}`}).catch(()=>{});}
+function calLoadCurrent(){fetch('/api/calib',{cache:'no-store'}).then(r=>r.json()).then(j=>{calGamma=j.gamma;$('calOut').value=`#define LEVI_CALIB_GR ${j.gr.toFixed(3)}f\n#define LEVI_CALIB_GG ${j.gg.toFixed(3)}f\n#define LEVI_CALIB_GB ${j.gb.toFixed(3)}f\n#define LEVI_CALIB_GAMMA ${j.gamma.toFixed(2)}f`;$('calCurrent').textContent=`Aktuell: R ${j.gr.toFixed(3)} · G ${j.gg.toFixed(3)} · B ${j.gb.toFixed(3)} · Gamma ${j.gamma.toFixed(2)}`}).catch(()=>{});}
 function calBuildSliders(){const box=$('calSliders');box.innerHTML='';['R','G','B'].forEach((c,i)=>{const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';row.innerHTML=`<span style="width:20px;font-size:15px;color:#171717">${c}</span><input type="range" min="0" max="255" id="calR${i}" style="flex:1"><span id="calV${i}" style="width:36px;text-align:right;font-size:15px;color:#888">0</span>`;box.appendChild(row);const inp=row.querySelector('input');inp.oninput=()=>{calCur[i]=+inp.value;$('calV'+i).textContent=inp.value;inp.style.setProperty('--p',(inp.value/255*100)+'%');calSendRaw();};});}
 function calUpdateSliders(){[0,1,2].forEach(i=>{const el=$('calR'+i);el.value=calCur[i];el.style.setProperty('--p',(calCur[i]/255*100)+'%');$('calV'+i).textContent=calCur[i];});}
 function calSendRaw(){clearTimeout(calTimer);calTimer=setTimeout(()=>fetch(`/api/raw?r=${calCur[0]}&g=${calCur[1]}&b=${calCur[2]}`,{method:'POST'}),60);}
@@ -83,5 +85,6 @@ $('calStart').onclick=calStart;
 $('calCancel').onclick=()=>{$('calBox').style.display='none';calRestoreColor();};
 $('calNext').onclick=()=>{calMatches.push({matched:[...calCur],target:hexToRgb(CAL[calIdx][1])});calIdx++;if(calIdx<CAL.length)calShow();else calFinish();};
 $('calReset').onclick=()=>{fetch('/api/calib/reset',{method:'POST'}).then(()=>{$('calInfo').textContent='Zurückgesetzt.';calLoadCurrent();});};
+$('calCopy').onclick=()=>{const t=$('calOut');t.select();if(navigator.clipboard){navigator.clipboard.writeText(t.value).then(()=>{$('calInfo').textContent='In die Zwischenablage kopiert.';}).catch(()=>{document.execCommand('copy');});}else{document.execCommand('copy');}};
 calBuildSliders();calLoadCurrent();
 </script></body></html>)LEVIHTML";

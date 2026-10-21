@@ -42,8 +42,20 @@ static bool screenDim=false;
 static uint8_t currentBacklight=255;
 
 // Kalibrierung: Kanal-Gains und Gamma, im NVS gespeichert. Ausgabe = gamma(gain*in).
-// Standard: FastLED TypicalSMD5050 (255,176,240) als Startpunkt, Gamma aus (linear wie FastLED).
-struct Calib { float gr=1.0f,gg=0.69f,gb=0.94f,gamma=1.0f; };
+#ifndef LEVI_CALIB_GR
+#define LEVI_CALIB_GR 1.000f
+#endif
+#ifndef LEVI_CALIB_GG
+#define LEVI_CALIB_GG 0.690f
+#endif
+#ifndef LEVI_CALIB_GB
+#define LEVI_CALIB_GB 0.940f
+#endif
+#ifndef LEVI_CALIB_GAMMA
+#define LEVI_CALIB_GAMMA 1.00f
+#endif
+// Standard-Kalibrierung aus Config.h (sonst FastLED TypicalSMD5050).
+struct Calib { float gr=LEVI_CALIB_GR,gg=LEVI_CALIB_GG,gb=LEVI_CALIB_GB,gamma=LEVI_CALIB_GAMMA; };
 static Calib calib;
 static void calibLoad(){Preferences p;p.begin("levi",true);Calib d;calib.gr=p.getFloat("gr",d.gr);calib.gg=p.getFloat("gg",d.gg);calib.gb=p.getFloat("gb",d.gb);calib.gamma=p.getFloat("gamma",d.gamma);p.end();}
 static void calibSave(){Preferences p;p.begin("levi",false);p.putFloat("gr",calib.gr);p.putFloat("gg",calib.gg);p.putFloat("gb",calib.gb);p.putFloat("gamma",calib.gamma);p.end();}
