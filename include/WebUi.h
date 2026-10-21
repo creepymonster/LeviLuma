@@ -26,7 +26,7 @@ footer{text-align:center;color:#8b8b8b;font-size:12px;padding:18px 0 2px}.footli
 <div class="divider"></div><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></main>
 <footer><div class="footline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round"><path d="M2 8a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1" fill="#888"/></svg>LeviLuma · ESP32-S3 · Lokale Steuerung</div><p class="note" title="Der LED-Controller bestätigt seinen Zustand nicht.">AN/AUS zeigt den zuletzt gesetzten Zustand, keine Bestätigung durch die LED.</p></footer></div>
 <script>
-const $=id=>document.getElementById(id),palette=['#e24f62','#e7a23b','#5fc36b','#52b4d1','#8b5cf6'];let s={power:'unknown',r:139,g:92,b:246,brightness:75},editingUntil=0,sendTimer;
+const $=id=>document.getElementById(id),palette=['#ff0000','#00ff00','#0000ff','#ffffff','#8b5cf6'];let s={power:'unknown',r:139,g:92,b:246,brightness:75},editingUntil=0,sendTimer;
 const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),hex=()=>('#'+[s.r,s.g,s.b].map(v=>v.toString(16).padStart(2,'0')).join(''));
 function post(url){editingUntil=Date.now()+1200;fetch(url,{method:'POST'}).then(()=>refresh()).catch(()=>{});}
 function setColor(h){[s.r,s.g,s.b]=rgb(h);render();post('/api/color?r='+s.r+'&g='+s.g+'&b='+s.b)}
