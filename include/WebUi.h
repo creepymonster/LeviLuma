@@ -39,7 +39,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(
 <section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
 <p class="muted" id="calCurrent">Lade Kalibrierung …</p>
 <textarea id="calOut" readonly rows="4" style="width:100%;box-sizing:border-box;font:13px ui-monospace,Menlo,monospace;border:1px solid #e1e1e1;border-radius:12px;padding:10px;background:#fafafa;color:#171717;resize:none"></textarea>
-<div class="center"><button id="calCopy">Kopieren</button></div>
 <div class="divider"></div>
 <div class="center"><button class="power" id="calStart">Kalibrierung starten</button> <button id="calReset">Zurücksetzen</button></div>
 <div id="calBox" style="display:none">
@@ -85,6 +84,5 @@ $('calStart').onclick=calStart;
 $('calCancel').onclick=()=>{$('calBox').style.display='none';calRestoreColor();};
 $('calNext').onclick=()=>{calMatches.push({matched:[...calCur],target:hexToRgb(CAL[calIdx][1])});calIdx++;if(calIdx<CAL.length)calShow();else calFinish();};
 $('calReset').onclick=()=>{fetch('/api/calib/reset',{method:'POST'}).then(()=>{$('calInfo').textContent='Zurückgesetzt.';calLoadCurrent();});};
-$('calCopy').onclick=()=>{const t=$('calOut');t.select();if(navigator.clipboard){navigator.clipboard.writeText(t.value).then(()=>{$('calInfo').textContent='In die Zwischenablage kopiert.';}).catch(()=>{document.execCommand('copy');});}else{document.execCommand('copy');}};
 calBuildSliders();calLoadCurrent();
 </script></body></html>)LEVIHTML";
