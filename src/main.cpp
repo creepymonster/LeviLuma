@@ -50,6 +50,14 @@ static void selectColor(int idx){int n=(idx%5+5)%5;State s=snapshot();uint8_t fr
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
 static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
+// Heller Hintergrund -> dunkle Schrift und Knopf, sonst weiss. Verhindert unsichtbare Beschriftung bei Weiss.
+static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
+  bool light=(r*299+g*587+b*114)/1000>170;
+  lv_color_t fg=light?lv_color_hex(0x1A1A1A):lv_color_white();
+  lv_obj_set_style_text_color(percent,fg,0);
+  lv_obj_set_style_text_color(caption,fg,0);
+  lv_obj_set_style_bg_color(arc,fg,LV_PART_KNOB);
+}
 
 // Sanfter Farbuebergang beim Wischen zwischen den Farben (ca. 280 ms, ease-out).
 static bool colorAnimating=false;
@@ -62,6 +70,7 @@ static void colorAnimExec(void*,int32_t v){
   lv_obj_set_style_arc_color(arc,col,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(center,col,0);
   lv_obj_set_style_shadow_color(center,col,0);
+  applyContrast(c[0],c[1],c[2]);
 }
 static void colorAnimDone(lv_anim_t*){colorAnimating=false;}
 static void startColorAnim(const uint8_t from[3],const uint8_t to[3]){
@@ -97,6 +106,7 @@ static void updateUI(){
     lv_obj_set_style_arc_color(arc,color,LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(center,color,0);
     lv_obj_set_style_shadow_color(center,color,0);
+    applyContrast(s.r,s.g,s.b);
   }
   lv_arc_set_value(arc,s.brightness);
   char label[12];snprintf(label,sizeof(label),"%u%%",s.brightness);
