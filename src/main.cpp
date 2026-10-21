@@ -11,6 +11,9 @@
 #include "Palette.h"
 #include <math.h>
 
+// Logging ueber USB-CDC (Serial Monitor, 115200 Baud)
+#define LEVI_LOG(fmt,...) Serial.printf("[%8lu] " fmt "\n",(unsigned long)millis(),##__VA_ARGS__)
+
 static LGFX_Board lcd;
 static WebServer web(80);
 static SemaphoreHandle_t stateLock;
@@ -114,7 +117,7 @@ static void gestures(){
 class ScanCallbacks: public NimBLEAdvertisedDeviceCallbacks {
   void onResult(NimBLEAdvertisedDevice* dev) override {if(dev->getName().find(LEVI_BLE_NAME)!=std::string::npos){NimBLEDevice::getScan()->stop();}}
 };
-class ClientCallbacks: public NimBLEClientCallbacks {void onDisconnect(NimBLEClient*) override {xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);}};
+class ClientCallbacks: public NimBLEClientCallbacks {void onDisconnect(NimBLEClient*) override {LEVI_LOG("BLE: Verbindung getrennt");xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);}};
 static ScanCallbacks scanCallbacks;
 static ClientCallbacks clientCallbacks;
 static void bleTask(void*){
@@ -128,12 +131,17 @@ static void bleTask(void*){
       if(millis()-lastAttempt>4000){
         lastAttempt=millis();NimBLEScan *scan=NimBLEDevice::getScan();scan->setActiveScan(true);scan->setAdvertisedDeviceCallbacks(&scanCallbacks);
         NimBLEScanResults results=scan->start(2,false);NimBLEAddress addr;bool found=false;
-        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);if(dev.getName().find(LEVI_BLE_NAME)!=std::string::npos){addr=dev.getAddress();found=true;break;}}
-        if(found){if(!client){client=NimBLEDevice::createClient();client->setClientCallbacks(&clientCallbacks);}if(client->connect(addr)){
-          auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
-          if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastSentRevision=s.revision;}
-          else client->disconnect();
-        }}scan->clearResults();
+        LEVI_LOG("BLE: Scan fertig, %d Geraete gefunden", results.getCount());
+        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);LEVI_LOG("BLE:   %s  RSSI %d  Name \"%s\"", dev.getAddress().toString().c_str(), dev.getRSSI(), dev.getName().c_str());if(dev.getName().find(LEVI_BLE_NAME)!=std::string::npos){addr=dev.getAddress();found=true;break;}}
+        if(!found) LEVI_LOG("BLE: \"%s\" nicht gefunden, naechster Versuch in 4 s", LEVI_BLE_NAME);
+        if(found){if(!client){client=NimBLEDevice::createClient();client->setClientCallbacks(&clientCallbacks);}
+          if(client->connect(addr)){
+            LEVI_LOG("BLE: verbunden mit %s", addr.toString().c_str());
+            auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
+            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastSentRevision=s.revision;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
+            else {LEVI_LOG("BLE: Service 0xFFF0 oder Characteristic 0xFFF3 fehlt, trenne"); client->disconnect();}
+          } else LEVI_LOG("BLE: Verbindung zu %s fehlgeschlagen", addr.toString().c_str());
+        }scan->clearResults();
       }
     }else{
       // Send only user changes; never assert unknown LED state after reconnection.
@@ -155,6 +163,7 @@ static void bleTask(void*){
             }
           }
           if(ok)lastSentRevision=s.revision;
+          else LEVI_LOG("BLE: Schreiben fehlgeschlagen (power=%d, rev=%lu)", (int)s.power, (unsigned long)s.revision);
         }
       }
     }
@@ -169,9 +178,46 @@ static void webInit(){
   web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
   web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
 }
-static void wifiConnect(){WiFi.mode(WIFI_STA);WiFi.setAutoReconnect(true);WiFi.setSleep(true);WiFi.setTxPower(LEVI_WIFI_TX_DBM<=8.5f?WIFI_POWER_8_5dBm:WIFI_POWER_11dBm);WiFi.setHostname(LEVI_WIFI_HOSTNAME);WiFi.begin(LEVI_WIFI_SSID,LEVI_WIFI_PASSWORD);lastWifiAttempt=millis();}
+static const char *wlStatusName(wl_status_t s){
+  switch(s){
+    case WL_IDLE_STATUS: return "IDLE";
+    case WL_NO_SSID_AVAIL: return "NO_SSID_AVAIL";
+    case WL_SCAN_COMPLETED: return "SCAN_COMPLETED";
+    case WL_CONNECTED: return "CONNECTED";
+    case WL_CONNECT_FAILED: return "CONNECT_FAILED";
+    case WL_CONNECTION_LOST: return "CONNECTION_LOST";
+    case WL_DISCONNECTED: return "DISCONNECTED";
+    default: return "UNKNOWN";
+  }
+}
+static void onWifiEvent(arduino_event_id_t event,arduino_event_info_t info){
+  switch(event){
+    case ARDUINO_EVENT_WIFI_STA_START: LEVI_LOG("WLAN: STA gestartet"); break;
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED: LEVI_LOG("WLAN: mit AP verbunden, Kanal %d", info.wifi_sta_connected.channel); break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP: LEVI_LOG("WLAN: IP %s, RSSI %d dBm", WiFi.localIP().toString().c_str(), WiFi.RSSI()); break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: LEVI_LOG("WLAN: getrennt, Grund %u", (unsigned)info.wifi_sta_disconnected.reason); break;
+    default: break;
+  }
+}
+static void wlanScanLog(){
+  int n=WiFi.scanNetworks(false,false,false,300);
+  bool seen=false;
+  for(int i=0;i<n;i++){
+    if(WiFi.SSID(i)==LEVI_WIFI_SSID){seen=true;LEVI_LOG("WLAN: \"%s\" sichtbar, RSSI %d dBm, Kanal %d", LEVI_WIFI_SSID, WiFi.RSSI(i), WiFi.channel(i));}
+  }
+  LEVI_LOG("WLAN-Scan: %d Netze, Ziel-SSID %s", n, seen?"gefunden":"NICHT gefunden");
+  WiFi.scanDelete();
+}
+static void wifiConnect(){
+  static bool eventsRegistered=false;
+  if(!eventsRegistered){WiFi.onEvent(onWifiEvent);eventsRegistered=true;}
+  LEVI_LOG("WLAN: verbinde mit \"%s\"", LEVI_WIFI_SSID);
+  WiFi.mode(WIFI_STA);WiFi.setAutoReconnect(true);WiFi.setSleep(true);WiFi.setTxPower(LEVI_WIFI_TX_DBM<=8.5f?WIFI_POWER_8_5dBm:WIFI_POWER_11dBm);WiFi.setHostname(LEVI_WIFI_HOSTNAME);WiFi.begin(LEVI_WIFI_SSID,LEVI_WIFI_PASSWORD);lastWifiAttempt=millis();
+}
 void setup(){
-  Serial.begin(115200);delay(200);stateLock=xSemaphoreCreateMutex();
+  Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
+  LEVI_LOG("LeviLuma startet");
+  stateLock=xSemaphoreCreateMutex();
   ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
   lcd.init();lcd.setRotation(0);lcd.fillScreen(TFT_BLACK);
   lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
@@ -186,9 +232,20 @@ void loop(){
   gestures();lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
-  static bool mdns=false;
-  if(WiFi.status()==WL_CONNECTED){if(!mdns){mdns=MDNS.begin(LEVI_WIFI_HOSTNAME);if(mdns)MDNS.addService("http","tcp",80);}}
-  else if(mdns){MDNS.end();mdns=false;}
-  else if(WiFi.status()==WL_DISCONNECTED && now-lastWifiAttempt>15000){lastWifiAttempt=now;WiFi.reconnect();}
+  static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
+  wl_status_t wl=WiFi.status();
+  if(wl!=lastWl){LEVI_LOG("WLAN: Status %s -> %s", wlStatusName(lastWl), wlStatusName(wl));lastWl=wl;}
+  if(wl==WL_CONNECTED){if(!mdns){mdns=MDNS.begin(LEVI_WIFI_HOSTNAME);if(mdns)MDNS.addService("http","tcp",80);LEVI_LOG("mDNS: %s.local %s", LEVI_WIFI_HOSTNAME, mdns?"aktiv":"FEHLER");}}
+  else{
+    if(mdns){MDNS.end();mdns=false;}
+    // Retry bei jedem Status ausser CONNECTED (nicht nur DISCONNECTED), sonst bleibt der ESP bei NO_SSID_AVAIL/CONNECT_FAILED haengen.
+    if(now-lastWifiAttempt>15000){
+      lastWifiAttempt=now;
+      LEVI_LOG("WLAN: neuer Verbindungsversuch (Status %s)", wlStatusName(wl));
+      if(wl==WL_NO_SSID_AVAIL||wl==WL_CONNECT_FAILED) wlanScanLog();
+      WiFi.disconnect();
+      wifiConnect();
+    }
+  }
   delay(5);
 }
