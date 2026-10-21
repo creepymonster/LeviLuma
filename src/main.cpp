@@ -33,7 +33,7 @@ static int8_t uiSelected=-2;
 static bool touchDown=false;
 static uint16_t touchX=120,touchY=120;
 static bool touchBlocked=false;
-static bool fingerDown=false, ringGesture=false, swipeGesture=false, wokeByTouch=false;
+static bool fingerDown=false, wokeByTouch=false;
 static int16_t startX=0,startY=0,lastX=0,lastY=0;
 static uint32_t touchStart=0;
 static bool screenDim=false;
@@ -119,7 +119,7 @@ static void makeUI(){
   lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
   lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
-  lv_obj_set_ext_click_area(arc,12);
+  lv_obj_remove_flag(arc,LV_OBJ_FLAG_CLICKABLE); // Helligkeit per Wischgeste statt Ring-Drag
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
   center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,12,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
@@ -133,14 +133,21 @@ static void makeUI(){
 }
 // Separate gesture detector: arc drag, horizontal swipe, central tap.
 // CST816S may report only intermittent points; tune thresholds after hardware testing.
+static void adjustBrightness(int delta){State s=snapshot();setBrightness(s.brightness+delta);}
+// Wischen ueberall: horizontal = Farbe, vertikal = Helligkeit, kurzer Tap in der Mitte = an/aus.
+// CST816S meldet teils wenige Punkte; Schwellen nach Hardware-Test feinjustieren.
 static void gestures(){
   bool down=touchDown;
   int x=touchX,y=touchY;uint32_t now=millis();
-  if(down&&!fingerDown){fingerDown=true;startX=lastX=x;startY=lastY=y;touchStart=now;swipeGesture=false;ringGesture=hypotf(x-120,y-120)>76;wokeByTouch=screenDim;touchBlocked=wokeByTouch;wake();}
-  if(down&&fingerDown){lastX=x;lastY=y;if(!ringGesture&&abs(x-startX)>42&&abs(x-startX)>abs(y-startY)*1.25f)swipeGesture=true;}
-  if(!down&&fingerDown){fingerDown=false;touchBlocked=false;int dx=lastX-startX,dy=lastY-startY;
-    if(!wokeByTouch&&swipeGesture&&abs(dx)>45){selectColor((selected<0?0:selected)+(dx<0?1:-1));}
-    else if(!wokeByTouch&&!ringGesture&&abs(dx)<25&&abs(dy)<25&&now-touchStart<650&&hypotf(startX-120,startY-120)<65){State s=snapshot();setPower(s.power!=1);}
+  if(down&&!fingerDown){fingerDown=true;startX=lastX=x;startY=lastY=y;touchStart=now;wokeByTouch=screenDim;touchBlocked=wokeByTouch;wake();}
+  if(down&&fingerDown){lastX=x;lastY=y;}
+  if(!down&&fingerDown){fingerDown=false;touchBlocked=false;
+    int dx=lastX-startX,dy=lastY-startY;
+    if(!wokeByTouch){
+      if(abs(dx)>=40&&abs(dx)>abs(dy)*1.3f){selectColor((selected<0?0:selected)+(dx<0?1:-1));LEVI_LOG("Geste: Farbe %s", dx<0?"weiter":"zurueck");}
+      else if(abs(dy)>=30&&abs(dy)>abs(dx)*1.3f){adjustBrightness(dy<0?10:-10);LEVI_LOG("Geste: Helligkeit %s", dy<0?"hoeher":"niedriger");}
+      else if(abs(dx)<25&&abs(dy)<25&&now-touchStart<650&&hypotf(startX-120,startY-120)<65){State s=snapshot();setPower(s.power!=1);LEVI_LOG("Geste: Tap, Power toggle");}
+    }
   }
 }
 
