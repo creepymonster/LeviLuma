@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <Preferences.h>
 #include <NimBLEDevice.h>
 #include <lvgl.h>
 #include "LGFX_Board.h"
@@ -24,7 +25,7 @@ static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
-struct State { bool ble=false; bool music=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; };
+struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
 static int8_t selected=4;
@@ -40,11 +41,19 @@ static uint32_t touchStart=0;
 static bool screenDim=false;
 static uint8_t currentBacklight=255;
 
+// Kalibrierung: Kanal-Gains und Gamma, im NVS gespeichert. Ausgabe = gamma(gain*in).
+struct Calib { float gr=1,gg=1,gb=1,gamma=2.2f; };
+static Calib calib;
+static void calibLoad(){Preferences p;p.begin("levi",true);calib.gr=p.getFloat("gr",1.0f);calib.gg=p.getFloat("gg",1.0f);calib.gb=p.getFloat("gb",1.0f);calib.gamma=p.getFloat("gamma",2.2f);p.end();}
+static void calibSave(){Preferences p;p.begin("levi",false);p.putFloat("gr",calib.gr);p.putFloat("gg",calib.gg);p.putFloat("gb",calib.gb);p.putFloat("gamma",calib.gamma);p.end();}
+static uint8_t calibCh(int v,float gain){float x=v*gain/255.0f;if(x<0)x=0;if(x>1)x=1;return (uint8_t)(powf(x,calib.gamma)*255.0f+0.5f);}
+static String calibJson(){return "{\"gr\":"+String(calib.gr,3)+",\"gg\":"+String(calib.gg,3)+",\"gb\":"+String(calib.gb,3)+",\"gamma\":"+String(calib.gamma,2)+"}";}
 static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state; xSemaphoreGive(stateLock); return s; }
 
 static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
 static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
-static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
+static void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock); }
+static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
   selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
 static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=5;}
 static void selectColor(int idx){int n=(idx%6+6)%6;if(n==5){setMusic(true);return;}setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);}
@@ -176,7 +185,7 @@ static void bleTask(void*){
             if(!client->isConnected())ok=false;
             else if(millis()-lastColorSent<33)ok=false; // keep revision pending
             else {
-              Lotus::color((uint16_t)s.r*s.brightness/100,(uint16_t)s.g*s.brightness/100,(uint16_t)s.b*s.brightness/100,packet);
+              uint8_t cr=s.r,cg=s.g,cb=s.b;if(!s.raw){cr=calibCh(s.r*s.brightness/100,calib.gr);cg=calibCh(s.g*s.brightness/100,calib.gg);cb=calibCh(s.b*s.brightness/100,calib.gb);}Lotus::color(cr,cg,cb,packet);
               if(client->isConnected())ok=writer->writeValue(packet,9,!writer->canWriteNoResponse());
               else ok=false;
               if(ok)lastColorSent=millis();
@@ -196,6 +205,14 @@ static void webInit(){
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
   web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
+  web.on("/api/raw",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRaw(r.toInt(),g.toInt(),b.toInt());stateJson();});
+  web.on("/api/calib",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
+  web.on("/api/calib",HTTP_POST,[]{
+    float gr=web.arg("gr").toFloat(),gg=web.arg("gg").toFloat(),gb=web.arg("gb").toFloat(),gm=web.arg("gamma").toFloat();
+    if(gr<0.2f||gr>2.0f||gg<0.2f||gg>2.0f||gb<0.2f||gb>2.0f||gm<1.0f||gm>3.0f){web.send(400,"text/plain","gr,gg,gb 0.2..2, gamma 1..3");return;}
+    calib.gr=gr;calib.gg=gg;calib.gb=gb;calib.gamma=gm;calibSave();LEVI_LOG("Kalibrierung gespeichert: %s",calibJson().c_str());
+    web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
+  web.on("/api/calib/reset",HTTP_POST,[]{calib=Calib();calibSave();LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
   web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
 }
 static const char *wlStatusName(wl_status_t s){
@@ -237,7 +254,7 @@ static void wifiConnect(){
 void setup(){
   Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
   LEVI_LOG("LeviLuma startet");
-  stateLock=xSemaphoreCreateMutex();
+  stateLock=xSemaphoreCreateMutex();calibLoad();
   ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
   lcd.init();lcd.setRotation(0);lcd.fillScreen(TFT_BLACK);
   lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);

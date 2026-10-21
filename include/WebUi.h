@@ -24,6 +24,17 @@ footer{text-align:center;color:#8b8b8b;font-size:12px;padding:18px 0 2px}.footli
 <div class="divider"></div><div class="preview" id="preview"></div><p class="muted center">Farbe auswählen</p><div class="swatches" id="swatches"></div>
 <div class="colorline"><label class="colorpill" for="color"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.2-2.5h2.1A4.2 4.2 0 0 0 22 11a9 9 0 0 0-10-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.5" r="1"/><circle cx="16" cy="7.5" r="1"/></svg><span class="sample" id="sample"></span><span id="hex">#8B5CF6</span></label><input type="color" id="color" value="#8b5cf6"></div>
 <div class="divider"></div><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></main>
+<section class="card" style="margin-top:16px"><div class="top"><strong>Kalibrierung</strong></div>
+<p class="muted" id="calCurrent">Lade Kalibrierung …</p>
+<div class="center"><button id="calStart">Kalibrierung starten</button> <button id="calReset">Zurücksetzen</button></div>
+<div id="calBox" style="display:none">
+  <p class="center" id="calStep"></p>
+  <div class="preview" id="calPreview"></div>
+  <div id="calSliders"></div>
+  <div class="center"><button id="calNext">Übernehmen</button> <button id="calCancel">Abbrechen</button></div>
+  <p class="muted center" id="calInfo"></p>
+</div>
+</section>
 <footer><div class="footline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round"><path d="M2 8a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1" fill="#888"/></svg>LeviLuma · ESP32-S3 · Lokale Steuerung</div><p class="note" title="Der LED-Controller bestätigt seinen Zustand nicht.">AN/AUS zeigt den zuletzt gesetzten Zustand, keine Bestätigung durch die LED.</p></footer></div>
 <script>
 const $=id=>document.getElementById(id),palette=['#ff2d55','#ff7a00','#00e060','#00c8ff','#8b5cf6'];let s={power:'unknown',r:139,g:92,b:246,brightness:75},editingUntil=0,sendTimer;
@@ -40,4 +51,24 @@ $('power').onclick=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();pos
 $('color').oninput=e=>setColor(e.target.value);
 $('brightness').oninput=e=>{s.brightness=+e.target.value;render();editingUntil=Date.now()+1200;clearTimeout(sendTimer);sendTimer=setTimeout(()=>post('/api/brightness?value='+s.brightness),35)};
 render();refresh();setInterval(refresh,1000);
+const CAL=[['Rot','#ff0000'],['Orange','#ff8000'],['Gelb','#ffff00'],['Grün','#00ff00'],['Türkis','#00ffff'],['Blau','#0000ff'],['Violett','#8000ff'],['Pink','#ff00aa'],['Weiß','#ffffff']];
+let calIdx=0,calMatches=[],calCur=[0,0,0],calTimer=null,calGamma=2.2;
+function hexToRgb(h){return [1,3,5].map(i=>parseInt(h.substr(i,2),16))}
+function calLoadCurrent(){fetch('/api/calib',{cache:'no-store'}).then(r=>r.json()).then(j=>{calGamma=j.gamma;$('calCurrent').textContent=`Aktuell: R ${j.gr.toFixed(3)} · G ${j.gg.toFixed(3)} · B ${j.gb.toFixed(3)} · Gamma ${j.gamma.toFixed(2)}`}).catch(()=>{});}
+function calBuildSliders(){const box=$('calSliders');box.innerHTML='';['R','G','B'].forEach((c,i)=>{const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';row.innerHTML=`<span style="width:16px">${c}</span><input type="range" min="0" max="255" id="calR${i}" style="flex:1"><span id="calV${i}" style="width:32px;text-align:right">0</span>`;box.appendChild(row);const inp=row.querySelector('input');inp.oninput=()=>{calCur[i]=+inp.value;$('calV'+i).textContent=inp.value;calSendRaw();};});}
+function calUpdateSliders(){[0,1,2].forEach(i=>{$('calR'+i).value=calCur[i];$('calV'+i).textContent=calCur[i];});}
+function calSendRaw(){clearTimeout(calTimer);calTimer=setTimeout(()=>fetch(`/api/raw?r=${calCur[0]}&g=${calCur[1]}&b=${calCur[2]}`,{method:'POST'}),60);}
+function calShow(){const [n,h]=CAL[calIdx];$('calStep').textContent=`Schritt ${calIdx+1}/${CAL.length}: ${n} – stelle die LED auf die Vorschau ein`;$('calPreview').style.background=h;calCur=hexToRgb(h);calUpdateSliders();calSendRaw();}
+function calRestoreColor(){post(`/api/color?r=${s.r}&g=${s.g}&b=${s.b}`);}
+function calStart(){calIdx=0;calMatches=[];$('calBox').style.display='';$('calInfo').textContent='';calShow();}
+function calFinish(){
+  const gains=[0,1,2].map(c=>{let num=0,den=0;calMatches.forEach(m=>{if(m.target[c]>0){num+=m.matched[c];den+=m.target[c];}});let k=den>0?num/den:1;return Math.min(2,Math.max(0.2,k));});
+  fetch(`/api/calib?gr=${gains[0].toFixed(3)}&gg=${gains[1].toFixed(3)}&gb=${gains[2].toFixed(3)}&gamma=${calGamma}`,{method:'POST'}).then(r=>r.json()).then(j=>{$('calInfo').textContent='Gespeichert.';calLoadCurrent();}).catch(()=>{$('calInfo').textContent='Fehler beim Speichern.';});
+  $('calBox').style.display='none';calRestoreColor();
+}
+$('calStart').onclick=calStart;
+$('calCancel').onclick=()=>{$('calBox').style.display='none';calRestoreColor();};
+$('calNext').onclick=()=>{calMatches.push({matched:[...calCur],target:hexToRgb(CAL[calIdx][1])});calIdx++;if(calIdx<CAL.length)calShow();else calFinish();};
+$('calReset').onclick=()=>{fetch('/api/calib/reset',{method:'POST'}).then(()=>{$('calInfo').textContent='Zurückgesetzt.';calLoadCurrent();});};
+calBuildSliders();calLoadCurrent();
 </script></body></html>)LEVIHTML";
