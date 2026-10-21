@@ -1,0 +1,194 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <NimBLEDevice.h>
+#include <lvgl.h>
+#include "LGFX_Board.h"
+#include "LotusProtocol.h"
+#include "WebUi.h"
+#include "Config.h"
+#include "Palette.h"
+#include <math.h>
+
+static LGFX_Board lcd;
+static WebServer web(80);
+static SemaphoreHandle_t stateLock;
+static constexpr uint16_t W=240,H=240;
+alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
+static lv_display_t *display=nullptr;
+static lv_indev_t *input=nullptr;
+static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[5]{};
+
+struct State { bool ble=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; };
+static State state;
+static uint32_t lastTouchMs=0,lastWifiAttempt=0;
+static int8_t selected=4;
+static uint32_t uiRevision=UINT32_MAX;
+static bool uiBle=false;
+static int8_t uiSelected=-2;
+static bool touchDown=false;
+static uint16_t touchX=120,touchY=120;
+static bool touchBlocked=false;
+static bool fingerDown=false, ringGesture=false, swipeGesture=false, wokeByTouch=false;
+static int16_t startX=0,startY=0,lastX=0,lastY=0;
+static uint32_t touchStart=0;
+static bool screenDim=false;
+static uint8_t currentBacklight=255;
+
+static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state; xSemaphoreGive(stateLock); return s; }
+
+static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
+static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
+static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
+  selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
+static void selectColor(int idx){int n=(idx%5+5)%5;setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);}
+static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
+static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
+static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
+
+static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
+  int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
+  lcd.startWrite();lcd.setAddrWindow(a->x1,a->y1,width,height);
+  lcd.pushPixels((const uint16_t*)px, width * height, true);
+  lcd.endWrite();lv_display_flush_ready(disp);
+}
+static void readTouch(lv_indev_t*,lv_indev_data_t *d){
+  d->state=(touchDown&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
+  d->point.x=touchX;d->point.y=touchY;
+}
+static void updateUI(){
+  State s=snapshot();
+  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected)return;
+  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;
+  lv_color_t color=rgbColor(s.r,s.g,s.b);
+  lv_obj_set_style_arc_color(arc,color,LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(center,color,0);
+  lv_obj_set_style_shadow_color(center,color,0);
+  lv_arc_set_value(arc,s.brightness);
+  char label[12];snprintf(label,sizeof(label),"%u%%",s.brightness);
+  lv_label_set_text(percent,label);
+  lv_label_set_text(caption,s.power==1?"Tippen: aus":"Tippen: an");
+  lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
+  for(int i=0;i<5;i++){
+    int size=i==selected?8:6;
+    lv_obj_set_size(dots[i],size,size);
+    lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(i-2)*12,196);
+    lv_obj_set_style_bg_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);
+  }
+  lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
+}
+static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED){setBrightness(lv_arc_get_value(arc));}}
+static void makeUI(){
+  lv_obj_t *screen=lv_screen_active();lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
+  arc=lv_arc_create(screen);lv_obj_set_size(arc,216,216);lv_obj_center(arc);
+  lv_arc_set_rotation(arc,45);lv_arc_set_bg_angles(arc,0,270);lv_arc_set_range(arc,1,100);
+  lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
+  lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
+  lv_obj_set_ext_click_area(arc,12);
+  lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
+  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,12,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
+  percent=lv_label_create(center);lv_obj_set_style_text_color(percent,lv_color_white(),0);
+  lv_obj_set_style_text_font(percent,&lv_font_montserrat_32,0);lv_obj_align(percent,LV_ALIGN_CENTER,0,-13);
+  caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
+  statusDot=lv_obj_create(screen);lv_obj_set_size(statusDot,8,8);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
+  for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(i-2)*12,196);}
+  updateUI();
+}
+// Separate gesture detector: arc drag, horizontal swipe, central tap.
+// CST816S may report only intermittent points; tune thresholds after hardware testing.
+static void gestures(){
+  bool down=touchDown;
+  int x=touchX,y=touchY;uint32_t now=millis();
+  if(down&&!fingerDown){fingerDown=true;startX=lastX=x;startY=lastY=y;touchStart=now;swipeGesture=false;ringGesture=hypotf(x-120,y-120)>76;wokeByTouch=screenDim;touchBlocked=wokeByTouch;wake();}
+  if(down&&fingerDown){lastX=x;lastY=y;if(!ringGesture&&abs(x-startX)>42&&abs(x-startX)>abs(y-startY)*1.25f)swipeGesture=true;}
+  if(!down&&fingerDown){fingerDown=false;touchBlocked=false;int dx=lastX-startX,dy=lastY-startY;
+    if(!wokeByTouch&&swipeGesture&&abs(dx)>45){selectColor((selected<0?0:selected)+(dx<0?1:-1));}
+    else if(!wokeByTouch&&!ringGesture&&abs(dx)<25&&abs(dy)<25&&now-touchStart<650&&hypotf(startX-120,startY-120)<65){State s=snapshot();setPower(s.power!=1);}
+  }
+}
+
+class ScanCallbacks: public NimBLEAdvertisedDeviceCallbacks {
+  void onResult(NimBLEAdvertisedDevice* dev) override {if(dev->getName().find(LEVI_BLE_NAME)!=std::string::npos){NimBLEDevice::getScan()->stop();}}
+};
+class ClientCallbacks: public NimBLEClientCallbacks {void onDisconnect(NimBLEClient*) override {xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);}};
+static ScanCallbacks scanCallbacks;
+static ClientCallbacks clientCallbacks;
+static void bleTask(void*){
+  NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
+  uint32_t lastSentRevision=0,lastColorSent=0,lastAttempt=0;int8_t lastPower=-1;
+  for(;;){
+    State s=snapshot();
+    if(!client||!client->isConnected()||!writer){
+      writer=nullptr; // Ungueltige BLE-Characteristic niemals wiederverwenden
+      xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);
+      if(millis()-lastAttempt>4000){
+        lastAttempt=millis();NimBLEScan *scan=NimBLEDevice::getScan();scan->setActiveScan(true);scan->setAdvertisedDeviceCallbacks(&scanCallbacks);
+        NimBLEScanResults results=scan->start(2,false);NimBLEAddress addr;bool found=false;
+        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);if(dev.getName().find(LEVI_BLE_NAME)!=std::string::npos){addr=dev.getAddress();found=true;break;}}
+        if(found){if(!client){client=NimBLEDevice::createClient();client->setClientCallbacks(&clientCallbacks);}if(client->connect(addr)){
+          auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
+          if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastSentRevision=s.revision;}
+          else client->disconnect();
+        }}scan->clearResults();
+      }
+    }else{
+      // Send only user changes; never assert unknown LED state after reconnection.
+      if(s.revision!=lastSentRevision && client && client->isConnected() && writer){
+        bool canWrite=writer->canWrite();bool valid=canWrite||writer->canWriteNoResponse();
+        if(valid){uint8_t packet[9];bool ok=true;
+          if(s.power>=0&&s.power!=lastPower){
+            if(!client->isConnected())ok=false;
+            else {Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,canWrite);if(ok)lastPower=s.power;}
+          }
+          if(ok&&s.power==1){
+            if(!client->isConnected())ok=false;
+            else if(millis()-lastColorSent<33)ok=false; // keep revision pending
+            else {
+              Lotus::color((uint16_t)s.r*s.brightness/100,(uint16_t)s.g*s.brightness/100,(uint16_t)s.b*s.brightness/100,packet);
+              if(client->isConnected())ok=writer->writeValue(packet,9,canWrite);
+              else ok=false;
+              if(ok)lastColorSent=millis();
+            }
+          }
+          if(ok)lastSentRevision=s.revision;
+        }
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(25));
+  }
+}
+static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
+static void stateJson(){State s=snapshot();String j="{\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
+static void webInit(){
+  web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
+  web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
+  web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
+  web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
+}
+static void wifiConnect(){WiFi.mode(WIFI_STA);WiFi.setAutoReconnect(true);WiFi.setSleep(true);WiFi.setTxPower(LEVI_WIFI_TX_DBM<=8.5f?WIFI_POWER_8_5dBm:WIFI_POWER_11dBm);WiFi.setHostname(LEVI_WIFI_HOSTNAME);WiFi.begin(LEVI_WIFI_SSID,LEVI_WIFI_PASSWORD);lastWifiAttempt=millis();}
+void setup(){
+  Serial.begin(115200);delay(200);stateLock=xSemaphoreCreateMutex();
+  ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
+  lcd.init();lcd.setRotation(0);lcd.fillScreen(TFT_BLACK);
+  lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
+  lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
+  input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,readTouch);lv_indev_set_display(input,display);
+  makeUI();lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webInit();
+  xTaskCreatePinnedToCore(bleTask,"ble",8192,nullptr,1,nullptr,0);
+}
+void loop(){
+  static uint32_t tick=millis(),lastUI=0;uint32_t now=millis();lv_tick_inc(now-tick);tick=now;
+  uint16_t tx=touchX,ty=touchY;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=tx;touchY=ty;}
+  gestures();lv_timer_handler();web.handleClient();
+  if(now-lastUI>20){lastUI=now;updateUI();}
+  if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
+  static bool mdns=false;
+  if(WiFi.status()==WL_CONNECTED){if(!mdns){mdns=MDNS.begin(LEVI_WIFI_HOSTNAME);if(mdns)MDNS.addService("http","tcp",80);}}
+  else if(mdns){MDNS.end();mdns=false;}
+  else if(WiFi.status()==WL_DISCONNECTED && now-lastWifiAttempt>15000){lastWifiAttempt=now;WiFi.reconnect();}
+  delay(5);
+}

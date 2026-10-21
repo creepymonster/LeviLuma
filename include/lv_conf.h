@@ -1,0 +1,14 @@
+#ifndef LV_CONF_H
+#define LV_CONF_H
+#define LV_COLOR_FORMAT_DEFAULT LV_COLOR_FORMAT_RGB565
+#define LV_FONT_MONTSERRAT_28 1
+#define LV_FONT_MONTSERRAT_32 1
+#define LV_USE_LOG 0
+#define LV_USE_ARC 1
+
+#define LV_USE_LABEL 1
+
+#define LV_USE_DRAW_SW 1
+
+#define LV_MEM_SIZE (96U * 1024U)
+#endif
