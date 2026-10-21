@@ -12,7 +12,8 @@
 #include <math.h>
 
 // Logging ueber USB-CDC (Serial Monitor, 115200 Baud)
-#define LEVI_LOG(fmt,...) Serial.printf("[%8lu] " fmt "\n",(unsigned long)millis(),##__VA_ARGS__)
+// Nur loggen, wenn ein Host am USB-Port haengt: ein blockierender USB-Schreibvorgang ohne Leser haengt sonst den Loop/LCD.
+#define LEVI_LOG(fmt,...) do{ if(Serial){ Serial.printf("[%8lu] " fmt "\n",(unsigned long)millis(),##__VA_ARGS__); } }while(0)
 
 static LGFX_Board lcd;
 static WebServer web(80);
