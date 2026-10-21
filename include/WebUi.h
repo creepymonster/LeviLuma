@@ -6,6 +6,9 @@ static const char LEVI_HTML[] PROGMEM=R"LEVIHTML(<!doctype html><html lang="de">
 .shell{background:#f3f3f3;border-radius:24px;padding:20px 17px 13px;width:min(100%,430px)}
 header{text-align:center;padding:5px 0 20px}h1{font-size:36px;letter-spacing:-1.3px;margin:0;font-weight:760;display:flex;align-items:center;justify-content:center;gap:8px}
 svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{display:flex;justify-content:center;gap:9px;margin-top:16px}.branddots i{width:15px;height:15px;border-radius:50%}
+.calib{margin-top:16px;border:1px solid #ededed;box-shadow:0 4px 20px #00000009}
+.calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
+.calib button:active{background:#f3f3f3}
 .card{background:white;border-radius:20px;padding:21px 20px 22px;box-shadow:0 4px 20px #00000007}
 .top,.line{display:flex;align-items:center;justify-content:space-between;gap:12px}.top strong{font-size:17px}.chip{padding:6px 10px;border-radius:99px;background:#ededed;color:#686868;font-size:12px;font-weight:650;white-space:nowrap}.chip.ok{background:#d8f5df;color:#1e743e}
 .line{margin:24px 0}.state{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:400}.state svg{width:20px;height:20px}.power{border:0;border-radius:99px;background:#191919;color:#fff;font-size:14px;font-weight:700;padding:12px 16px;cursor:pointer}
@@ -33,7 +36,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(
 <div class="divider"></div><div class="preview" id="preview"></div><p class="muted center">Farbe auswählen</p><div class="swatches" id="swatches"></div>
 <div class="colorline"><label class="colorpill" for="color"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.2-2.5h2.1A4.2 4.2 0 0 0 22 11a9 9 0 0 0-10-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.5" r="1"/><circle cx="16" cy="7.5" r="1"/></svg><span class="sample" id="sample"></span><span id="hex">#8B5CF6</span></label><input type="color" id="color" value="#8b5cf6"></div>
 <div class="divider"></div><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></main>
-<section class="card" style="margin-top:16px"><div class="top"><strong>Kalibrierung</strong></div>
+<section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
 <p class="muted" id="calCurrent">Lade Kalibrierung …</p>
 <div class="center"><button id="calStart">Kalibrierung starten</button> <button id="calReset">Zurücksetzen</button></div>
 <div id="calBox" style="display:none">
