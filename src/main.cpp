@@ -42,9 +42,10 @@ static bool screenDim=false;
 static uint8_t currentBacklight=255;
 
 // Kalibrierung: Kanal-Gains und Gamma, im NVS gespeichert. Ausgabe = gamma(gain*in).
-struct Calib { float gr=1,gg=1,gb=1,gamma=2.2f; };
+// Standard: FastLED TypicalSMD5050 (255,176,240) als Startpunkt, Gamma aus (linear wie FastLED).
+struct Calib { float gr=1.0f,gg=0.69f,gb=0.94f,gamma=1.0f; };
 static Calib calib;
-static void calibLoad(){Preferences p;p.begin("levi",true);calib.gr=p.getFloat("gr",1.0f);calib.gg=p.getFloat("gg",1.0f);calib.gb=p.getFloat("gb",1.0f);calib.gamma=p.getFloat("gamma",2.2f);p.end();}
+static void calibLoad(){Preferences p;p.begin("levi",true);Calib d;calib.gr=p.getFloat("gr",d.gr);calib.gg=p.getFloat("gg",d.gg);calib.gb=p.getFloat("gb",d.gb);calib.gamma=p.getFloat("gamma",d.gamma);p.end();}
 static void calibSave(){Preferences p;p.begin("levi",false);p.putFloat("gr",calib.gr);p.putFloat("gg",calib.gg);p.putFloat("gb",calib.gb);p.putFloat("gamma",calib.gamma);p.end();}
 static uint8_t calibCh(int v,float gain){float x=v*gain/255.0f;if(x<0)x=0;if(x>1)x=1;return (uint8_t)(powf(x,calib.gamma)*255.0f+0.5f);}
 static String calibJson(){return "{\"gr\":"+String(calib.gr,3)+",\"gg\":"+String(calib.gg,3)+",\"gb\":"+String(calib.gb,3)+",\"gamma\":"+String(calib.gamma,2)+"}";}
