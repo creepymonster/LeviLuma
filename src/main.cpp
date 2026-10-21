@@ -71,7 +71,7 @@ static void startColorAnim(const uint8_t from[3],const uint8_t to[3]){
   lv_anim_set_var(&a,&animVar);
   lv_anim_set_exec_cb(&a,colorAnimExec);
   lv_anim_set_values(&a,0,256);
-  lv_anim_set_duration(&a,280);
+  lv_anim_set_duration(&a,200);
   lv_anim_set_path_cb(&a,lv_anim_path_ease_out);
   lv_anim_set_completed_cb(&a,colorAnimDone);
   colorAnimating=true;
@@ -112,17 +112,26 @@ static void updateUI(){
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
 }
 static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED){setBrightness(lv_arc_get_value(arc));}}
+static void stopBubble(lv_event_t *e){lv_event_stop_bubbling(e);}
+static void screenGesture(lv_event_t *e){
+  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
+  lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
+  int base=selected<0?0:selected;
+  if(d==LV_DIR_LEFT)selectColor(base+1);
+  else if(d==LV_DIR_RIGHT)selectColor(base-1);
+}
+static void centerClicked(lv_event_t *e){(void)e;State s=snapshot();setPower(s.power!=1);}
 static void makeUI(){
-  lv_obj_t *screen=lv_screen_active();lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *screen=lv_screen_active();lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_event_cb(screen,screenGesture,LV_EVENT_GESTURE,nullptr);
   arc=lv_arc_create(screen);lv_obj_set_size(arc,216,216);lv_obj_center(arc);
   lv_arc_set_rotation(arc,45);lv_arc_set_bg_angles(arc,0,270);lv_arc_set_range(arc,1,100);
   lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
   lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
-  lv_obj_remove_flag(arc,LV_OBJ_FLAG_CLICKABLE); // Helligkeit per Wischgeste statt Ring-Drag
+  lv_obj_add_event_cb(arc,stopBubble,LV_EVENT_GESTURE,nullptr);
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
-  lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,12,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
+  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_CLICKED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
   percent=lv_label_create(center);lv_obj_set_style_text_color(percent,lv_color_white(),0);
   lv_obj_set_style_text_font(percent,&lv_font_montserrat_32,0);lv_obj_align(percent,LV_ALIGN_CENTER,0,-13);
   caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
@@ -133,22 +142,11 @@ static void makeUI(){
 }
 // Separate gesture detector: arc drag, horizontal swipe, central tap.
 // CST816S may report only intermittent points; tune thresholds after hardware testing.
-static void adjustBrightness(int delta){State s=snapshot();setBrightness(s.brightness+delta);}
-// Wischen ueberall: horizontal = Farbe, vertikal = Helligkeit, kurzer Tap in der Mitte = an/aus.
-// CST816S meldet teils wenige Punkte; Schwellen nach Hardware-Test feinjustieren.
+// Gesten (Farbe) und Tap (Power) laufen ueber LVGL-Events, hier nur Wecklogik.
 static void gestures(){
   bool down=touchDown;
-  int x=touchX,y=touchY;uint32_t now=millis();
-  if(down&&!fingerDown){fingerDown=true;startX=lastX=x;startY=lastY=y;touchStart=now;wokeByTouch=screenDim;touchBlocked=wokeByTouch;wake();}
-  if(down&&fingerDown){lastX=x;lastY=y;}
-  if(!down&&fingerDown){fingerDown=false;touchBlocked=false;
-    int dx=lastX-startX,dy=lastY-startY;
-    if(!wokeByTouch){
-      if(abs(dx)>=40&&abs(dx)>abs(dy)*1.3f){selectColor((selected<0?0:selected)+(dx<0?1:-1));LEVI_LOG("Geste: Farbe %s", dx<0?"weiter":"zurueck");}
-      else if(abs(dy)>=30&&abs(dy)>abs(dx)*1.3f){adjustBrightness(dy<0?10:-10);LEVI_LOG("Geste: Helligkeit %s", dy<0?"hoeher":"niedriger");}
-      else if(abs(dx)<25&&abs(dy)<25&&now-touchStart<650&&hypotf(startX-120,startY-120)<65){State s=snapshot();setPower(s.power!=1);LEVI_LOG("Geste: Tap, Power toggle");}
-    }
-  }
+  if(down&&!fingerDown){fingerDown=true;wokeByTouch=screenDim;touchBlocked=wokeByTouch;wake();}
+  if(!down&&fingerDown){fingerDown=false;touchBlocked=false;}
 }
 
 class ScanCallbacks: public NimBLEAdvertisedDeviceCallbacks {
@@ -194,7 +192,7 @@ static void bleTask(void*){
             else if(millis()-lastColorSent<33)ok=false; // keep revision pending
             else {
               Lotus::color((uint16_t)s.r*s.brightness/100,(uint16_t)s.g*s.brightness/100,(uint16_t)s.b*s.brightness/100,packet);
-              if(client->isConnected())ok=writer->writeValue(packet,9,canWrite);
+              if(client->isConnected())ok=writer->writeValue(packet,9,!writer->canWriteNoResponse());
               else ok=false;
               if(ok)lastColorSent=millis();
             }
