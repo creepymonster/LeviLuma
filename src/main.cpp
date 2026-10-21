@@ -46,9 +46,8 @@ static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.po
 static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
 static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
   selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
-static void startColorAnim(const uint8_t from[3],const uint8_t to[3]);
 static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=5;}
-static void selectColor(int idx){int n=(idx%6+6)%6;if(n==5){setMusic(true);return;}State s=snapshot();uint8_t from[3]={s.r,s.g,s.b};setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);startColorAnim(from,LeviPalette::rgb[n]);}
+static void selectColor(int idx){int n=(idx%6+6)%6;if(n==5){setMusic(true);return;}setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);}
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
 static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
@@ -61,33 +60,6 @@ static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
   lv_obj_set_style_bg_color(arc,fg,LV_PART_KNOB);
 }
 
-// Sanfter Farbuebergang beim Wischen zwischen den Farben (ca. 280 ms, ease-out).
-static bool colorAnimating=false;
-static uint8_t animFrom[3]{139,92,246},animTo[3]{139,92,246};
-static int animVar=0;
-static void colorAnimExec(void*,int32_t v){
-  uint8_t c[3];
-  for(int i=0;i<3;i++) c[i]=(uint8_t)(animFrom[i]+((int)animTo[i]-(int)animFrom[i])*v/256);
-  lv_color_t col=rgbColor(c[0],c[1],c[2]);
-  lv_obj_set_style_arc_color(arc,col,LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(center,col,0);
-  lv_obj_set_style_shadow_color(center,col,0);
-  applyContrast(c[0],c[1],c[2]);
-}
-static void colorAnimDone(lv_anim_t*){colorAnimating=false;}
-static void startColorAnim(const uint8_t from[3],const uint8_t to[3]){
-  memcpy(animFrom,from,3);memcpy(animTo,to,3);
-  lv_anim_delete(&animVar,colorAnimExec);
-  lv_anim_t a;lv_anim_init(&a);
-  lv_anim_set_var(&a,&animVar);
-  lv_anim_set_exec_cb(&a,colorAnimExec);
-  lv_anim_set_values(&a,0,256);
-  lv_anim_set_duration(&a,200);
-  lv_anim_set_path_cb(&a,lv_anim_path_ease_out);
-  lv_anim_set_completed_cb(&a,colorAnimDone);
-  colorAnimating=true;
-  lv_anim_start(&a);
-}
 
 static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
@@ -104,12 +76,10 @@ static void updateUI(){
   if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected)return;
   uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;
   lv_color_t color=rgbColor(s.r,s.g,s.b);
-  if(!colorAnimating){
-    lv_obj_set_style_arc_color(arc,color,LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(center,color,0);
-    lv_obj_set_style_shadow_color(center,color,0);
-    applyContrast(s.r,s.g,s.b);
-  }
+  lv_obj_set_style_arc_color(arc,color,LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(center,color,0);
+  lv_obj_set_style_shadow_color(center,color,0);
+  applyContrast(s.r,s.g,s.b);
   lv_arc_set_value(arc,s.brightness);
   char label[12];snprintf(label,sizeof(label),"%u%%",s.brightness);
   lv_label_set_text(percent,label);
