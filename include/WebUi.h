@@ -29,12 +29,12 @@ footer{text-align:center;color:#8b8b8b;font-size:12px;padding:18px 0 2px}.footli
 const $=id=>document.getElementById(id),palette=['#ff2d55','#ff7a00','#00e060','#00c8ff','#8b5cf6'];let s={power:'unknown',r:139,g:92,b:246,brightness:75},editingUntil=0,sendTimer;
 const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),hex=()=>('#'+[s.r,s.g,s.b].map(v=>v.toString(16).padStart(2,'0')).join(''));
 function post(url){editingUntil=Date.now()+1200;fetch(url,{method:'POST'}).then(()=>refresh()).catch(()=>{});}
-function setColor(h){[s.r,s.g,s.b]=rgb(h);render();post('/api/color?r='+s.r+'&g='+s.g+'&b='+s.b)}
-palette.forEach(h=>{let b=document.createElement('button');b.style.background=h;b.setAttribute('aria-label',h);b.onclick=()=>setColor(h);$('swatches').appendChild(b)});
+function setColor(h){s.music=false;[s.r,s.g,s.b]=rgb(h);render();post('/api/color?r='+s.r+'&g='+s.g+'&b='+s.b)}
+palette.forEach(h=>{let b=document.createElement('button');b.style.background=h;b.setAttribute('aria-label',h);b.onclick=()=>setColor(h);$('swatches').appendChild(b)});{let m=document.createElement('button');m.textContent='\u266A';m.style.background='#292929';m.style.color='#fff';m.setAttribute('aria-label','Musikmodus');m.onclick=()=>{s.music=true;render();post('/api/music?on=1')};$('swatches').appendChild(m)}
 function render(){let h=hex();$('preview').style.background=h;$('sample').style.background=h;$('hex').textContent=h.toUpperCase();$('color').value=h;
 $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;let pct=(s.brightness-1)/99*100;$('brightness').style.background='linear-gradient(to right,#191919 '+pct+'%,#e5e5e5 '+pct+'%)';
 $('pstatus').textContent=s.power==='on'?'Eingeschaltet':s.power==='off'?'Ausgeschaltet':'Status unbekannt';$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';$('powerIcon').setAttribute('stroke',s.power==='on'?'#23a455':'#aaa');
-[...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',palette[i]===h));}
+[...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&palette[i]===h));$('swatches').lastElementChild.classList.toggle('sel',!!s.music);}
 function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let b=$('ble');b.textContent=d.ble?'BLE verbunden':'BLE getrennt';b.className='chip'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('ble').textContent='ESP offline';$('ble').className='chip';});}
 $('power').onclick=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
 $('color').oninput=e=>setColor(e.target.value);

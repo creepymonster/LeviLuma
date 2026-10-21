@@ -21,9 +21,9 @@ static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
-static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[5]{};
+static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
-struct State { bool ble=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; };
+struct State { bool ble=false; bool music=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
 static int8_t selected=4;
@@ -43,10 +43,11 @@ static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state;
 
 static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
 static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
-static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
+static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
   selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
 static void startColorAnim(const uint8_t from[3],const uint8_t to[3]);
-static void selectColor(int idx){int n=(idx%5+5)%5;State s=snapshot();uint8_t from[3]={s.r,s.g,s.b};setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);startColorAnim(from,LeviPalette::rgb[n]);}
+static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=5;}
+static void selectColor(int idx){int n=(idx%6+6)%6;if(n==5){setMusic(true);return;}State s=snapshot();uint8_t from[3]={s.r,s.g,s.b};setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);startColorAnim(from,LeviPalette::rgb[n]);}
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
 static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
@@ -113,10 +114,11 @@ static void updateUI(){
   lv_label_set_text(percent,label);
   lv_label_set_text(caption,s.power==1?"Tippen: aus":"Tippen: an");
   lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
-  for(int i=0;i<5;i++){
+  for(int i=0;i<6;i++){
+    if(i==5){lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,190);lv_obj_set_style_text_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);continue;}
     int size=i==selected?8:6;
     lv_obj_set_size(dots[i],size,size);
-    lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(i-2)*12,196);
+    lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);
     lv_obj_set_style_bg_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);
   }
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
@@ -147,7 +149,8 @@ static void makeUI(){
   caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
   statusDot=lv_obj_create(screen);lv_obj_set_size(statusDot,8,8);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
-  for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(i-2)*12,196);}
+  for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);}
+  dots[5]=lv_label_create(screen);lv_label_set_text(dots[5],LV_SYMBOL_AUDIO);lv_obj_align(dots[5],LV_ALIGN_TOP_MID,(2*5-5)*6,190);
   updateUI();
 }
 // Separate gesture detector: arc drag, horizontal swipe, central tap.
@@ -167,7 +170,7 @@ static ScanCallbacks scanCallbacks;
 static ClientCallbacks clientCallbacks;
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
-  uint32_t lastSentRevision=0,lastColorSent=0,lastAttempt=0;int8_t lastPower=-1;
+  uint32_t lastSentRevision=0,lastColorSent=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;
   for(;;){
     State s=snapshot();
     if(!client||!client->isConnected()||!writer){
@@ -183,7 +186,7 @@ static void bleTask(void*){
           if(client->connect(addr)){
             LEVI_LOG("BLE: verbunden mit %s", addr.toString().c_str());
             auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
-            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastSentRevision=s.revision;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
+            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=false;lastSentRevision=s.revision;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
             else {LEVI_LOG("BLE: Service 0xFFF0 oder Characteristic 0xFFF3 fehlt, trenne"); client->disconnect();}
           } else LEVI_LOG("BLE: Verbindung zu %s fehlgeschlagen", addr.toString().c_str());
         }scan->clearResults();
@@ -193,11 +196,12 @@ static void bleTask(void*){
       if(s.revision!=lastSentRevision && client && client->isConnected() && writer){
         bool canWrite=writer->canWrite();bool valid=canWrite||writer->canWriteNoResponse();
         if(valid){uint8_t packet[9];bool ok=true;
+          if(s.music!=lastMusic){if(!client->isConnected())ok=false;else{Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,true);if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}}}
           if(s.power>=0&&s.power!=lastPower){
             if(!client->isConnected())ok=false;
             else {Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,canWrite);if(ok)lastPower=s.power;}
           }
-          if(ok&&s.power==1){
+          if(ok&&s.power==1&&!s.music){
             if(!client->isConnected())ok=false;
             else if(millis()-lastColorSent<33)ok=false; // keep revision pending
             else {
@@ -216,12 +220,12 @@ static void bleTask(void*){
   }
 }
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
-static void stateJson(){State s=snapshot();String j="{\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
+static void stateJson(){State s=snapshot();String j="{\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
 static void webInit(){
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
   web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
-  web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
+  web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
 }
 static const char *wlStatusName(wl_status_t s){
   switch(s){

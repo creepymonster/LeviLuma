@@ -8,6 +8,11 @@ inline void power(bool on,uint8_t (&out)[9]) {
   const uint8_t a[9]={0x7E,0x07,0x04,0xFF,0,1,2,1,0xEF};
   const uint8_t b[9]={0x7E,0x07,0x04,0,0,0,2,1,0xEF}; memcpy(out,on?a:b,9);
 }
+// Musikmodus: 7E 04 07 01|00 FF FF FF 00 EF (an/aus), vom Benutzer aus der Original-App uebernommen.
+inline void music(bool on,uint8_t (&out)[9]) {
+  const uint8_t a[9]={0x7E,0x04,0x07,0x01,0xFF,0xFF,0xFF,0x00,0xEF};
+  const uint8_t b[9]={0x7E,0x04,0x07,0x00,0xFF,0xFF,0xFF,0x00,0xEF}; memcpy(out,on?a:b,9);
+}
 // Helligkeitsbefehl ist noch NICHT am Zielgeraet bestaetigt.
 inline void brightness(uint8_t pct,uint8_t (&out)[9]) {
   uint8_t c[9]={0x7E,0x04,0x01,(uint8_t)constrain(pct,0,100),0x01,0xFF,0x02,0x01,0xEF}; memcpy(out,c,9);
