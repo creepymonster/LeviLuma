@@ -13,10 +13,10 @@
 #include "CalibCore.h"
 #include <math.h>
 
-// Logging ueber die ESP-IDF-Konsole (UART0), also in demselben Monitor wie die NimBLE-Meldungen.
+// Logging ueber stdout (UART0-Konsole), also in demselben Monitor wie die NimBLE-Meldungen.
+// ESP_LOGI wurde unterdrueckt (Log-Level), printf geht direkt auf die Konsole.
 // Serial (USB-CDC) wird nicht mehr genutzt: dort kam nichts an, wenn der Monitor am anderen Port haengt.
-#include "esp_log.h"
-#define LEVI_LOG(fmt,...) ESP_LOGI("levi","[%8lu] " fmt,(unsigned long)millis(),##__VA_ARGS__)
+#define LEVI_LOG(fmt,...) printf("[%8lu] levi: " fmt "\n",(unsigned long)millis(),##__VA_ARGS__)
 
 static LGFX_Board lcd;
 static WebServer web(80);
