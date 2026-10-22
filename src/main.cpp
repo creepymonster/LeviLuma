@@ -37,9 +37,6 @@ static int8_t uiSelected=-2;
 static bool touchDown=false;
 static uint16_t touchX=120,touchY=120;
 static bool touchBlocked=false;
-static bool fingerDown=false, wokeByTouch=false;
-static int16_t startX=0,startY=0,lastX=0,lastY=0;
-static uint32_t touchStart=0;
 static bool screenDim=false;
 static uint8_t currentBacklight=255;
 
@@ -108,7 +105,11 @@ static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   lcd.pushPixels((const uint16_t*)px, width * height, true);
   lcd.endWrite();lv_display_flush_ready(disp);
 }
+// Touch-Treiber: eine Berührung im gedimmten Zustand weckt nur das Display und wird nicht
+// an die Oberfläche weitergegeben, bis der Finger wieder oben ist. Gesten erkennt LVGL.
 static void readTouch(lv_indev_t*,lv_indev_data_t *d){
+  if(!touchDown)touchBlocked=false;
+  else if(screenDim){wake();touchBlocked=true;}
   d->state=(touchDown&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
   d->point.x=touchX;d->point.y=touchY;
 }
@@ -181,14 +182,6 @@ static void makeUI(){
   for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);}
   dots[5]=lv_label_create(screen);lv_label_set_text(dots[5],LV_SYMBOL_AUDIO);lv_obj_align(dots[5],LV_ALIGN_TOP_MID,(2*5-5)*6,190);
   updateUI();
-}
-// Separate gesture detector: arc drag, horizontal swipe, central tap.
-// CST816S may report only intermittent points; tune thresholds after hardware testing.
-// Gesten (Farbe) und Tap (Power) laufen ueber LVGL-Events, hier nur Wecklogik.
-static void gestures(){
-  bool down=touchDown;
-  if(down&&!fingerDown){fingerDown=true;wokeByTouch=screenDim;touchBlocked=wokeByTouch;wake();}
-  if(!down&&fingerDown){fingerDown=false;touchBlocked=false;}
 }
 
 // Lotus-Lantern-/ELK-Familie (gleiches Protokoll, Service 0xFFF0): Namen beginnen mit einem dieser Praefixe.
@@ -329,7 +322,7 @@ void setup(){
 void loop(){
   static uint32_t tick=millis(),lastUI=0;uint32_t now=millis();lv_tick_inc(now-tick);tick=now;
   uint16_t tx=touchX,ty=touchY;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=tx;touchY=ty;}
-  gestures();lv_timer_handler();web.handleClient();
+  lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;

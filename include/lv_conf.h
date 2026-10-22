@@ -11,4 +11,6 @@
 #define LV_USE_DRAW_SW 1
 
 #define LV_MEM_SIZE (96U * 1024U)
+/* Wischgesten: Mindestweg in Pixeln, ab dem LVGL eine Wischgeste erkennt (LVGL-Standard 50). */
+#define LV_INDEV_DEF_GESTURE_LIMIT 30
 #endif
