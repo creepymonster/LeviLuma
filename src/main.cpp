@@ -222,23 +222,23 @@ static void bleTask(void*){
       }
     }else{
       // Ein Befehl pro Zeitfenster, nie Helligkeit und Farbe im selben Schritt.
-      // Nach jedem gesendeten Befehl 200 ms Pause.
-      if(client->isConnected()&&writer&&(writer->canWrite()||writer->canWriteNoResponse())){
+      // Schreiben ohne Antwort; nach jedem gesendeten Befehl 200 ms Pause.
+      if(client->isConnected()&&writer&&writer->canWriteNoResponse()){
         uint8_t packet[9];bool attempted=false,ok=false;
         if(s.music!=lastMusic){
-          attempted=true;Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,true);
+          attempted=true;Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}
         }else if(s.brightness!=lastBright){
-          attempted=true;Lotus::brightness(s.brightness,packet);ok=writer->writeValue(packet,9,true);
+          attempted=true;Lotus::brightness(s.brightness,packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastBright=s.brightness;LEVI_LOG("BLE: Helligkeit %u%%", (unsigned)s.brightness);}
         }else if(s.power>=0&&s.power!=lastPower){
-          attempted=true;Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,true);
+          attempted=true;Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastPower=s.power;LEVI_LOG("BLE: Power %s", s.power==1?"an":"aus");}
         }else if(s.power==1&&!s.music&&s.colorRev!=lastColorRev){
           attempted=true;uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);
           Lotus::color(cc[0],cc[1],cc[2],packet);
           LEVI_LOG("BLE: Farbe %u,%u,%u -> %u,%u,%u%s",(unsigned)s.r,(unsigned)s.g,(unsigned)s.b,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],s.raw?" (raw)":"");
-          ok=writer->writeValue(packet,9,true);if(ok)lastColorRev=s.colorRev;
+          ok=writer->writeValue(packet,9,false);if(ok)lastColorRev=s.colorRev;
         }
         if(attempted&&!ok) LEVI_LOG("BLE: Schreiben fehlgeschlagen");
         if(ok) vTaskDelay(pdMS_TO_TICKS(200));
