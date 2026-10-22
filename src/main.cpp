@@ -224,7 +224,7 @@ static void bleTask(void*){
             if(!client->isConnected())ok=false;
             else if(millis()-lastColorSent<33)ok=false; // keep revision pending
             else {
-              uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);Lotus::color(cc[0],cc[1],cc[2],packet);
+              uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);Lotus::color(cc[0],cc[1],cc[2],packet);LEVI_LOG("BLE: Farbe %u,%u,%u -> %u,%u,%u%s",(unsigned)s.r,(unsigned)s.g,(unsigned)s.b,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],s.raw?" (raw)":"");
               if(client->isConnected())ok=writer->writeValue(packet,9,!writer->canWriteNoResponse());
               else ok=false;
               if(ok)lastColorSent=millis();
