@@ -13,9 +13,10 @@
 #include "CalibCore.h"
 #include <math.h>
 
-// Logging ueber USB-CDC (Serial Monitor, 115200 Baud)
-// Nur loggen, wenn ein Host am USB-Port haengt: ein blockierender USB-Schreibvorgang ohne Leser haengt sonst den Loop/LCD.
-#define LEVI_LOG(fmt,...) do{ if(Serial){ Serial.printf("[%8lu] " fmt "\n",(unsigned long)millis(),##__VA_ARGS__); } }while(0)
+// Logging ueber die ESP-IDF-Konsole (UART0), also in demselben Monitor wie die NimBLE-Meldungen.
+// Serial (USB-CDC) wird nicht mehr genutzt: dort kam nichts an, wenn der Monitor am anderen Port haengt.
+#include "esp_log.h"
+#define LEVI_LOG(fmt,...) ESP_LOGI("levi","[%8lu] " fmt,(unsigned long)millis(),##__VA_ARGS__)
 
 static LGFX_Board lcd;
 static WebServer web(80);
