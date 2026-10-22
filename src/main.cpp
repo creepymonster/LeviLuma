@@ -27,7 +27,7 @@ static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
-struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; };
+struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
 static int8_t selected=4;
@@ -84,8 +84,8 @@ static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state;
 
 static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
 static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
-static void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock); }
-static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; xSemaphoreGive(stateLock);
+static void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
+static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
   selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
 static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=5;}
 static void selectColor(int idx){int n=(idx%6+6)%6;if(n==5){setMusic(true);return;}setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);}
@@ -135,7 +135,7 @@ static void updateUI(){
   }
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
 }
-static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED){setBrightness(lv_arc_get_value(arc));}}
+static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED&&lv_indev_get_act()){setBrightness(lv_arc_get_value(arc));}}
 static void stopBubble(lv_event_t *e){lv_event_stop_bubbling(e);}
 static void screenGesture(lv_event_t *e){
   if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
@@ -188,7 +188,7 @@ static ScanCallbacks scanCallbacks;
 static ClientCallbacks clientCallbacks;
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
-  uint32_t lastSentRevision=0,lastColorSent=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;
+  uint32_t lastColorRev=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;
   for(;;){
     State s=snapshot();
     if(!client||!client->isConnected()||!writer){
@@ -205,35 +205,33 @@ static void bleTask(void*){
           if(client->connect(addr)){
             LEVI_LOG("BLE: verbunden mit %s", addr.toString().c_str());
             auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
-            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=true;/* Modus unbekannt: Musik-aus wird beim Verbinden erzwungen */lastBright=-1;lastSentRevision=s.revision;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
+            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=true;/* Modus unbekannt: Musik-aus wird beim Verbinden erzwungen */lastBright=-1;lastColorRev=s.colorRev-1;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
             else {LEVI_LOG("BLE: Service 0xFFF0 oder Characteristic 0xFFF3 fehlt, trenne"); client->disconnect();}
           } else LEVI_LOG("BLE: Verbindung zu %s fehlgeschlagen", addr.toString().c_str());
         }scan->clearResults();
       }
     }else{
-      // Send only user changes; never assert unknown LED state after reconnection.
-      if(s.revision!=lastSentRevision && client && client->isConnected() && writer){
-        bool canWrite=writer->canWrite();bool valid=canWrite||writer->canWriteNoResponse();
-        if(valid){uint8_t packet[9];bool ok=true;
-          if(s.music!=lastMusic){if(!client->isConnected())ok=false;else{Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,true);if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}}}
-          if(ok&&s.brightness!=lastBright){if(!client->isConnected())ok=false;else{Lotus::brightness(s.brightness,packet);ok=writer->writeValue(packet,9,true);if(ok){lastBright=s.brightness;LEVI_LOG("BLE: Helligkeit %u%%", (unsigned)s.brightness);}}}
-          if(s.power>=0&&s.power!=lastPower){
-            if(!client->isConnected())ok=false;
-            else {Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,canWrite);if(ok)lastPower=s.power;}
-          }
-          if(ok&&s.power==1&&!s.music){
-            if(!client->isConnected())ok=false;
-            else if(millis()-lastColorSent<33)ok=false; // keep revision pending
-            else {
-              uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);Lotus::color(cc[0],cc[1],cc[2],packet);LEVI_LOG("BLE: Farbe %u,%u,%u -> %u,%u,%u%s",(unsigned)s.r,(unsigned)s.g,(unsigned)s.b,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],s.raw?" (raw)":"");
-              if(client->isConnected())ok=writer->writeValue(packet,9,true); // mit Antwort, wie Power/Helligkeit
-              else ok=false;
-              if(ok)lastColorSent=millis();
-            }
-          }
-          if(ok)lastSentRevision=s.revision;
-          else LEVI_LOG("BLE: Schreiben fehlgeschlagen (power=%d, rev=%lu)", (int)s.power, (unsigned long)s.revision);
+      // Ein Befehl pro Zeitfenster, nie Helligkeit und Farbe im selben Schritt.
+      // Nach jedem gesendeten Befehl 200 ms Pause.
+      if(client->isConnected()&&writer&&(writer->canWrite()||writer->canWriteNoResponse())){
+        uint8_t packet[9];bool attempted=false,ok=false;
+        if(s.music!=lastMusic){
+          attempted=true;Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,true);
+          if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}
+        }else if(s.brightness!=lastBright){
+          attempted=true;Lotus::brightness(s.brightness,packet);ok=writer->writeValue(packet,9,true);
+          if(ok){lastBright=s.brightness;LEVI_LOG("BLE: Helligkeit %u%%", (unsigned)s.brightness);}
+        }else if(s.power>=0&&s.power!=lastPower){
+          attempted=true;Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,true);
+          if(ok){lastPower=s.power;LEVI_LOG("BLE: Power %s", s.power==1?"an":"aus");}
+        }else if(s.power==1&&!s.music&&s.colorRev!=lastColorRev){
+          attempted=true;uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);
+          Lotus::color(cc[0],cc[1],cc[2],packet);
+          LEVI_LOG("BLE: Farbe %u,%u,%u -> %u,%u,%u%s",(unsigned)s.r,(unsigned)s.g,(unsigned)s.b,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],s.raw?" (raw)":"");
+          ok=writer->writeValue(packet,9,true);if(ok)lastColorRev=s.colorRev;
         }
+        if(attempted&&!ok) LEVI_LOG("BLE: Schreiben fehlgeschlagen");
+        if(ok) vTaskDelay(pdMS_TO_TICKS(200));
       }
     }
     vTaskDelay(pdMS_TO_TICKS(25));
