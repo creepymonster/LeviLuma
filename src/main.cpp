@@ -136,7 +136,6 @@ static void updateUI(){
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
 }
 static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED&&lv_indev_get_act()){setBrightness(lv_arc_get_value(arc));}}
-static void stopBubble(lv_event_t *e){lv_event_stop_bubbling(e);}
 static void screenGesture(lv_event_t *e){
   if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
   lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
@@ -144,7 +143,25 @@ static void screenGesture(lv_event_t *e){
   if(d==LV_DIR_LEFT)selectColor(base+1);
   else if(d==LV_DIR_RIGHT)selectColor(base-1);
 }
-static void centerClicked(lv_event_t *e){(void)e;State s=snapshot();setPower(s.power!=1);}
+// Ring: Helligkeit wird nur durch Ziehen am Ring geaendert. Wischt man ueber den Ring,
+// wird die Helligkeit auf den Wert vor der Geste zurueckgesetzt, die Geste laeuft zur Farbe weiter.
+static uint8_t arcStartBrightness=75;
+static lv_point_t centerPressPt={0,0};
+static void arcPressed(lv_event_t *e){(void)e;arcStartBrightness=snapshot().brightness;}
+static void arcGesture(lv_event_t *e){
+  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
+  if(snapshot().brightness!=arcStartBrightness)setBrightness(arcStartBrightness);
+}
+// Mitte: nur ein Tippen (ohne Bewegung) schaltet die Power, Wischen nicht.
+static void centerPressed(lv_event_t *e){(void)e;lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
+static void centerClicked(lv_event_t *e){
+  (void)e;
+  lv_indev_t *in=lv_indev_get_act();if(!in)return;
+  lv_point_t p;lv_indev_get_point(in,&p);
+  int dx=p.x-centerPressPt.x,dy=p.y-centerPressPt.y;
+  if((dx<0?-dx:dx)+(dy<0?-dy:dy)>20)return;
+  setPower(snapshot().power!=1);
+}
 static void makeUI(){
   lv_obj_t *screen=lv_screen_active();lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_event_cb(screen,screenGesture,LV_EVENT_GESTURE,nullptr);
   arc=lv_arc_create(screen);lv_obj_set_size(arc,216,216);lv_obj_center(arc);
@@ -152,9 +169,9 @@ static void makeUI(){
   lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
   lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
-  lv_obj_add_event_cb(arc,stopBubble,LV_EVENT_GESTURE,nullptr);
+  lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcGesture,LV_EVENT_GESTURE,nullptr);
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_CLICKED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
+  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_CLICKED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
   percent=lv_label_create(center);lv_obj_set_style_text_color(percent,lv_color_white(),0);
   lv_obj_set_style_text_font(percent,&lv_font_montserrat_32,0);lv_obj_align(percent,LV_ALIGN_CENTER,0,-13);
