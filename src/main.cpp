@@ -162,7 +162,7 @@ static bool bleNameMatches(const std::string &n){
   return false;
 }
 class ScanCallbacks: public NimBLEAdvertisedDeviceCallbacks {
-  void onResult(NimBLEAdvertisedDevice* dev) override {if(bleNameMatches(dev->getName())){NimBLEDevice::getScan()->stop();}}
+  void onResult(NimBLEAdvertisedDevice* dev) override {(void)dev;} // Scan komplett laufen lassen, damit das staerkste Geraet gewaehlt wird
 };
 class ClientCallbacks: public NimBLEClientCallbacks {void onDisconnect(NimBLEClient*) override {LEVI_LOG("BLE: Verbindung getrennt");xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);}};
 static ScanCallbacks scanCallbacks;
@@ -177,9 +177,10 @@ static void bleTask(void*){
       xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);
       if(millis()-lastAttempt>4000){
         lastAttempt=millis();NimBLEScan *scan=NimBLEDevice::getScan();scan->setActiveScan(true);scan->setAdvertisedDeviceCallbacks(&scanCallbacks);
-        NimBLEScanResults results=scan->start(2,false);NimBLEAddress addr;bool found=false;
+        NimBLEScanResults results=scan->start(2,false);NimBLEAddress addr;bool found=false;int bestRssi=-200;
         LEVI_LOG("BLE: Scan fertig, %d Geraete gefunden", results.getCount());
-        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);LEVI_LOG("BLE:   %s  RSSI %d  Name \"%s\"", dev.getAddress().toString().c_str(), dev.getRSSI(), dev.getName().c_str());if(bleNameMatches(dev.getName())){addr=dev.getAddress();found=true;break;}}
+        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);LEVI_LOG("BLE:   %s  RSSI %d  Name \"%s\"", dev.getAddress().toString().c_str(), dev.getRSSI(), dev.getName().c_str());if(bleNameMatches(dev.getName())&&(!found||dev.getRSSI()>bestRssi)){addr=dev.getAddress();bestRssi=dev.getRSSI();found=true;}}
+        if(found) LEVI_LOG("BLE: staerkstes Geraet %s (RSSI %d dBm) gewaehlt", addr.toString().c_str(), bestRssi);
         if(!found) LEVI_LOG("BLE: kein Gerät der ELK/Lotus-Familie gefunden, naechster Versuch in 4 s");
         if(found){if(!client){client=NimBLEDevice::createClient();client->setClientCallbacks(&clientCallbacks);}
           if(client->connect(addr)){
