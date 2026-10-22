@@ -155,8 +155,14 @@ static void gestures(){
   if(!down&&fingerDown){fingerDown=false;touchBlocked=false;}
 }
 
+// Lotus-Lantern-/ELK-Familie (gleiches Protokoll, Service 0xFFF0): Namen beginnen mit einem dieser Praefixe.
+static bool bleNameMatches(const std::string &n){
+  static const char *prefixes[]={"ELK-BLEDDM","ELK-BLEDOM","ELK-BLEDOB","MELK","LEDBLE"};
+  for(const char *p:prefixes){if(n.rfind(p,0)==0)return true;}
+  return false;
+}
 class ScanCallbacks: public NimBLEAdvertisedDeviceCallbacks {
-  void onResult(NimBLEAdvertisedDevice* dev) override {if(dev->getName().find(LEVI_BLE_NAME)!=std::string::npos){NimBLEDevice::getScan()->stop();}}
+  void onResult(NimBLEAdvertisedDevice* dev) override {if(bleNameMatches(dev->getName())){NimBLEDevice::getScan()->stop();}}
 };
 class ClientCallbacks: public NimBLEClientCallbacks {void onDisconnect(NimBLEClient*) override {LEVI_LOG("BLE: Verbindung getrennt");xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);}};
 static ScanCallbacks scanCallbacks;
@@ -173,8 +179,8 @@ static void bleTask(void*){
         lastAttempt=millis();NimBLEScan *scan=NimBLEDevice::getScan();scan->setActiveScan(true);scan->setAdvertisedDeviceCallbacks(&scanCallbacks);
         NimBLEScanResults results=scan->start(2,false);NimBLEAddress addr;bool found=false;
         LEVI_LOG("BLE: Scan fertig, %d Geraete gefunden", results.getCount());
-        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);LEVI_LOG("BLE:   %s  RSSI %d  Name \"%s\"", dev.getAddress().toString().c_str(), dev.getRSSI(), dev.getName().c_str());if(dev.getName().find(LEVI_BLE_NAME)!=std::string::npos){addr=dev.getAddress();found=true;break;}}
-        if(!found) LEVI_LOG("BLE: \"%s\" nicht gefunden, naechster Versuch in 4 s", LEVI_BLE_NAME);
+        for(int i=0;i<results.getCount();i++){auto dev=results.getDevice(i);LEVI_LOG("BLE:   %s  RSSI %d  Name \"%s\"", dev.getAddress().toString().c_str(), dev.getRSSI(), dev.getName().c_str());if(bleNameMatches(dev.getName())){addr=dev.getAddress();found=true;break;}}
+        if(!found) LEVI_LOG("BLE: kein Gerät der ELK/Lotus-Familie gefunden, naechster Versuch in 4 s");
         if(found){if(!client){client=NimBLEDevice::createClient();client->setClientCallbacks(&clientCallbacks);}
           if(client->connect(addr)){
             LEVI_LOG("BLE: verbunden mit %s", addr.toString().c_str());
