@@ -163,7 +163,7 @@ static ScanCallbacks scanCallbacks;
 static ClientCallbacks clientCallbacks;
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
-  uint32_t lastSentRevision=0,lastColorSent=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;
+  uint32_t lastSentRevision=0,lastColorSent=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;
   for(;;){
     State s=snapshot();
     if(!client||!client->isConnected()||!writer){
@@ -179,7 +179,7 @@ static void bleTask(void*){
           if(client->connect(addr)){
             LEVI_LOG("BLE: verbunden mit %s", addr.toString().c_str());
             auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
-            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=false;lastSentRevision=s.revision;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
+            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=false;lastBright=-1;lastSentRevision=s.revision;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
             else {LEVI_LOG("BLE: Service 0xFFF0 oder Characteristic 0xFFF3 fehlt, trenne"); client->disconnect();}
           } else LEVI_LOG("BLE: Verbindung zu %s fehlgeschlagen", addr.toString().c_str());
         }scan->clearResults();
@@ -190,6 +190,7 @@ static void bleTask(void*){
         bool canWrite=writer->canWrite();bool valid=canWrite||writer->canWriteNoResponse();
         if(valid){uint8_t packet[9];bool ok=true;
           if(s.music!=lastMusic){if(!client->isConnected())ok=false;else{Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,true);if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}}}
+          if(ok&&s.brightness!=lastBright){if(!client->isConnected())ok=false;else{Lotus::brightness(s.brightness,packet);ok=writer->writeValue(packet,9,true);if(ok){lastBright=s.brightness;LEVI_LOG("BLE: Helligkeit %u%%", (unsigned)s.brightness);}}}
           if(s.power>=0&&s.power!=lastPower){
             if(!client->isConnected())ok=false;
             else {Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,canWrite);if(ok)lastPower=s.power;}
@@ -198,7 +199,7 @@ static void bleTask(void*){
             if(!client->isConnected())ok=false;
             else if(millis()-lastColorSent<33)ok=false; // keep revision pending
             else {
-              uint8_t cr=s.r,cg=s.g,cb=s.b;if(!s.raw){cr=calibCh(s.r*s.brightness/100,calib.gr);cg=calibCh(s.g*s.brightness/100,calib.gg);cb=calibCh(s.b*s.brightness/100,calib.gb);}Lotus::color(cr,cg,cb,packet);
+              uint8_t cr=s.r,cg=s.g,cb=s.b;if(!s.raw){cr=calibCh(s.r,calib.gr);cg=calibCh(s.g,calib.gg);cb=calibCh(s.b,calib.gb);}Lotus::color(cr,cg,cb,packet);
               if(client->isConnected())ok=writer->writeValue(packet,9,!writer->canWriteNoResponse());
               else ok=false;
               if(ok)lastColorSent=millis();
