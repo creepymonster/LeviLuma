@@ -11,6 +11,7 @@
 #include "Config.h"
 #include "Palette.h"
 #include "CalibCore.h"
+#include "ColorMath.h"
 #include <math.h>
 
 // Logging ueber stdout (UART0-Konsole), also in demselben Monitor wie die NimBLE-Meldungen.
@@ -201,9 +202,14 @@ static ClientCallbacks clientCallbacks;
 #define LEVI_BRIGHTNESS_MAX 100
 #endif
 static uint8_t bandBrightness(uint8_t pct){return LEVI_BRIGHTNESS_MAX==255?(uint8_t)((pct*255+50)/100):pct;}
+// Anzahl Zwischenschritte beim Farbwechsel (ein Schritt pro 200-ms-Slot).
+#ifndef LEVI_FADE_STEPS
+#define LEVI_FADE_STEPS 8
+#endif
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
   uint32_t lastColorRev=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;
+  ColorMath::HSV shown={0.f,0.f,1.f},fadeFrom=shown,fadeTo=shown;int fadeLeft=0,fadeN=1;bool fadeRaw=false,instantColor=true;
   for(;;){
     State s=snapshot();
     if(!client||!client->isConnected()||!writer){
@@ -220,7 +226,7 @@ static void bleTask(void*){
           if(client->connect(addr)){
             LEVI_LOG("BLE: verbunden mit %s", addr.toString().c_str());
             auto svc=client->getService(NimBLEUUID((uint16_t)0xFFF0));writer=svc?svc->getCharacteristic(NimBLEUUID((uint16_t)0xFFF3)):nullptr;
-            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=true;/* Modus unbekannt: Musik-aus wird beim Verbinden erzwungen */lastBright=-1;lastColorRev=s.colorRev-1;LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
+            if(writer){xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=true;xSemaphoreGive(stateLock);lastPower=-1;lastMusic=true;/* Modus unbekannt: Musik-aus wird beim Verbinden erzwungen */lastBright=-1;lastColorRev=s.colorRev-1;instantColor=true;shown=ColorMath::fromRgb(s.r,s.g,s.b);LEVI_LOG("BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");}
             else {LEVI_LOG("BLE: Service 0xFFF0 oder Characteristic 0xFFF3 fehlt, trenne"); client->disconnect();}
           } else LEVI_LOG("BLE: Verbindung zu %s fehlgeschlagen", addr.toString().c_str());
         }scan->clearResults();
@@ -239,11 +245,18 @@ static void bleTask(void*){
         }else if(s.power>=0&&s.power!=lastPower){
           attempted=true;Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastPower=s.power;LEVI_LOG("BLE: Power %s", s.power==1?"an":"aus");}
-        }else if(s.power==1&&!s.music&&s.colorRev!=lastColorRev){
-          attempted=true;uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);
+        }else if(s.power==1&&!s.music&&(s.colorRev!=lastColorRev||fadeLeft>0)){
+          attempted=true;
+          if(s.colorRev!=lastColorRev){ // neue Farbe: Ueberblendung ab dem zuletzt gesendeten Zwischenwert
+            lastColorRev=s.colorRev;
+            fadeRaw=s.raw;fadeTo=ColorMath::fromRgb(s.r,s.g,s.b);fadeFrom=shown;
+            fadeN=(s.raw||instantColor)?1:LEVI_FADE_STEPS;fadeLeft=fadeN;instantColor=false;
+          }
+          int step=fadeN-fadeLeft+1;uint8_t cc[3]={s.r,s.g,s.b};
+          if(!fadeRaw){shown=ColorMath::mix(fadeFrom,fadeTo,(float)step/fadeN);ColorMath::toRgb(shown,cc);LeviCal::apply(calModel,cc[0],cc[1],cc[2],cc);}
           Lotus::color(cc[0],cc[1],cc[2],packet);
-          LEVI_LOG("BLE: Farbe %u,%u,%u -> %u,%u,%u%s",(unsigned)s.r,(unsigned)s.g,(unsigned)s.b,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],s.raw?" (raw)":"");
-          ok=writer->writeValue(packet,9,false);if(ok)lastColorRev=s.colorRev;
+          LEVI_LOG("BLE: Farbe Schritt %d/%d -> %u,%u,%u%s",step,fadeN,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],fadeRaw?" (raw)":"");
+          ok=writer->writeValue(packet,9,false);if(ok)fadeLeft--;
         }
         if(attempted&&!ok) LEVI_LOG("BLE: Schreiben fehlgeschlagen");
         if(ok) vTaskDelay(pdMS_TO_TICKS(200));
