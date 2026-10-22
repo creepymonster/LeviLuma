@@ -16,7 +16,7 @@ inline void music(bool on,uint8_t (&out)[9]) {
   const uint8_t b[9]={0x7E,0x04,0x07,0x00,0xFF,0xFF,0xFF,0x00,0xEF}; memcpy(out,on?a:b,9);
 }
 // Helligkeit nativ am Controller: 7E 04 01 BB MM FF FF 00 EF (BB = 0..100, MM = 0xFF), Referenz aus der Python-Vorlage.
-inline void brightness(uint8_t pct,uint8_t (&out)[9]) {
-  uint8_t c[9]={0x7E,0x04,0x01,(uint8_t)constrain(pct,0,100),0xFF,0xFF,0xFF,0x00,0xEF}; memcpy(out,c,9);
+inline void brightness(uint8_t value,uint8_t (&out)[9]) {
+  const uint8_t c[9]={0x7E,0x04,0x01,value,0xFF,0xFF,0xFF,0x00,0xEF}; memcpy(out,c,9);
 }
 }

@@ -196,6 +196,11 @@ class ScanCallbacks: public NimBLEAdvertisedDeviceCallbacks {
 class ClientCallbacks: public NimBLEClientCallbacks {void onDisconnect(NimBLEClient*) override {LEVI_LOG("BLE: Verbindung getrennt");xSemaphoreTake(stateLock,portMAX_DELAY);state.ble=false;xSemaphoreGive(stateLock);}};
 static ScanCallbacks scanCallbacks;
 static ClientCallbacks clientCallbacks;
+// Helligkeit fuer das Band: LEVI_BRIGHTNESS_MAX 100 = Werte 0..100, 255 = Prozent auf 0..255 umgerechnet.
+#ifndef LEVI_BRIGHTNESS_MAX
+#define LEVI_BRIGHTNESS_MAX 100
+#endif
+static uint8_t bandBrightness(uint8_t pct){return LEVI_BRIGHTNESS_MAX==255?(uint8_t)((pct*255+50)/100):pct;}
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
   uint32_t lastColorRev=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;
@@ -229,7 +234,7 @@ static void bleTask(void*){
           attempted=true;Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}
         }else if(s.brightness!=lastBright){
-          attempted=true;Lotus::brightness(s.brightness,packet);ok=writer->writeValue(packet,9,false);
+          attempted=true;Lotus::brightness(bandBrightness(s.brightness),packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastBright=s.brightness;LEVI_LOG("BLE: Helligkeit %u%%", (unsigned)s.brightness);}
         }else if(s.power>=0&&s.power!=lastPower){
           attempted=true;Lotus::power(s.power==1,packet);ok=writer->writeValue(packet,9,false);

@@ -15,3 +15,5 @@
 // Eigene Kalibrierung aus der Web-UI: 51 Werte (17 Zielfarben x R,G,B), Export aus dem Kalibrierungsbereich.
 // Beispiel (Platzhalter, bitte durch deine Werte ersetzen):
 // #define LEVI_CALIB_POINTS 255,255,255, 255,243,224, ...
+// Helligkeitsbereich des Bandes: 100 = Werte 0..100 (Rust-Referenz), 255 = Prozent auf 0..255 (Python-Referenz)
+#define LEVI_BRIGHTNESS_MAX 100
