@@ -10,6 +10,7 @@
 #include "WebUi.h"
 #include "Config.h"
 #include "Palette.h"
+#include "CalibCore.h"
 #include <math.h>
 
 // Logging ueber USB-CDC (Serial Monitor, 115200 Baud)
@@ -51,16 +52,33 @@ static uint8_t currentBacklight=255;
 #ifndef LEVI_CALIB_GB
 #define LEVI_CALIB_GB 0.940f
 #endif
-#ifndef LEVI_CALIB_GAMMA
-#define LEVI_CALIB_GAMMA 1.00f
-#endif
 // Standard-Kalibrierung aus Config.h (sonst FastLED TypicalSMD5050).
-struct Calib { float gr=LEVI_CALIB_GR,gg=LEVI_CALIB_GG,gb=LEVI_CALIB_GB,gamma=LEVI_CALIB_GAMMA; };
-static Calib calib;
-static void calibLoad(){Preferences p;p.begin("levi",true);Calib d;calib.gr=p.getFloat("gr",d.gr);calib.gg=p.getFloat("gg",d.gg);calib.gb=p.getFloat("gb",d.gb);calib.gamma=p.getFloat("gamma",d.gamma);p.end();}
-static void calibSave(){Preferences p;p.begin("levi",false);p.putFloat("gr",calib.gr);p.putFloat("gg",calib.gg);p.putFloat("gb",calib.gb);p.putFloat("gamma",calib.gamma);p.end();}
-static uint8_t calibCh(int v,float gain){float x=v*gain/255.0f;if(x<0)x=0;if(x>1)x=1;return (uint8_t)(powf(x,calib.gamma)*255.0f+0.5f);}
-static String calibJson(){return "{\"gr\":"+String(calib.gr,3)+",\"gg\":"+String(calib.gg,3)+",\"gb\":"+String(calib.gb,3)+",\"gamma\":"+String(calib.gamma,2)+"}";}
+static LeviCal::Model calModel;
+static bool calCustom=false;   // true, wenn eine Kalibrierung aus dem Web im NVS liegt
+// Standard: Config-Tabelle (LEVI_CALIB_POINTS) oder lineare Gains (sonst FastLED TypicalSMD5050).
+static void calibDefaults(){
+  LeviCal::defaultPts(calModel,LEVI_CALIB_GR,LEVI_CALIB_GG,LEVI_CALIB_GB);
+#ifdef LEVI_CALIB_POINTS
+  static const uint8_t cfgPts[LeviCal::N*3]={LEVI_CALIB_POINTS};
+  memcpy(calModel.pts,cfgPts,sizeof(cfgPts));
+#endif
+}
+static void calibCompute(){LeviCal::solve(calModel);}
+static void calibLoad(){
+  calibDefaults();calCustom=false;
+  Preferences p;p.begin("levi",true);
+  if(p.getBytesLength("pts")==sizeof(calModel.pts)){p.getBytes("pts",calModel.pts,sizeof(calModel.pts));calCustom=true;}
+  p.end();
+  calibCompute();
+}
+static void calibSave(){Preferences p;p.begin("levi",false);p.putBytes("pts",calModel.pts,sizeof(calModel.pts));p.end();calCustom=true;calibCompute();}
+static void calibReset(){Preferences p;p.begin("levi",false);p.remove("pts");p.end();calibDefaults();calCustom=false;calibCompute();}
+static String calibJson(){
+  String j="{\"custom\":";j+=calCustom?"true":"false";j+=",\"points\":[";
+  const uint8_t *flat=&calModel.pts[0][0];
+  for(int i=0;i<LeviCal::N*3;i++){if(i)j+=',';j+=String(flat[i]);}
+  j+="]}";return j;
+}
 static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state; xSemaphoreGive(stateLock); return s; }
 
 static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
@@ -206,7 +224,7 @@ static void bleTask(void*){
             if(!client->isConnected())ok=false;
             else if(millis()-lastColorSent<33)ok=false; // keep revision pending
             else {
-              uint8_t cr=s.r,cg=s.g,cb=s.b;if(!s.raw){cr=calibCh(s.r,calib.gr);cg=calibCh(s.g,calib.gg);cb=calibCh(s.b,calib.gb);}Lotus::color(cr,cg,cb,packet);
+              uint8_t cc[3]={s.r,s.g,s.b};if(!s.raw)LeviCal::apply(calModel,s.r,s.g,s.b,cc);Lotus::color(cc[0],cc[1],cc[2],packet);
               if(client->isConnected())ok=writer->writeValue(packet,9,!writer->canWriteNoResponse());
               else ok=false;
               if(ok)lastColorSent=millis();
@@ -229,11 +247,19 @@ static void webInit(){
   web.on("/api/raw",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRaw(r.toInt(),g.toInt(),b.toInt());stateJson();});
   web.on("/api/calib",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
   web.on("/api/calib",HTTP_POST,[]{
-    float gr=web.arg("gr").toFloat(),gg=web.arg("gg").toFloat(),gb=web.arg("gb").toFloat(),gm=web.arg("gamma").toFloat();
-    if(gr<0.2f||gr>2.0f||gg<0.2f||gg>2.0f||gb<0.2f||gb>2.0f||gm<1.0f||gm>3.0f){web.send(400,"text/plain","gr,gg,gb 0.2..2, gamma 1..3");return;}
-    calib.gr=gr;calib.gg=gg;calib.gb=gb;calib.gamma=gm;calibSave();LEVI_LOG("Kalibrierung gespeichert: %s",calibJson().c_str());
+    // p = 51 Werte (17 Zielfarben x R,G,B), komma-getrennt, je 0..255
+    String p=web.arg("p");uint8_t tmp[LeviCal::N*3];int n=0,start=0;bool ok=true;
+    while(n<LeviCal::N*3){
+      int c=p.indexOf(',',start);String tok=(c<0)?p.substring(start):p.substring(start,c);tok.trim();
+      if(tok.length()<1||tok.length()>3){ok=false;break;}
+      int v=tok.toInt();if(v<0||v>255){ok=false;break;}
+      tmp[n++]=(uint8_t)v;if(c<0)break;start=c+1;
+    }
+    if(!ok||n!=LeviCal::N*3){web.send(400,"text/plain","p=51 Werte 0..255");return;}
+    memcpy(calModel.pts,tmp,sizeof(tmp));calibSave();
+    LEVI_LOG("Kalibrierung gespeichert (17 Punkte)");
     web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
-  web.on("/api/calib/reset",HTTP_POST,[]{calib=Calib();calibSave();LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
+  web.on("/api/calib/reset",HTTP_POST,[]{calibReset();LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
   web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
 }
 static const char *wlStatusName(wl_status_t s){

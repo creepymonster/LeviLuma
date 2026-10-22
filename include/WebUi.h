@@ -65,24 +65,30 @@ $('power').onclick=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();pos
 $('color').oninput=e=>setColor(e.target.value);
 $('brightness').oninput=e=>{s.brightness=+e.target.value;e.target.style.setProperty('--p',((s.brightness-1)/99*100)+'%');render();editingUntil=Date.now()+1200;clearTimeout(sendTimer);sendTimer=setTimeout(()=>post('/api/brightness?value='+s.brightness),35)};
 render();refresh();setInterval(refresh,1000);
-const CAL=[['Rot','#ff0000'],['Orange','#ff8000'],['Gelb','#ffff00'],['Grün','#00ff00'],['Türkis','#00ffff'],['Blau','#0000ff'],['Violett','#8000ff'],['Pink','#ff00aa'],['Weiß','#ffffff']];
-let calIdx=0,calMatches=[],calCur=[0,0,0],calTimer=null,calGamma=2.2;
-function hexToRgb(h){return [1,3,5].map(i=>parseInt(h.substr(i,2),16))}
-function calLoadCurrent(){fetch('/api/calib',{cache:'no-store'}).then(r=>r.json()).then(j=>{calGamma=j.gamma;$('calOut').value=`#define LEVI_CALIB_GR ${j.gr.toFixed(3)}f\n#define LEVI_CALIB_GG ${j.gg.toFixed(3)}f\n#define LEVI_CALIB_GB ${j.gb.toFixed(3)}f\n#define LEVI_CALIB_GAMMA ${j.gamma.toFixed(2)}f`;$('calCurrent').textContent=`Aktuell: R ${j.gr.toFixed(3)} · G ${j.gg.toFixed(3)} · B ${j.gb.toFixed(3)} · Gamma ${j.gamma.toFixed(2)}`}).catch(()=>{});}
+// 17 Zielfarben (wie LED-Calibrator): Weiss (Planck), 75 %, 100 %
+const CAL=[['D65',255,255,255],['D50',255,243,224],['4000K',255,228,189],['3000K',255,197,143],['2700K',255,180,117],
+['Rot 75%',255,64,64],['Gelb 75%',255,255,64],['Grün 75%',64,255,64],['Cyan 75%',64,255,255],['Blau 75%',64,64,255],['Magenta 75%',255,64,255],
+['Orange',255,128,64],['Türkis',0,255,128],['Hellblau',0,128,255],['Blau-Violett',128,0,255],['Rot-Violett',255,0,128],['Sat. Cyan',0,192,255]];
+let calIdx=0,calDone=[],calCur=[0,0,0],calTimer=null;
 function calBuildSliders(){const box=$('calSliders');box.innerHTML='';['R','G','B'].forEach((c,i)=>{const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';row.innerHTML=`<span style="width:20px;font-size:15px;color:#171717">${c}</span><input type="range" min="0" max="255" id="calR${i}" style="flex:1"><span id="calV${i}" style="width:36px;text-align:right;font-size:15px;color:#888">0</span>`;box.appendChild(row);const inp=row.querySelector('input');inp.oninput=()=>{calCur[i]=+inp.value;$('calV'+i).textContent=inp.value;inp.style.setProperty('--p',(inp.value/255*100)+'%');calSendRaw();};});}
 function calUpdateSliders(){[0,1,2].forEach(i=>{const el=$('calR'+i);el.value=calCur[i];el.style.setProperty('--p',(calCur[i]/255*100)+'%');$('calV'+i).textContent=calCur[i];});}
 function calSendRaw(){clearTimeout(calTimer);calTimer=setTimeout(()=>fetch(`/api/raw?r=${calCur[0]}&g=${calCur[1]}&b=${calCur[2]}`,{method:'POST'}),60);}
-function calShow(){const [n,h]=CAL[calIdx];$('calStep').textContent=`Schritt ${calIdx+1}/${CAL.length}: ${n} – stelle die LED auf die Vorschau ein`;$('calPreview').style.background=h;calCur=hexToRgb(h);calUpdateSliders();calSendRaw();}
 function calRestoreColor(){post(`/api/color?r=${s.r}&g=${s.g}&b=${s.b}`);}
-function calStart(){calIdx=0;calMatches=[];$('calBox').style.display='';$('calInfo').textContent='';calShow();}
+function calShow(){const c=CAL[calIdx];$('calStep').textContent=`Schritt ${calIdx+1}/${CAL.length}: ${c[0]} – LED auf die Vorschau einstellen`;$('calPreview').style.background=`rgb(${c[1]},${c[2]},${c[3]})`;calCur=[c[1],c[2],c[3]];calUpdateSliders();calSendRaw();}
+function calRender(j){
+  $('calCurrent').textContent=j.custom?'Eigene Kalibrierung aktiv (17 Punkte)':'Standard (FastLED TypicalSMD5050)';
+  $('calOut').value='#define LEVI_CALIB_POINTS '+j.points.join(', ');
+}
+function calLoadCurrent(){fetch('/api/calib',{cache:'no-store'}).then(r=>r.json()).then(calRender).catch(()=>{});}
+function calStart(){calIdx=0;calDone=[];$('calBox').style.display='';$('calInfo').textContent='';calShow();}
 function calFinish(){
-  const gains=[0,1,2].map(c=>{let num=0,den=0;calMatches.forEach(m=>{if(m.target[c]>0){num+=m.matched[c];den+=m.target[c];}});let k=den>0?num/den:1;return Math.min(2,Math.max(0.2,k));});
-  fetch(`/api/calib?gr=${gains[0].toFixed(3)}&gg=${gains[1].toFixed(3)}&gb=${gains[2].toFixed(3)}&gamma=${calGamma}`,{method:'POST'}).then(r=>r.json()).then(j=>{$('calInfo').textContent='Gespeichert.';calLoadCurrent();}).catch(()=>{$('calInfo').textContent='Fehler beim Speichern.';});
+  const flat=[];calDone.forEach(c=>flat.push(c[0],c[1],c[2]));
+  fetch('/api/calib?p='+flat.join(','),{method:'POST'}).then(r=>r.json()).then(j=>{calRender(j);$('calInfo').textContent='Gespeichert.';}).catch(()=>{$('calInfo').textContent='Fehler beim Speichern.';});
   $('calBox').style.display='none';calRestoreColor();
 }
 $('calStart').onclick=calStart;
 $('calCancel').onclick=()=>{$('calBox').style.display='none';calRestoreColor();};
-$('calNext').onclick=()=>{calMatches.push({matched:[...calCur],target:hexToRgb(CAL[calIdx][1])});calIdx++;if(calIdx<CAL.length)calShow();else calFinish();};
-$('calReset').onclick=()=>{fetch('/api/calib/reset',{method:'POST'}).then(()=>{$('calInfo').textContent='Zurückgesetzt.';calLoadCurrent();});};
+$('calNext').onclick=()=>{calDone.push([...calCur]);calIdx++;if(calIdx<CAL.length)calShow();else calFinish();};
+$('calReset').onclick=()=>{fetch('/api/calib/reset',{method:'POST'}).then(r=>r.json()).then(j=>{calRender(j);$('calInfo').textContent='Zurückgesetzt.';});};
 calBuildSliders();calLoadCurrent();
 </script></body></html>)LEVIHTML";
