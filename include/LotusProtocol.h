@@ -2,8 +2,8 @@
 #include <Arduino.h>
 namespace Lotus {
 inline void color(uint8_t r,uint8_t g,uint8_t b,uint8_t (&out)[9]) {
-  // 0x0A am Ende: am Band getestet (Rot kommt an)
-  const uint8_t c[9]={0x7E,0x07,0x05,0x03,r,g,b,0x0A,0xEF};
+  // 0x10 am Ende: wie in der Original-App (dekompiliert)
+  const uint8_t c[9]={0x7E,0x07,0x05,0x03,r,g,b,0x10,0xEF};
   memcpy(out,c,9);
 }
 inline void power(bool on,uint8_t (&out)[9]) {
