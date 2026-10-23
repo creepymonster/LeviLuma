@@ -221,9 +221,9 @@ static ClientCallbacks clientCallbacks;
 #define LEVI_BRIGHTNESS_MAX 100
 #endif
 static uint8_t bandBrightness(uint8_t pct){return LEVI_BRIGHTNESS_MAX==255?(uint8_t)((pct*255+50)/100):pct;}
-// Mikrofon-EQ-Modus, der nach 'Mikrofon an' gesendet wird (App-Wert 3).
+// Mikrofon-EQ-Modus nach 'Mikrofon an': 0 = normal, 1 = weich, 2 = dynamisch, 4 = disko (3 unbekannt).
 #ifndef LEVI_MIC_EQ_MODE
-#define LEVI_MIC_EQ_MODE 3
+#define LEVI_MIC_EQ_MODE 0
 #endif
 // Anzahl Zwischenschritte beim Farbwechsel (ein Schritt pro 200-ms-Slot).
 #ifndef LEVI_FADE_STEPS
