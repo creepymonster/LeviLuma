@@ -62,10 +62,8 @@ $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;$('br
 $('pstatus').textContent=s.power==='on'?'Eingeschaltet':s.power==='off'?'Ausgeschaltet':'Status unbekannt';$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';$('powerIcon').setAttribute('stroke',s.power==='on'?'#23a455':'#aaa');
 [...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&palette[i]===h));$('swatches').lastElementChild.classList.toggle('sel',!!s.music);}
 function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let b=$('ble');b.textContent=d.ble?'BLE verbunden':'BLE getrennt';b.className='chip'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('ble').textContent='ESP offline';$('ble').className='chip';});}
-let holdT=0;const togglePower=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
-const holdStart=()=>{clearTimeout(holdT);holdT=setTimeout(togglePower,500)},holdEnd=()=>clearTimeout(holdT);
-$('power').addEventListener('pointerdown',holdStart);['pointerup','pointerleave','pointercancel'].forEach(ev=>$('power').addEventListener(ev,holdEnd));
-$('power').addEventListener('click',e=>e.preventDefault());
+const togglePower=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
+$('power').onclick=togglePower;
 $('color').oninput=e=>setColor(e.target.value);
 $('brightness').oninput=e=>{s.brightness=+e.target.value;e.target.style.setProperty('--p',((s.brightness-1)/99*100)+'%');render();editingUntil=Date.now()+1200;clearTimeout(sendTimer);sendTimer=setTimeout(()=>post('/api/brightness?value='+s.brightness),35)};
 render();refresh();setInterval(refresh,1000);
