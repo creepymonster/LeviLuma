@@ -224,12 +224,13 @@ static void barChanged(lv_event_t *e){
   if(snapshot().power!=1)return;
   setBrightness(lv_slider_get_value(bar));
 }
-// Ein Tipp auf einen Farbpunkt waehlt genau diese Farbe.
-static void dotClicked(lv_event_t *e){
-  int k=(int)(intptr_t)lv_event_get_user_data(e);
+// Ein Tipp auf die Farbseite springt zur naechsten Farbe; nach der letzten wieder zur ersten.
+static void nextColorClicked(lv_event_t *e){
+  (void)e;
   State s=snapshot();
   if(s.power!=1||!s.ble)return;
-  selectColor(k);
+  int n=selected<0?0:(selected+1)%LeviCal::N;
+  selectColor(n);
 }
 
 // Halten-Fuellung in der Pille: laeuft in 500 ms von links nach rechts voll, verschwindet beim Loslassen.
@@ -364,9 +365,9 @@ static void makeUI(){
     lv_obj_set_style_radius(dots[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_pad_all(dots[k],0,0);
     lv_obj_set_style_border_color(dots[k],lv_color_white(),0);lv_obj_set_style_shadow_width(dots[k],0,0);
     lv_obj_align(dots[k],LV_ALIGN_CENTER,(k%5-2)*34,(k/5)*34-51);
-    lv_obj_add_flag(dots[k],LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(dots[k],dotClicked,LV_EVENT_CLICKED,(void*)(intptr_t)k);
   }
+  lv_obj_add_flag(tileColor,LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(tileColor,nextColorClicked,LV_EVENT_CLICKED,nullptr);
   updateUI();
 }
 
