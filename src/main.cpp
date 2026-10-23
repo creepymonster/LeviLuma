@@ -27,9 +27,8 @@ alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer 
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
-static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*stateLbl=nullptr,*caption=nullptr,*statusDot=nullptr,*holdArc=nullptr,*iconBle=nullptr;
-static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};static int lastConn=-1;
-
+static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*stateLbl=nullptr,*caption=nullptr,*statusDot=nullptr,*holdArc=nullptr;
+static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
@@ -125,39 +124,34 @@ static void readTouch(lv_indev_t*,lv_indev_data_t *d){
   d->state=(down&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
   d->point.x=touchX;d->point.y=touchY;
 }
-static void setHidden(lv_obj_t *o,bool h){lv_obj_set_hidden(o,h);}
-
+// Deaktiviert und halbtransparent, wenn das Element gerade keine Eingabe annehmen soll.
+static void setEnabled(lv_obj_t *o,bool en,lv_opa_t opaOn=LV_OPA_COVER){
+  if(en)lv_obj_remove_state(o,LV_STATE_DISABLED);else lv_obj_add_state(o,LV_STATE_DISABLED);
+  lv_obj_set_style_opa(o,en?opaOn:LV_OPA_40,0);
+}
 static void updateUI(){
   State s=snapshot();
   if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected)return;
   uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;
   bool on=s.power==1;
+  bool active=on&&s.ble;   // Helligkeit und Farben nur eingeschaltet und mit Band verbunden
   lv_color_t color=rgbColor(s.r,s.g,s.b);
   applyContrast(s.r,s.g,s.b);
-  // Mitte: Farbe und An/Aus
+  // Mitte: An/Aus ist auch ausgeschaltet bedienbar, sobald verbunden
   lv_obj_set_style_bg_color(center,color,0);
   lv_obj_set_style_shadow_color(center,color,0);
-  lv_obj_set_style_opa(center,on?LV_OPA_COVER:LV_OPA_60,0);
+  setEnabled(center,s.ble,on?LV_OPA_COVER:LV_OPA_60);
   lv_label_set_text(stateLbl,on?"AN":"AUS");
   lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
-  lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
-  // Helligkeit: Balken in aktueller Farbe, Prozentwert daneben
+  // Statuspunkt: gruen verbunden, rot getrennt
+  lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
+  // Helligkeit
   lv_obj_set_style_bg_color(bar,color,LV_PART_INDICATOR);
+  setEnabled(bar,active);
+  setEnabled(barLbl,active);
   if(lv_slider_get_value(bar)!=s.brightness)lv_slider_set_value(bar,s.brightness,LV_ANIM_OFF);
   char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)s.brightness);
   lv_label_set_text(barLbl,label);
-  lv_obj_set_style_opa(tileBright,on?LV_OPA_COVER:LV_OPA_40,0);
-  lv_obj_set_style_opa(tileColor,on?LV_OPA_COVER:LV_OPA_40,0);
-  // Ohne Verbindung: nur das Bluetooth-Symbol, keine Kacheln wischbar
-  if(s.ble!=lastConn){
-    lastConn=s.ble;
-    setHidden(center,!s.ble);setHidden(holdArc,!s.ble);setHidden(statusDot,!s.ble);
-    setHidden(bar,!s.ble);setHidden(barLbl,!s.ble);
-    for(int k=0;k<3;k++)setHidden(bubbles[k],!s.ble);
-    setHidden(iconBle,s.ble);
-    if(s.ble)lv_obj_add_flag(tv,LV_OBJ_FLAG_SCROLLABLE);
-    else{lv_obj_remove_flag(tv,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);}
-  }
   // Farbliste: aktive Farbe in der Mitte (groesser, weisser Rahmen), Nachbarn oben und unten
   int base=selected<0?0:selected;
   int idx[3]={wrapIdx(base-1),base,wrapIdx(base+1)};
@@ -175,8 +169,8 @@ static void updateUI(){
     lv_obj_set_style_bg_color(bubbles[k],c,0);
     lv_obj_set_style_border_width(bubbles[k],mid?2:0,0);
     lv_label_set_text(bubbleLbl[k],music?LV_SYMBOL_AUDIO:"");
+    setEnabled(bubbles[k],active);
   }
-  for(int k=0;k<3;k++)lv_obj_set_style_opa(bubbles[k],LV_OPA_COVER,0);
 }
 
 // Helligkeitsbalken: nur Benutzereingaben (Indev aktiv) setzen den Zustand, nicht die Anzeige selbst.
@@ -249,7 +243,7 @@ static void makeUI(){
   stateLbl=lv_label_create(center);lv_obj_set_style_text_color(stateLbl,lv_color_white(),0);
   lv_obj_set_style_text_font(stateLbl,&lv_font_montserrat_32,0);lv_obj_align(stateLbl,LV_ALIGN_CENTER,0,-13);
   caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
-  statusDot=lv_obj_create(tilePower);lv_obj_set_size(statusDot,8,8);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
+  statusDot=lv_obj_create(tilePower);lv_obj_set_size(statusDot,10,10);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
   // Fortschrittsring waehrend des Haltens (nicht klickbar)
   holdArc=lv_arc_create(tilePower);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
@@ -258,8 +252,6 @@ static void makeUI(){
   lv_obj_set_style_arc_opa(holdArc,LV_OPA_TRANSP,LV_PART_MAIN);lv_obj_set_style_arc_width(holdArc,4,LV_PART_MAIN);
   lv_obj_set_style_arc_width(holdArc,4,LV_PART_INDICATOR);lv_obj_set_style_arc_color(holdArc,lv_color_white(),LV_PART_INDICATOR);
   lv_obj_remove_flag(holdArc,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
-  iconBle=lv_label_create(tilePower);lv_label_set_text(iconBle,LV_SYMBOL_BLUETOOTH);lv_obj_set_style_text_font(iconBle,&lv_font_montserrat_48,0);
-  lv_obj_set_style_text_color(iconBle,lv_color_white(),0);lv_obj_center(iconBle);
 
   // Farbliste: drei Blasen untereinander, die mittlere ist aktiv und groesser
   for(int k=0;k<3;k++){
