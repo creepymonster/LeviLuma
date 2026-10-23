@@ -23,6 +23,10 @@
 #ifndef LEVI_DISPLAY_ROTATION
 #define LEVI_DISPLAY_ROTATION 0
 #endif
+// 1: Touch-Koordinaten um 180 Grad drehen (falls Berührungen genau verkehrt herum ankommen)
+#ifndef LEVI_TOUCH_FLIP180
+#define LEVI_TOUCH_FLIP180 0
+#endif
 // Touch: CST816S direkt ueber I2C (Wire). Liefert Rohkoordinaten im Panel-Koordinatensystem;
 // mapTouch dreht sie passend zur Displaydrehung, damit LVGL die Oberflaeche richtig trifft.
 namespace Cst {
@@ -66,6 +70,7 @@ static void mapTouch(uint16_t rx,uint16_t ry,uint16_t &x,uint16_t &y){
     case 3: x=ry; y=239-rx; break;        // 270 Grad
     default: x=rx; y=ry;                  // 0 Grad
   }
+  if(LEVI_TOUCH_FLIP180){x=239-x;y=239-y;}
 }
 
 static LGFX_Board lcd;
@@ -205,7 +210,7 @@ static void updateUI(){
   char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)s.brightness);
   lv_label_set_text(barLbl,label);
   // Farbpunkte: aktive Farbe mit weissem Rahmen
-  for(int k=0;k<LIST_COUNT;k++){
+  for(int k=0;k<LeviCal::N;k++){
     lv_obj_set_style_border_width(dots[k],k==selected?2:0,0);
     if(k==MUSIC_IDX)lv_obj_set_style_bg_color(dots[k],lv_color_hex(0x333333),0);
     else lv_obj_set_style_bg_color(dots[k],lv_color_make(LeviCal::TARGET[k][0],LeviCal::TARGET[k][1],LeviCal::TARGET[k][2]),0);
@@ -354,7 +359,7 @@ static void makeUI(){
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
   // Farbpunkte: 5 Spalten, 4 Zeilen (17 Kalibrierfarben plus Musik)
-  for(int k=0;k<LIST_COUNT;k++){
+  for(int k=0;k<LeviCal::N;k++){
     dots[k]=lv_obj_create(tileColor);lv_obj_set_size(dots[k],14,14);lv_obj_remove_flag(dots[k],LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(dots[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_pad_all(dots[k],0,0);
     lv_obj_set_style_border_color(dots[k],lv_color_white(),0);lv_obj_set_style_shadow_width(dots[k],0,0);
