@@ -125,7 +125,7 @@ static void readTouch(lv_indev_t*,lv_indev_data_t *d){
   d->state=(down&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
   d->point.x=touchX;d->point.y=touchY;
 }
-static void setHidden(lv_obj_t *o,bool h){if(h)lv_obj_add_flag(o,LV_OBJ_FLAG_HIDDEN);else lv_obj_remove_flag(o,LV_OBJ_FLAG_HIDDEN);}
+static void setHidden(lv_obj_t *o,bool h){lv_obj_set_hidden(o,h);}
 
 static void updateUI(){
   State s=snapshot();
@@ -226,7 +226,7 @@ static void makeUI(){
   lv_obj_set_style_bg_color(tv,lv_color_hex(0x000000),0);lv_obj_set_style_border_width(tv,0,0);lv_obj_set_style_pad_all(tv,0,0);
   lv_obj_set_scrollbar_mode(tv,LV_SCROLLBAR_MODE_OFF);
   tileBright=lv_tileview_add_tile(tv,0,0,LV_DIR_RIGHT);
-  tilePower=lv_tileview_add_tile(tv,1,0,LV_DIR_LEFT|LV_DIR_RIGHT);
+  tilePower=lv_tileview_add_tile(tv,1,0,(lv_dir_t)(LV_DIR_LEFT|LV_DIR_RIGHT));
   tileColor=lv_tileview_add_tile(tv,2,0,LV_DIR_LEFT);
   lv_obj_t *tiles[3]={tileBright,tilePower,tileColor};
   for(int i=0;i<3;i++){lv_obj_set_style_bg_color(tiles[i],lv_color_hex(0x000000),0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_scrollbar_mode(tiles[i],LV_SCROLLBAR_MODE_OFF);}
