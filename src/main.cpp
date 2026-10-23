@@ -82,7 +82,7 @@ static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
-static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static int tileCol=1;static bool uiWifi=false;
+static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static bool uiWifi=false;
 static lv_obj_t *dots[LeviCal::N+1]{};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
@@ -258,72 +258,20 @@ static void centerClicked(lv_event_t *e){ // LONG_PRESSED
   setPower(snapshot().power!=1);
 }
 
-// Kacheln: der Streifen tv wird per x verschoben (Kachel n bei x = -240*n).
-static void tileX(void *o,int32_t v){lv_obj_set_x((lv_obj_t*)o,v);}
-static void setTile(int col,bool anim){
-  tileCol=col;int32_t to=-col*240;
-  lv_anim_delete(tv,nullptr);
-  if(!anim){lv_obj_set_x(tv,to);return;}
-  lv_anim_t a;lv_anim_init(&a);lv_anim_set_var(&a,tv);lv_anim_set_exec_cb(&a,tileX);
-  lv_anim_set_values(&a,lv_obj_get_x(tv),to);lv_anim_set_duration(&a,220);lv_anim_set_path_cb(&a,lv_anim_path_ease_out);
-  lv_anim_start(&a);
-}
-// Wischen: die Kacheln folgen dem Finger, beim Loslassen rastet die naechste Kachel ein.
-// Erkennung aus den Touch-Rohdaten in der Hauptschleife.
-static void handleSwipe(uint32_t now){
-  enum {IDLE,PENDING,DRAG,VERT};
-  static int st=IDLE;static uint32_t lastDownMs=0;static int x0=0,y0=0,base=0;static bool wasDown=false;
-  if(screenDim){st=IDLE;return;}
-  if(touchDown)lastDownMs=now;
-  bool down=touchDown||(now-lastDownMs<100);   // kurze Aussetzer des Touch ueberbruecken
-  int x=touchX,y=touchY;
-  if(down){
-    if(st==IDLE){st=PENDING;x0=x;y0=y;base=lv_obj_get_x(tv);LEVI_LOG("Touch an: x=%d y=%d", x, y);}
-    wasDown=true;
-    int dx=x-x0,dy=y-y0,ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;
-    if(st==PENDING&&(ax>=12||ay>=12)){
-      if(ax>2*ay){st=DRAG;lv_anim_delete(tv,nullptr);}
-      else st=VERT;
-    }
-    if(st==DRAG){
-      int v=base+dx;
-      if(v>40)v=40;                      // leichtes Ueberziehen am Rand
-      if(v<-520)v=-520;
-      lv_obj_set_x(tv,v);
-    }
-    return;
-  }
-  if(wasDown)LEVI_LOG("Touch los: Zustand=%d x=%d y=%d", st, x, y);
-  wasDown=false;
-  if(st==DRAG){
-    int dx=x-x0;
-    LEVI_LOG("Wischen: dx=%d Start-Kachel-x=%d", dx, base);
-    int col=(-base+120)/240;             // Kachel beim Start
-    if(dx<-60)col++;
-    else if(dx>60)col--;
-    if(col<0)col=0;
-    if(col>2)col=2;
-    setTile(col,true);
-  }
-  st=IDLE;
-}
 static void makeUI(){
   lv_obj_t *screen=lv_screen_active();
   lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
   // Drei Kacheln nebeneinander: links Helligkeit, Mitte An/Aus (Start), rechts Farben
-  // Ausschnitt 240x240 mit einem Streifen (tv) aus drei Kacheln nebeneinander; der Streifen wird verschoben
-  lv_obj_t *view=lv_obj_create(screen);lv_obj_set_size(view,240,240);lv_obj_center(view);
-  lv_obj_set_style_bg_color(view,lv_color_hex(0x000000),0);lv_obj_set_style_bg_opa(view,LV_OPA_COVER,0);lv_obj_set_style_border_width(view,0,0);lv_obj_set_style_pad_all(view,0,0);lv_obj_set_style_radius(view,0,0);
-  lv_obj_remove_flag(view,LV_OBJ_FLAG_SCROLLABLE);
-  tv=lv_obj_create(view);lv_obj_set_size(tv,720,240);lv_obj_set_pos(tv,-240,0);
-  lv_obj_set_style_bg_opa(tv,LV_OPA_TRANSP,0);lv_obj_set_style_border_width(tv,0,0);lv_obj_set_style_pad_all(tv,0,0);lv_obj_set_style_radius(tv,0,0);
-  lv_obj_remove_flag(tv,LV_OBJ_FLAG_SCROLLABLE);
-  tileBright=lv_obj_create(tv);lv_obj_set_pos(tileBright,0,0);
-  tilePower=lv_obj_create(tv);lv_obj_set_pos(tilePower,240,0);
-  tileColor=lv_obj_create(tv);lv_obj_set_pos(tileColor,480,0);
+  // LVGL-Tileview: drei Kacheln, Wischen links/rechts blaettert
+  tv=lv_tileview_create(screen);lv_obj_set_size(tv,240,240);lv_obj_center(tv);
+  lv_obj_set_style_bg_color(tv,lv_color_hex(0x000000),0);lv_obj_set_style_bg_opa(tv,LV_OPA_COVER,0);
+  lv_obj_set_style_border_width(tv,0,0);lv_obj_set_style_pad_all(tv,0,0);lv_obj_set_scrollbar_mode(tv,LV_SCROLLBAR_MODE_OFF);
+  tileBright=lv_tileview_add_tile(tv,0,0,(lv_dir_t)LV_DIR_RIGHT);
+  tilePower=lv_tileview_add_tile(tv,1,0,(lv_dir_t)(LV_DIR_LEFT|LV_DIR_RIGHT));
+  tileColor=lv_tileview_add_tile(tv,2,0,(lv_dir_t)LV_DIR_LEFT);
   lv_obj_t *tiles[3]={tileBright,tilePower,tileColor};
-  for(int i=0;i<3;i++){lv_obj_set_size(tiles[i],240,240);lv_obj_set_style_bg_opa(tiles[i],LV_OPA_TRANSP,0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_style_radius(tiles[i],0,0);lv_obj_remove_flag(tiles[i],LV_OBJ_FLAG_SCROLLABLE);}
-  tileCol=1;
+  for(int i=0;i<3;i++){lv_obj_set_style_bg_opa(tiles[i],LV_OPA_TRANSP,0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_scrollbar_mode(tiles[i],LV_SCROLLBAR_MODE_OFF);}
+  lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);
 
   // Helligkeit: vertikaler Balken, Prozent oben
   // Helligkeit: waagerechte Spur, darueber der Prozentwert mit etwas Abstand
@@ -540,14 +488,13 @@ void setup(){
 void loop(){
   static uint32_t tick=millis(),lastUI=0;uint32_t now=millis();lv_tick_inc(now-tick);tick=now;
   {uint16_t rx=0,ry=0;touchDown=Cst::read(rx,ry);if(touchDown)mapTouch(rx,ry,touchX,touchY);}
-  handleSwipe(now);
   lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
   // Lange ungenutzt: zurueck auf den Startbildschirm (Mitte), einmal pro Ruhephase
   static bool idleCentered=false;
   bool idle=now-lastTouchMs>LEVI_RECENTER_MS;
-  if(idle&&!idleCentered)setTile(1,true);
+  if(idle&&!idleCentered)lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);
   idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
   wl_status_t wl=WiFi.status();
