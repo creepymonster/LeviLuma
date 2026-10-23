@@ -221,13 +221,17 @@ static ClientCallbacks clientCallbacks;
 #define LEVI_BRIGHTNESS_MAX 100
 #endif
 static uint8_t bandBrightness(uint8_t pct){return LEVI_BRIGHTNESS_MAX==255?(uint8_t)((pct*255+50)/100):pct;}
+// Mikrofon-EQ-Modus, der nach 'Mikrofon an' gesendet wird (App-Wert 3).
+#ifndef LEVI_MIC_EQ_MODE
+#define LEVI_MIC_EQ_MODE 3
+#endif
 // Anzahl Zwischenschritte beim Farbwechsel (ein Schritt pro 200-ms-Slot).
 #ifndef LEVI_FADE_STEPS
 #define LEVI_FADE_STEPS 8
 #endif
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;
-  uint32_t lastColorRev=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;
+  uint32_t lastColorRev=0,lastAttempt=0;int8_t lastPower=-1;bool lastMusic=false;int lastBright=-1;bool eqPending=false;
   ColorMath::HSV shown={0.f,0.f,1.f},fadeFrom=shown,fadeTo=shown;int fadeLeft=0,fadeN=1;bool fadeRaw=false,instantColor=true;
   for(;;){
     State s=snapshot();
@@ -258,7 +262,10 @@ static void bleTask(void*){
         uint8_t packet[9];bool attempted=false,ok=false;
         if(s.music!=lastMusic){
           attempted=true;Lotus::music(s.music,packet);ok=writer->writeValue(packet,9,false);
-          if(ok){lastMusic=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}
+          if(ok){lastMusic=s.music;eqPending=s.music;LEVI_LOG("BLE: Musikmodus %s", s.music?"an":"aus");}
+        }else if(eqPending){ // Mikrofon-EQ direkt nach 'Mikrofon an', wie die App
+          attempted=true;Lotus::micEq(LEVI_MIC_EQ_MODE,packet);ok=writer->writeValue(packet,9,false);
+          if(ok){eqPending=false;LEVI_LOG("BLE: Mikrofon-EQ %d gesetzt", LEVI_MIC_EQ_MODE);}
         }else if(s.brightness!=lastBright){
           attempted=true;Lotus::brightness(bandBrightness(s.brightness),packet);ok=writer->writeValue(packet,9,false);
           if(ok){lastBright=s.brightness;LEVI_LOG("BLE: Helligkeit %u%%", (unsigned)s.brightness);}
