@@ -27,7 +27,7 @@ alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer 
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
-static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
+static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static int tileCol=1;static bool uiWifi=false;
 static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
@@ -105,6 +105,7 @@ static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
   bool light=(r*299+g*587+b*114)/1000>170;
   lv_color_t fg=light?lv_color_hex(0x1A1A1A):lv_color_white();
   lv_obj_set_style_text_color(pillLbl,fg,0);
+  lv_obj_set_style_text_color(pillLbl2,fg,0);
 }
 static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
@@ -143,6 +144,7 @@ static void updateUI(){
   lv_obj_set_style_shadow_color(center,color,0);
   setEnabled(center,s.ble,on?LV_OPA_COVER:LV_OPA_60);
   lv_label_set_text(pillLbl,on?"Ausschalten":"Einschalten");
+  lv_label_set_text(pillLbl2,on?"Ausschalten":"Einschalten");
   // Statuspunkt: gruen verbunden, rot getrennt
   lv_obj_set_style_bg_color(statusWifi,wifi?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
   lv_obj_set_style_bg_color(statusBle,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
@@ -258,7 +260,9 @@ static void makeUI(){
   lv_obj_set_style_border_width(holdFill,0,0);lv_obj_set_style_pad_all(holdFill,0,0);lv_obj_set_style_shadow_width(holdFill,0,0);
   lv_obj_set_style_bg_color(holdFill,lv_color_white(),0);lv_obj_set_style_bg_opa(holdFill,LV_OPA_30,0);
   lv_obj_remove_flag(holdFill,LV_OBJ_FLAG_CLICKABLE);lv_obj_align(holdFill,LV_ALIGN_LEFT_MID,0,0);
-  pillLbl=lv_label_create(center);lv_obj_set_style_text_color(pillLbl,lv_color_white(),0);lv_obj_center(pillLbl);
+  // Halbfett: die Beschriftung zweimal mit 1 px Versatz (LVGL hat keine fette Montserrat-Variante)
+  pillLbl=lv_label_create(center);lv_obj_set_style_text_color(pillLbl,lv_color_white(),0);lv_obj_align(pillLbl,LV_ALIGN_CENTER,-1,0);
+  pillLbl2=lv_label_create(center);lv_obj_set_style_text_color(pillLbl2,lv_color_white(),0);lv_obj_align(pillLbl2,LV_ALIGN_CENTER,0,0);
   // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
   statusWifi=lv_obj_create(tilePower);lv_obj_set_size(statusWifi,10,10);lv_obj_set_style_radius(statusWifi,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-11,22);
