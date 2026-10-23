@@ -216,14 +216,24 @@ static void centerClicked(lv_event_t *e){ // LONG_PRESSED
   setPower(snapshot().power!=1);
 }
 
-// Wischen links/rechts wechselt die Kachel (Helligkeit | An/Aus | Farben).
-static void tileGesture(lv_event_t *e){
-  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
-  lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
-  if(d==LV_DIR_LEFT&&tileCol<2)tileCol++;
-  else if(d==LV_DIR_RIGHT&&tileCol>0)tileCol--;
-  else return;
-  lv_obj_set_tile_id(tv,tileCol,0,LV_ANIM_ON);
+// Wischen links/rechts wechselt die Kachel. Erkennung aus den Touch-Rohdaten in der Hauptschleife,
+// weil LVGL-Gesten bei Schieberegler und Mitten-Knopf nicht zuverlaessig beim Kachelbereich ankamen.
+static void handleSwipe(uint32_t now){
+  static bool active=false;static uint32_t lastDownMs=0;static uint16_t x0=0,y0=0;
+  if(touchDown){lastDownMs=now;if(!active){active=true;x0=touchX;y0=touchY;}}
+  bool down=touchDown||(now-lastDownMs<100);   // kurze Aussetzer des Touch ueberbruecken
+  if(down||!active)return;
+  active=false;
+  int dx=(int)touchX-(int)x0, dy=(int)touchY-(int)y0;
+  int ax=dx<0?-dx:dx, ay=dy<0?-dy:dy;
+  if(ax<40||ax<2*ay)return;                   // zu kurz oder zu schraeg
+  int cur=(lv_obj_get_scroll_x(tv)+120)/240;  // aktuelle Kachel aus der Scroll-Position
+  int target=cur;
+  if(dx<0&&cur<2)target=cur+1;
+  else if(dx>0&&cur>0)target=cur-1;
+  if(target==cur)return;
+  tileCol=target;
+  lv_obj_set_tile_id(tv,target,0,LV_ANIM_ON);
 }
 static void makeUI(){
   lv_obj_t *screen=lv_screen_active();
@@ -237,8 +247,6 @@ static void makeUI(){
   tileColor=lv_tileview_add_tile(tv,2,0,LV_DIR_LEFT);
   lv_obj_t *tiles[3]={tileBright,tilePower,tileColor};
   for(int i=0;i<3;i++){lv_obj_set_style_bg_color(tiles[i],lv_color_hex(0x000000),0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_scrollbar_mode(tiles[i],LV_SCROLLBAR_MODE_OFF);}
-  lv_obj_remove_flag(tv,LV_OBJ_FLAG_SCROLLABLE); // Kachelwechsel nur per Geste, damit Regler und Knopf nicht stoeren
-  lv_obj_add_event_cb(tv,tileGesture,LV_EVENT_GESTURE,nullptr);
   lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);
 
   // Helligkeit: vertikaler Balken, Prozent oben
@@ -453,6 +461,7 @@ void setup(){
 void loop(){
   static uint32_t tick=millis(),lastUI=0;uint32_t now=millis();lv_tick_inc(now-tick);tick=now;
   uint16_t tx=touchX,ty=touchY;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=tx;touchY=ty;}
+  handleSwipe(now);
   lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
