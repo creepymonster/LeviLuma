@@ -27,7 +27,8 @@ alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer 
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
-static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*stateLbl=nullptr,*caption=nullptr,*statusDot=nullptr,*holdArc=nullptr;
+static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*stateLbl=nullptr,*caption=nullptr,*statusWifi=nullptr,*statusBle=nullptr,*holdArc=nullptr;
+static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static int tileCol=1;static bool uiWifi=false;
 static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
@@ -131,8 +132,9 @@ static void setEnabled(lv_obj_t *o,bool en,lv_opa_t opaOn=LV_OPA_COVER){
 }
 static void updateUI(){
   State s=snapshot();
-  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected)return;
-  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;
+  bool wifi=WiFi.status()==WL_CONNECTED;
+  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected && wifi==uiWifi)return;
+  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;uiWifi=wifi;
   bool on=s.power==1;
   bool active=on&&s.ble;   // Helligkeit und Farben nur eingeschaltet und mit Band verbunden
   lv_color_t color=rgbColor(s.r,s.g,s.b);
@@ -144,7 +146,8 @@ static void updateUI(){
   lv_label_set_text(stateLbl,on?"AN":"AUS");
   lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
   // Statuspunkt: gruen verbunden, rot getrennt
-  lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
+  lv_obj_set_style_bg_color(statusWifi,wifi?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
+  lv_obj_set_style_bg_color(statusBle,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
   // Helligkeit
   lv_obj_set_style_bg_color(bar,color,LV_PART_INDICATOR);
   setEnabled(bar,active);
@@ -212,6 +215,15 @@ static void centerClicked(lv_event_t *e){ // LONG_PRESSED
   setPower(snapshot().power!=1);
 }
 
+// Wischen links/rechts wechselt die Kachel (Helligkeit | An/Aus | Farben).
+static void tileGesture(lv_event_t *e){
+  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
+  lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
+  if(d==LV_DIR_LEFT&&tileCol<2)tileCol++;
+  else if(d==LV_DIR_RIGHT&&tileCol>0)tileCol--;
+  else return;
+  lv_obj_set_tile_id(tv,tileCol,0,LV_ANIM_ON);
+}
 static void makeUI(){
   lv_obj_t *screen=lv_screen_active();
   lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
@@ -224,6 +236,8 @@ static void makeUI(){
   tileColor=lv_tileview_add_tile(tv,2,0,LV_DIR_LEFT);
   lv_obj_t *tiles[3]={tileBright,tilePower,tileColor};
   for(int i=0;i<3;i++){lv_obj_set_style_bg_color(tiles[i],lv_color_hex(0x000000),0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_scrollbar_mode(tiles[i],LV_SCROLLBAR_MODE_OFF);}
+  lv_obj_remove_flag(tv,LV_OBJ_FLAG_SCROLLABLE); // Kachelwechsel nur per Geste, damit Regler und Knopf nicht stoeren
+  lv_obj_add_event_cb(tv,tileGesture,LV_EVENT_GESTURE,nullptr);
   lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);
 
   // Helligkeit: vertikaler Balken, Prozent oben
@@ -243,8 +257,15 @@ static void makeUI(){
   stateLbl=lv_label_create(center);lv_obj_set_style_text_color(stateLbl,lv_color_white(),0);
   lv_obj_set_style_text_font(stateLbl,&lv_font_montserrat_32,0);lv_obj_align(stateLbl,LV_ALIGN_CENTER,0,-13);
   caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
-  statusDot=lv_obj_create(tilePower);lv_obj_set_size(statusDot,10,10);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
-  lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
+  // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
+  statusWifi=lv_obj_create(tilePower);lv_obj_set_size(statusWifi,10,10);lv_obj_set_style_radius(statusWifi,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-11,22);
+  statusBle=lv_obj_create(tilePower);lv_obj_set_size(statusBle,10,10);lv_obj_set_style_radius(statusBle,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(statusBle,0,0);lv_obj_align(statusBle,LV_ALIGN_TOP_MID,11,22);
+  lblWifi=lv_label_create(tilePower);lv_label_set_text(lblWifi,"W");lv_obj_set_style_text_color(lblWifi,lv_color_hex(0x888888),0);
+  lv_obj_align_to(lblWifi,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
+  lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x888888),0);
+  lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
   // Fortschrittsring waehrend des Haltens (nicht klickbar)
   holdArc=lv_arc_create(tilePower);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
   lv_arc_set_rotation(holdArc,270);lv_arc_set_bg_angles(holdArc,0,360);lv_arc_set_range(holdArc,0,100);lv_arc_set_value(holdArc,0);
@@ -354,7 +375,7 @@ static void bleTask(void*){
   }
 }
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
-static void stateJson(){State s=snapshot();String j="{\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
+static void stateJson(){State s=snapshot();String j="{\"wifi\":";j+=(WiFi.status()==WL_CONNECTED?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
 static void webInit(){
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
@@ -439,7 +460,7 @@ void loop(){
   // Lange ungenutzt: zurueck auf den Startbildschirm (Mitte), einmal pro Ruhephase
   static bool idleCentered=false;
   bool idle=now-lastTouchMs>LEVI_RECENTER_MS;
-  if(idle&&!idleCentered&&tv)lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);
+  if(idle&&!idleCentered&&tv){tileCol=1;lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);}
   idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
   wl_status_t wl=WiFi.status();
