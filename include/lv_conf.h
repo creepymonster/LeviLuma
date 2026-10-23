@@ -16,4 +16,6 @@
 /* An/Aus: Mitte 500 ms halten. */
 #define LV_INDEV_DEF_LONG_PRESS_TIME 500
 #define LV_FONT_MONTSERRAT_48 1
+#define LV_USE_SLIDER 1
+#define LV_USE_TILEVIEW 1
 #endif

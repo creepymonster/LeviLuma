@@ -26,13 +26,18 @@ static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
-static lv_obj_t *holdArc=nullptr,*iconBle=nullptr;static int arcPreview=-1,uiPreview=-2;static bool arcGestured=false;static int8_t lastConn=-1;
-static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
+static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
+static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*stateLbl=nullptr,*caption=nullptr,*statusDot=nullptr,*holdArc=nullptr,*iconBle=nullptr;
+static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};static int lastConn=-1;
 
-struct State { bool brightLock=false; bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
+struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
-static int8_t selected=4;
+static int8_t selected=-1;   // Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe
+// Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
+static constexpr int MUSIC_IDX=LeviCal::N;
+static constexpr int LIST_COUNT=LeviCal::N+1;
+static int wrapIdx(int i){return ((i%LIST_COUNT)+LIST_COUNT)%LIST_COUNT;}
 static uint32_t uiRevision=UINT32_MAX;
 static bool uiBle=false;
 static int8_t uiSelected=-2;
@@ -83,25 +88,21 @@ static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state;
 
 static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
 static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
-static void toggleBrightLock(){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightLock=!state.brightLock; ++state.revision; xSemaphoreGive(stateLock); LEVI_LOG("Helligkeit %s", state.brightLock?"gesperrt":"entsperrt"); }
 static void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
 static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
-  selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
-static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=5;}
-static void selectColor(int idx){int n=(idx%6+6)%6;if(n==5){setMusic(true);return;}setRGB(LeviPalette::rgb[n][0],LeviPalette::rgb[n][1],LeviPalette::rgb[n][2]);}
+  selected=-1;for(int i=0;i<LeviCal::N;i++)if(LeviCal::TARGET[i][0]==r&&LeviCal::TARGET[i][1]==g&&LeviCal::TARGET[i][2]==b){selected=(int8_t)i;break;} }
+static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=MUSIC_IDX;}
+static void selectColor(int idx){int n=wrapIdx(idx);if(n==MUSIC_IDX){setMusic(true);return;}setRGB(LeviCal::TARGET[n][0],LeviCal::TARGET[n][1],LeviCal::TARGET[n][2]);}
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
 static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
-// Heller Hintergrund -> dunkle Schrift und Knopf, sonst weiss. Verhindert unsichtbare Beschriftung bei Weiss.
+// Heller Hintergrund -> dunkle Schrift, sonst weiss.
 static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
   bool light=(r*299+g*587+b*114)/1000>170;
   lv_color_t fg=light?lv_color_hex(0x1A1A1A):lv_color_white();
-  lv_obj_set_style_text_color(percent,fg,0);
+  lv_obj_set_style_text_color(stateLbl,fg,0);
   lv_obj_set_style_text_color(caption,fg,0);
-  lv_obj_set_style_bg_color(arc,fg,LV_PART_KNOB);
 }
-
-
 static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
   lcd.startWrite();lcd.setAddrWindow(a->x1,a->y1,width,height);
@@ -121,86 +122,83 @@ static void readTouch(lv_indev_t*,lv_indev_data_t *d){
   d->point.x=touchX;d->point.y=touchY;
 }
 static void setHidden(lv_obj_t *o,bool h){if(h)lv_obj_add_flag(o,LV_OBJ_FLAG_HIDDEN);else lv_obj_remove_flag(o,LV_OBJ_FLAG_HIDDEN);}
+
 static void updateUI(){
   State s=snapshot();
-  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected && arcPreview==uiPreview)return;
-  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;uiPreview=arcPreview;
+  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected)return;
+  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;
+  bool on=s.power==1;
   lv_color_t color=rgbColor(s.r,s.g,s.b);
-  lv_obj_set_style_arc_color(arc,color,LV_PART_INDICATOR);
+  applyContrast(s.r,s.g,s.b);
+  // Mitte: Farbe und An/Aus
   lv_obj_set_style_bg_color(center,color,0);
   lv_obj_set_style_shadow_color(center,color,0);
-  applyContrast(s.r,s.g,s.b);
-  if(arcPreview<0)lv_arc_set_value(arc,s.brightness); // Ring folgt dem Zustand, solange nicht gezogen wird
-  uint8_t shown=arcPreview>0?(uint8_t)arcPreview:s.brightness;
-  char label[12];snprintf(label,sizeof(label),"%u%%",shown);
-  lv_label_set_text(percent,label);
-  bool on=s.power==1;
+  lv_obj_set_style_opa(center,on?LV_OPA_COVER:LV_OPA_60,0);
+  lv_label_set_text(stateLbl,on?"AN":"AUS");
   lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
-  if(on)lv_obj_remove_state(arc,LV_STATE_DISABLED);else lv_obj_add_state(arc,LV_STATE_DISABLED);
-  lv_obj_set_style_opa(arc,(on&&!s.brightLock)?LV_OPA_COVER:LV_OPA_40,0);
   lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
-  // Ohne Band nur das Bluetooth-Symbol in der Mitte, sonst Power, Ring und Farbanzeige
+  // Helligkeit: Balken in aktueller Farbe, Prozentwert daneben
+  lv_obj_set_style_bg_color(bar,color,LV_PART_INDICATOR);
+  if(lv_slider_get_value(bar)!=s.brightness)lv_slider_set_value(bar,s.brightness,LV_ANIM_OFF);
+  char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)s.brightness);
+  lv_label_set_text(barLbl,label);
+  lv_obj_set_style_opa(tileBright,on?LV_OPA_COVER:LV_OPA_40,0);
+  lv_obj_set_style_opa(tileColor,on?LV_OPA_COVER:LV_OPA_40,0);
+  // Ohne Verbindung: nur das Bluetooth-Symbol, keine Kacheln wischbar
   if(s.ble!=lastConn){
     lastConn=s.ble;
-    setHidden(center,!s.ble);setHidden(arc,!s.ble);setHidden(holdArc,!s.ble);
+    setHidden(center,!s.ble);setHidden(holdArc,!s.ble);setHidden(statusDot,!s.ble);
+    setHidden(bar,!s.ble);setHidden(barLbl,!s.ble);
+    for(int k=0;k<3;k++)setHidden(bubbles[k],!s.ble);
     setHidden(iconBle,s.ble);
-    for(int i=0;i<6;i++)setHidden(dots[i],!s.ble);
+    if(s.ble)lv_obj_add_flag(tv,LV_OBJ_FLAG_SCROLLABLE);
+    else{lv_obj_remove_flag(tv,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);}
   }
-  for(int i=0;i<6;i++){
-    if(i==5){lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,180);lv_obj_set_style_text_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);continue;}
-    int size=i==selected?8:6;
-    lv_obj_set_size(dots[i],size,size);
-    lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,186);
-    lv_obj_set_style_bg_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);
+  // Farbliste: aktive Farbe in der Mitte (groesser, weisser Rahmen), Nachbarn oben und unten
+  int base=selected<0?0:selected;
+  int idx[3]={wrapIdx(base-1),base,wrapIdx(base+1)};
+  static const int dy[3]={-78,0,78};
+  for(int k=0;k<3;k++){
+    bool mid=k==1, music=idx[k]==MUSIC_IDX;
+    bubbleIdx[k]=idx[k];
+    lv_color_t c;
+    if(music)c=lv_color_hex(0x292929);
+    else if(mid&&selected<0)c=color;
+    else c=lv_color_make(LeviCal::TARGET[idx[k]][0],LeviCal::TARGET[idx[k]][1],LeviCal::TARGET[idx[k]][2]);
+    int size=mid?76:36;
+    lv_obj_set_size(bubbles[k],size,size);
+    lv_obj_align(bubbles[k],LV_ALIGN_CENTER,0,dy[k]);
+    lv_obj_set_style_bg_color(bubbles[k],c,0);
+    lv_obj_set_style_border_width(bubbles[k],mid?2:0,0);
+    lv_label_set_text(bubbleLbl[k],music?LV_SYMBOL_AUDIO:"");
   }
-  for(int i=0;i<6;i++)lv_obj_set_style_opa(dots[i],on?LV_OPA_COVER:LV_OPA_40,0);
-  lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
+  for(int k=0;k<3;k++)lv_obj_set_style_opa(bubbles[k],LV_OPA_COVER,0);
 }
-static void arcChanged(lv_event_t *e){
+
+// Helligkeitsbalken: nur Benutzereingaben (Indev aktiv) setzen den Zustand, nicht die Anzeige selbst.
+static void barChanged(lv_event_t *e){
   if(lv_event_get_code(e)!=LV_EVENT_VALUE_CHANGED||!lv_indev_get_act())return;
+  if(snapshot().power!=1)return;
+  setBrightness(lv_slider_get_value(bar));
+}
+// Vertikal wischen auf der Farbkachel: eine Farbe weiter oder zurueck.
+static void colorGesture(lv_event_t *e){
+  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
   State s=snapshot();
-  if(s.power!=1||s.brightLock){lv_arc_set_value(arc,s.brightness);return;} // gesperrt: Ring springt zurueck
-  arcPreview=lv_arc_get_value(arc); // nur Vorschau, uebernommen wird beim Loslassen
-}
-static void screenGesture(lv_event_t *e){
-  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
-  if(snapshot().power!=1||!snapshot().ble)return; // Farbauswahl nur bei eingeschaltetem, verbundenem Band
+  if(s.power!=1||!s.ble)return;
   lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
   int base=selected<0?0:selected;
-  if(d==LV_DIR_LEFT)selectColor(base+1);
-  else if(d==LV_DIR_RIGHT)selectColor(base-1);
+  if(d==LV_DIR_UP)selectColor(base+1);
+  else if(d==LV_DIR_DOWN)selectColor(base-1);
 }
-// Ring: Vorschau waehrend des Ziehens, uebernommen wird nur beim Loslassen. Wischgesten (Farbwechsel)
-// die auf dem Ring beginnen, aendern die Helligkeit nicht und werden nicht an den Bildschirm weitergereicht.
-static lv_point_t arcPressPt={0,0},centerPressPt={0,0};
-static uint32_t lastArcPressMs=0;
-// Doppeltippen auf den Ring sperrt bzw. entsperrt die Helligkeit.
-static void arcPressed(lv_event_t *e){
-  (void)e;arcGestured=false;uint32_t now=millis();
-  if(now-lastArcPressMs<350){toggleBrightLock();lastArcPressMs=0;}else lastArcPressMs=now;
-  lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&arcPressPt);
+// Antippen einer Nachbarfarbe waehlt sie direkt.
+static void bubbleClicked(lv_event_t *e){
+  int k=(int)(intptr_t)lv_event_get_user_data(e);
+  State s=snapshot();
+  if(k==1||s.power!=1||!s.ble)return;
+  selectColor(bubbleIdx[k]);
 }
-// Geste auf dem Ring: Farbwechsel, Vorschau verwerfen, Ring zurueck auf die aktuelle Helligkeit.
-static void arcGesture(lv_event_t *e){
-  arcGestured=true;arcPreview=-1;
-  lv_arc_set_value(arc,snapshot().brightness);
-  lv_event_stop_bubbling(e);
-  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
-  lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
-  int base=selected<0?0:selected;
-  if(d==LV_DIR_LEFT)selectColor(base+1);
-  else if(d==LV_DIR_RIGHT)selectColor(base-1);
-}
-static void arcReleased(lv_event_t *e){
-  int v=arcPreview;bool gestured=arcGestured;arcPreview=-1;
-  if(lv_event_get_code(e)!=LV_EVENT_RELEASED||v<0||gestured)return;
-  lv_indev_t *in=lv_indev_get_act();if(!in)return;
-  lv_point_t p;lv_indev_get_point(in,&p);
-  int dx=p.x-arcPressPt.x,dy=p.y-arcPressPt.y;
-  int ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;
-  if(ax+ay<12)return;           // Tippen aendert nichts
-  setBrightness(v);
-}
+
 // Haltering fuer An/Aus: laeuft in 500 ms voll, verschwindet beim Loslassen oder nach dem Ausloesen.
 static void holdExec(void *obj,int32_t v){lv_arc_set_value((lv_obj_t*)obj,v);}
 static void holdStart(){
@@ -214,7 +212,7 @@ static void holdStop(){
   lv_anim_delete(holdArc,nullptr);
   lv_arc_set_value(holdArc,0);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
 }
-// Mitte: Druck startet den Ring, Halten (LONG_PRESSED nach 500 ms) schaltet An/Aus.
+static lv_point_t centerPressPt={0,0};
 static void centerPressed(lv_event_t *e){(void)e;holdStart();lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
 static void centerReleased(lv_event_t *e){(void)e;holdStop();}
 static void centerClicked(lv_event_t *e){ // LONG_PRESSED
@@ -225,33 +223,60 @@ static void centerClicked(lv_event_t *e){ // LONG_PRESSED
   if((dx<0?-dx:dx)+(dy<0?-dy:dy)>20)return;
   setPower(snapshot().power!=1);
 }
+
 static void makeUI(){
-  lv_obj_t *screen=lv_screen_active();lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_event_cb(screen,screenGesture,LV_EVENT_GESTURE,nullptr);
-  arc=lv_arc_create(screen);lv_obj_set_size(arc,216,216);lv_obj_center(arc);
-  lv_arc_set_rotation(arc,45);lv_arc_set_bg_angles(arc,0,270);lv_arc_set_range(arc,1,100);
-  lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
-  lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
-  lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcGesture,LV_EVENT_GESTURE,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_PRESS_LOST,nullptr);
-  lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
-  lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
-  percent=lv_label_create(center);lv_obj_set_style_text_color(percent,lv_color_white(),0);
-  lv_obj_set_style_text_font(percent,&lv_font_montserrat_32,0);lv_obj_align(percent,LV_ALIGN_CENTER,0,-13);
+  lv_obj_t *screen=lv_screen_active();
+  lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
+  // Drei Kacheln nebeneinander: links Helligkeit, Mitte An/Aus (Start), rechts Farben
+  tv=lv_tileview_create(screen);lv_obj_set_size(tv,240,240);lv_obj_center(tv);
+  lv_obj_set_style_bg_color(tv,lv_color_hex(0x000000),0);lv_obj_set_style_border_width(tv,0,0);lv_obj_set_style_pad_all(tv,0,0);
+  lv_obj_set_scrollbar_mode(tv,LV_SCROLLBAR_MODE_OFF);
+  tileBright=lv_tileview_add_tile(tv,0,0,LV_DIR_RIGHT);
+  tilePower=lv_tileview_add_tile(tv,1,0,LV_DIR_LEFT|LV_DIR_RIGHT);
+  tileColor=lv_tileview_add_tile(tv,2,0,LV_DIR_LEFT);
+  lv_obj_t *tiles[3]={tileBright,tilePower,tileColor};
+  for(int i=0;i<3;i++){lv_obj_set_style_bg_color(tiles[i],lv_color_hex(0x000000),0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_scrollbar_mode(tiles[i],LV_SCROLLBAR_MODE_OFF);}
+  lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);
+
+  // Helligkeit: vertikaler Balken, Prozent oben
+  bar=lv_slider_create(tileBright);lv_slider_set_range(bar,1,100);lv_obj_set_size(bar,72,160);lv_obj_align(bar,LV_ALIGN_CENTER,0,30);
+  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(bar,lv_color_hex(0x242424),LV_PART_MAIN);
+  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_INDICATOR);lv_obj_set_style_bg_color(bar,lv_color_white(),LV_PART_INDICATOR);
+  lv_obj_set_style_bg_opa(bar,LV_OPA_TRANSP,LV_PART_KNOB);lv_obj_set_style_border_width(bar,0,LV_PART_KNOB);
+  lv_obj_add_event_cb(bar,barChanged,LV_EVENT_VALUE_CHANGED,nullptr);
+  barLbl=lv_label_create(tileBright);lv_obj_set_style_text_color(barLbl,lv_color_white(),0);lv_obj_set_style_text_font(barLbl,&lv_font_montserrat_32,0);lv_obj_align(barLbl,LV_ALIGN_TOP_MID,0,12);
+
+  // Mitte: An/Aus mit Halten
+  center=lv_obj_create(tilePower);lv_obj_set_size(center,108,108);lv_obj_center(center);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);
+  lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);
+  lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);
+  lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
+  stateLbl=lv_label_create(center);lv_obj_set_style_text_color(stateLbl,lv_color_white(),0);
+  lv_obj_set_style_text_font(stateLbl,&lv_font_montserrat_32,0);lv_obj_align(stateLbl,LV_ALIGN_CENTER,0,-13);
   caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
-  statusDot=lv_obj_create(screen);lv_obj_set_size(statusDot,8,8);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
+  statusDot=lv_obj_create(tilePower);lv_obj_set_size(statusDot,8,8);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
-  for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,186);}
-  dots[5]=lv_label_create(screen);lv_label_set_text(dots[5],LV_SYMBOL_AUDIO);lv_obj_align(dots[5],LV_ALIGN_TOP_MID,(2*5-5)*6,180);
-  // Fortschrittsring waehrend des Haltens (nicht klickbar, damit die Mitte die Eingabe behaelt)
-  holdArc=lv_arc_create(screen);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
+  // Fortschrittsring waehrend des Haltens (nicht klickbar)
+  holdArc=lv_arc_create(tilePower);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
   lv_arc_set_rotation(holdArc,270);lv_arc_set_bg_angles(holdArc,0,360);lv_arc_set_range(holdArc,0,100);lv_arc_set_value(holdArc,0);
   lv_obj_remove_style(holdArc,nullptr,LV_PART_KNOB);
   lv_obj_set_style_arc_opa(holdArc,LV_OPA_TRANSP,LV_PART_MAIN);lv_obj_set_style_arc_width(holdArc,4,LV_PART_MAIN);
   lv_obj_set_style_arc_width(holdArc,4,LV_PART_INDICATOR);lv_obj_set_style_arc_color(holdArc,lv_color_white(),LV_PART_INDICATOR);
   lv_obj_remove_flag(holdArc,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
-  iconBle=lv_label_create(screen);lv_label_set_text(iconBle,LV_SYMBOL_BLUETOOTH);lv_obj_set_style_text_font(iconBle,&lv_font_montserrat_48,0);
+  iconBle=lv_label_create(tilePower);lv_label_set_text(iconBle,LV_SYMBOL_BLUETOOTH);lv_obj_set_style_text_font(iconBle,&lv_font_montserrat_48,0);
   lv_obj_set_style_text_color(iconBle,lv_color_white(),0);lv_obj_center(iconBle);
+
+  // Farbliste: drei Blasen untereinander, die mittlere ist aktiv und groesser
+  for(int k=0;k<3;k++){
+    bubbles[k]=lv_obj_create(tileColor);lv_obj_remove_flag(bubbles[k],LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(bubbles[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(bubbles[k],0,0);lv_obj_set_style_border_color(bubbles[k],lv_color_white(),0);
+    lv_obj_set_style_pad_all(bubbles[k],0,0);lv_obj_set_style_shadow_width(bubbles[k],0,0);
+    lv_obj_add_flag(bubbles[k],LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(bubbles[k],bubbleClicked,LV_EVENT_CLICKED,(void*)(intptr_t)k);
+    bubbleLbl[k]=lv_label_create(bubbles[k]);lv_obj_center(bubbleLbl[k]);lv_obj_set_style_text_color(bubbleLbl[k],lv_color_white(),0);
+  }
+  lv_obj_add_event_cb(tileColor,colorGesture,LV_EVENT_GESTURE,nullptr);
   updateUI();
 }
 
