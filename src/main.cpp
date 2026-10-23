@@ -26,7 +26,7 @@ static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
-static lv_obj_t *holdArc=nullptr;static bool holding=false;static uint32_t holdStartMs=0;
+static lv_obj_t *holdArc=nullptr,*iconBle=nullptr;static int arcPreview=-1,uiPreview=-2;static int8_t lastConn=-1;
 static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
 struct State { bool brightLock=false; bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
@@ -108,68 +108,107 @@ static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   lcd.pushPixels((const uint16_t*)px, width * height, true);
   lcd.endWrite();lv_display_flush_ready(disp);
 }
-// Touch-Treiber: eine Berührung im gedimmten Zustand weckt nur das Display und wird nicht
-// an die Oberfläche weitergegeben, bis der Finger wieder oben ist. Gesten erkennt LVGL.
+// Touch-Treiber: eine Beruehrung im gedimmten Zustand weckt nur das Display und wird nicht
+// an die Oberflaeche weitergegeben, bis der Finger wieder oben ist. Kurze Aussetzer des CST816S
+// (Loslassen unter 100 ms) werden ueberbrueckt. Gesten erkennt LVGL.
 static void readTouch(lv_indev_t*,lv_indev_data_t *d){
-  if(!touchDown)touchBlocked=false;
-  else if(screenDim){wake();touchBlocked=true;}
-  d->state=(touchDown&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
+  static uint32_t seenMs=0;
+  if(touchDown)seenMs=millis();
+  bool down=touchDown||(millis()-seenMs<100);
+  if(!down)touchBlocked=false;
+  else if(touchDown&&screenDim){wake();touchBlocked=true;}
+  d->state=(down&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
   d->point.x=touchX;d->point.y=touchY;
 }
+static void setHidden(lv_obj_t *o,bool h){if(h)lv_obj_add_flag(o,LV_OBJ_FLAG_HIDDEN);else lv_obj_remove_flag(o,LV_OBJ_FLAG_HIDDEN);}
 static void updateUI(){
   State s=snapshot();
-  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected)return;
-  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;
+  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected && arcPreview==uiPreview)return;
+  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;uiPreview=arcPreview;
   lv_color_t color=rgbColor(s.r,s.g,s.b);
   lv_obj_set_style_arc_color(arc,color,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(center,color,0);
   lv_obj_set_style_shadow_color(center,color,0);
   applyContrast(s.r,s.g,s.b);
-  lv_arc_set_value(arc,s.brightness);
-  char label[12];snprintf(label,sizeof(label),"%u%%",s.brightness);
+  if(arcPreview<0)lv_arc_set_value(arc,s.brightness); // Ring folgt dem Zustand, solange nicht gezogen wird
+  uint8_t shown=arcPreview>0?(uint8_t)arcPreview:s.brightness;
+  char label[12];snprintf(label,sizeof(label),"%u%%",shown);
   lv_label_set_text(percent,label);
   bool on=s.power==1;
   lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
   if(on)lv_obj_remove_state(arc,LV_STATE_DISABLED);else lv_obj_add_state(arc,LV_STATE_DISABLED);
   lv_obj_set_style_opa(arc,(on&&!s.brightLock)?LV_OPA_COVER:LV_OPA_40,0);
   lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
+  // Ohne Band nur das Bluetooth-Symbol in der Mitte, sonst Power, Ring und Farbanzeige
+  if(s.ble!=lastConn){
+    lastConn=s.ble;
+    setHidden(center,!s.ble);setHidden(arc,!s.ble);setHidden(holdArc,!s.ble);
+    setHidden(iconBle,s.ble);
+    for(int i=0;i<6;i++)setHidden(dots[i],!s.ble);
+  }
   for(int i=0;i<6;i++){
-    if(i==5){lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,190);lv_obj_set_style_text_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);continue;}
+    if(i==5){lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,180);lv_obj_set_style_text_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);continue;}
     int size=i==selected?8:6;
     lv_obj_set_size(dots[i],size,size);
-    lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);
+    lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,186);
     lv_obj_set_style_bg_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);
   }
   for(int i=0;i<6;i++)lv_obj_set_style_opa(dots[i],on?LV_OPA_COVER:LV_OPA_40,0);
-  lv_obj_set_style_opa(holdArc,holding?LV_OPA_COVER:LV_OPA_TRANSP,0);
-  if(holding){uint32_t el=millis()-holdStartMs;lv_arc_set_value(holdArc,el>=500?100:(int)(el*100/500));} // 500 ms bis An/Aus
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
 }
-static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED&&lv_indev_get_act()&&snapshot().power==1&&!snapshot().brightLock){setBrightness(lv_arc_get_value(arc));}}
+static void arcChanged(lv_event_t *e){
+  if(lv_event_get_code(e)!=LV_EVENT_VALUE_CHANGED||!lv_indev_get_act())return;
+  State s=snapshot();
+  if(s.power!=1||s.brightLock){lv_arc_set_value(arc,s.brightness);return;} // gesperrt: Ring springt zurueck
+  arcPreview=lv_arc_get_value(arc); // nur Vorschau, uebernommen wird beim Loslassen
+}
 static void screenGesture(lv_event_t *e){
   if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
-  if(snapshot().power!=1)return; // Farbauswahl nur bei eingeschaltetem Band
+  if(snapshot().power!=1||!snapshot().ble)return; // Farbauswahl nur bei eingeschaltetem, verbundenem Band
   lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
   int base=selected<0?0:selected;
   if(d==LV_DIR_LEFT)selectColor(base+1);
   else if(d==LV_DIR_RIGHT)selectColor(base-1);
 }
-// Ring: Helligkeit wird nur durch Ziehen am Ring geaendert. Wischt man ueber den Ring,
-// wird die Helligkeit auf den Wert vor der Geste zurueckgesetzt, die Geste laeuft zur Farbe weiter.
-static uint8_t arcStartBrightness=75;
-static lv_point_t centerPressPt={0,0};
+// Ring: Vorschau waehrend des Ziehens, uebernommen wird nur beim Loslassen. Tippen und horizontales
+// Wischen (Farbwechsel) aendern die Helligkeit nicht.
+static lv_point_t arcPressPt={0,0},centerPressPt={0,0};
 static uint32_t lastArcPressMs=0;
 // Doppeltippen auf den Ring sperrt bzw. entsperrt die Helligkeit.
-static void arcPressed(lv_event_t *e){(void)e;uint32_t now=millis();if(now-lastArcPressMs<350){toggleBrightLock();lastArcPressMs=0;}else lastArcPressMs=now;arcStartBrightness=snapshot().brightness;}
-static void arcGesture(lv_event_t *e){
-  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
-  if(snapshot().brightness!=arcStartBrightness)setBrightness(arcStartBrightness);
+static void arcPressed(lv_event_t *e){
+  (void)e;uint32_t now=millis();
+  if(now-lastArcPressMs<350){toggleBrightLock();lastArcPressMs=0;}else lastArcPressMs=now;
+  lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&arcPressPt);
 }
-// Mitte: nur ein Tippen (ohne Bewegung) schaltet die Power, Wischen nicht.
-static void centerPressed(lv_event_t *e){(void)e;holding=true;holdStartMs=millis();lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
-static void centerReleased(lv_event_t *e){(void)e;holding=false;}
-static void centerClicked(lv_event_t *e){
-  (void)e;
+static void arcReleased(lv_event_t *e){
+  int v=arcPreview;arcPreview=-1;
+  if(lv_event_get_code(e)!=LV_EVENT_RELEASED||v<0)return;
+  lv_indev_t *in=lv_indev_get_act();if(!in)return;
+  lv_point_t p;lv_indev_get_point(in,&p);
+  int dx=p.x-arcPressPt.x,dy=p.y-arcPressPt.y;
+  int ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;
+  if(ax+ay<12)return;           // Tippen aendert nichts
+  if(ax>ay*2&&ax>40)return;     // waagerechtes Wischen ist ein Farbwechsel
+  setBrightness(v);
+}
+// Haltering fuer An/Aus: laeuft in 500 ms voll, verschwindet beim Loslassen oder nach dem Ausloesen.
+static void holdExec(void *obj,int32_t v){lv_arc_set_value((lv_obj_t*)obj,v);}
+static void holdStart(){
+  lv_anim_delete(holdArc,nullptr);
+  lv_arc_set_value(holdArc,0);lv_obj_set_style_opa(holdArc,LV_OPA_COVER,0);
+  lv_anim_t a;lv_anim_init(&a);lv_anim_set_var(&a,holdArc);lv_anim_set_exec_cb(&a,holdExec);
+  lv_anim_set_values(&a,0,100);lv_anim_set_duration(&a,500);
+  lv_anim_start(&a);
+}
+static void holdStop(){
+  lv_anim_delete(holdArc,nullptr);
+  lv_arc_set_value(holdArc,0);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
+}
+// Mitte: Druck startet den Ring, Halten (LONG_PRESSED nach 500 ms) schaltet An/Aus.
+static void centerPressed(lv_event_t *e){(void)e;holdStart();lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
+static void centerReleased(lv_event_t *e){(void)e;holdStop();}
+static void centerClicked(lv_event_t *e){ // LONG_PRESSED
+  (void)e;holdStop();
   lv_indev_t *in=lv_indev_get_act();if(!in)return;
   lv_point_t p;lv_indev_get_point(in,&p);
   int dx=p.x-centerPressPt.x,dy=p.y-centerPressPt.y;
@@ -183,7 +222,7 @@ static void makeUI(){
   lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
   lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
-  lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcGesture,LV_EVENT_GESTURE,nullptr);
+  lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_PRESS_LOST,nullptr);
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
   center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
@@ -192,8 +231,8 @@ static void makeUI(){
   caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
   statusDot=lv_obj_create(screen);lv_obj_set_size(statusDot,8,8);lv_obj_set_style_radius(statusDot,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
-  for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);}
-  dots[5]=lv_label_create(screen);lv_label_set_text(dots[5],LV_SYMBOL_AUDIO);lv_obj_align(dots[5],LV_ALIGN_TOP_MID,(2*5-5)*6,190);
+  for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,186);}
+  dots[5]=lv_label_create(screen);lv_label_set_text(dots[5],LV_SYMBOL_AUDIO);lv_obj_align(dots[5],LV_ALIGN_TOP_MID,(2*5-5)*6,180);
   // Fortschrittsring waehrend des Haltens (nicht klickbar, damit die Mitte die Eingabe behaelt)
   holdArc=lv_arc_create(screen);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
   lv_arc_set_rotation(holdArc,270);lv_arc_set_bg_angles(holdArc,0,360);lv_arc_set_range(holdArc,0,100);lv_arc_set_value(holdArc,0);
@@ -201,6 +240,8 @@ static void makeUI(){
   lv_obj_set_style_arc_opa(holdArc,LV_OPA_TRANSP,LV_PART_MAIN);lv_obj_set_style_arc_width(holdArc,4,LV_PART_MAIN);
   lv_obj_set_style_arc_width(holdArc,4,LV_PART_INDICATOR);lv_obj_set_style_arc_color(holdArc,lv_color_white(),LV_PART_INDICATOR);
   lv_obj_remove_flag(holdArc,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
+  iconBle=lv_label_create(screen);lv_label_set_text(iconBle,LV_SYMBOL_BLUETOOTH);lv_obj_set_style_text_font(iconBle,&lv_font_montserrat_48,0);
+  lv_obj_set_style_text_color(iconBle,lv_color_white(),0);lv_obj_center(iconBle);
   updateUI();
 }
 

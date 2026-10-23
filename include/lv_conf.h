@@ -15,4 +15,5 @@
 #define LV_INDEV_DEF_GESTURE_LIMIT 30
 /* An/Aus: Mitte 500 ms halten. */
 #define LV_INDEV_DEF_LONG_PRESS_TIME 500
+#define LV_FONT_MONTSERRAT_48 1
 #endif
