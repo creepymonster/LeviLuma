@@ -236,7 +236,7 @@ static void handleSwipe(uint32_t now){
   bool down=touchDown||(now-lastDownMs<100);   // kurze Aussetzer des Touch ueberbruecken
   int x=touchX,y=touchY;
   if(down){
-    if(st==IDLE){st=PENDING;x0=x;y0=y;base=lv_obj_get_x(tv);}
+    if(st==IDLE){st=PENDING;x0=x;y0=y;base=lv_obj_get_x(tv);LEVI_LOG("Touch an: x=%d y=%d", x, y);}
     int dx=x-x0,dy=y-y0,ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;
     if(st==PENDING&&(ax>=12||ay>=12)){
       if(ax>2*ay){st=DRAG;lv_anim_delete(tv,nullptr);}
@@ -250,6 +250,7 @@ static void handleSwipe(uint32_t now){
     }
     return;
   }
+  LEVI_LOG("Touch los: Zustand=%d x=%d y=%d", st, x, y);
   if(st==DRAG){
     int dx=x-x0;
     LEVI_LOG("Wischen: dx=%d Start-Kachel-x=%d", dx, base);
