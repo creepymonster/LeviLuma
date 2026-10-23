@@ -27,7 +27,7 @@ alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer 
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *holdArc=nullptr;static bool holding=false;static uint32_t holdStartMs=0;
-static lv_obj_t *arc=nullptr,*center=nullptr,**percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
+static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
 struct State { bool brightLock=false; bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
