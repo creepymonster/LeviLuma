@@ -45,6 +45,10 @@ static bool touchDown=false;
 static uint16_t touchX=120,touchY=120;
 static bool touchBlocked=false;
 static bool screenDim=false;
+// Nach so vielen ms ohne Beruehrung springt die Ansicht zurueck auf die Mitte (An/Aus).
+#ifndef LEVI_RECENTER_MS
+#define LEVI_RECENTER_MS 60000
+#endif
 static uint8_t currentBacklight=255;
 
 // Kalibrierung: Kanal-Gains und Gamma, im NVS gespeichert. Ausgabe = gamma(gain*in).
@@ -114,7 +118,7 @@ static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
 // (Loslassen unter 100 ms) werden ueberbrueckt. Gesten erkennt LVGL.
 static void readTouch(lv_indev_t*,lv_indev_data_t *d){
   static uint32_t seenMs=0;
-  if(touchDown)seenMs=millis();
+  if(touchDown){seenMs=millis();lastTouchMs=seenMs;}
   bool down=touchDown||(millis()-seenMs<100);
   if(!down)touchBlocked=false;
   else if(touchDown&&screenDim){wake();touchBlocked=true;}
@@ -446,6 +450,11 @@ void loop(){
   lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
+  // Lange ungenutzt: zurueck auf den Startbildschirm (Mitte), einmal pro Ruhephase
+  static bool idleCentered=false;
+  bool idle=now-lastTouchMs>LEVI_RECENTER_MS;
+  if(idle&&!idleCentered&&tv)lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);
+  idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
   wl_status_t wl=WiFi.status();
   if(wl!=lastWl){LEVI_LOG("WLAN: Status %s -> %s", wlStatusName(lastWl), wlStatusName(wl));lastWl=wl;}
