@@ -9,7 +9,9 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .calib{margin:16px auto 0;max-width:430px}
 .tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .tile{display:flex;flex-direction:column;justify-content:center;padding:20px 18px}
-.tile .line{flex-direction:column;gap:14px;margin:0}
+.power-tile{position:relative;padding:20px 18px}
+.statebar{display:flex;justify-content:center;margin-top:14px}
+.power-tile .power{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
 .tile .brightnessline{margin-bottom:6px}
 @media (max-width:760px){.tri{grid-template-columns:minmax(0,1fr)}}
 .calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
@@ -19,7 +21,7 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .line{margin:24px 0}.state{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:400}.state svg{width:20px;height:20px}.power{border:0;border-radius:99px;background:#191919;color:#fff;font-size:14px;font-weight:700;padding:12px 16px;cursor:pointer}
 .divider{height:1px;background:#ededed;margin:19px 0}.preview{width:84px;height:84px;border-radius:50%;border:4px solid #EDEDEB;background:#8b5cf6;margin:18px auto 10px;border-color:#EDEDEB}
 .preview{border-color:#EDEDEB} .muted{color:#818181}.center{text-align:center;font-size:13px}
-.swatches{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:19px 0}.swatches button{width:32px;height:32px;border-radius:50%;border:1px solid #e1e1e1;cursor:pointer}.swatches button.sel{outline:3px solid #292929;outline-offset:0}
+.swatches{display:grid;grid-template-columns:repeat(5,32px);justify-content:center;gap:10px;margin:4px 0 18px}.swatches button{width:32px;height:32px;border-radius:50%;border:1px solid #e1e1e1;cursor:pointer}.swatches button.sel{outline:3px solid #292929;outline-offset:0}
 .colorline{display:flex;justify-content:center;align-items:center;gap:9px}.colorline input[type=color]{position:absolute;opacity:0;width:1px;height:1px}.colorpill{display:flex;align-items:center;gap:9px;border:1px solid #e1e1e1;border-radius:99px;padding:8px 14px;cursor:pointer;font-size:14px;color:#555}.colorpill .sample{width:15px;height:15px;border-radius:50%}
 .brightnessline{display:flex;align-items:center;justify-content:space-between}.brightnessline b{font-size:17px}.brightnessline span{font-size:20px;color:#888}
 input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:6px;border-radius:99px;background:linear-gradient(to right,#1c1c1c 75%,#e5e5e5 75%);margin:25px 0 13px;cursor:pointer}
@@ -37,9 +39,7 @@ input[type=range]:focus{outline:none}
 input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(41,41,41,.18)}
 .locked{opacity:.4;pointer-events:none}
 </style></head><body><div class="shell"><header><h1><svg width="33" height="37" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6m-5 4h4m-2-20a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>LeviLuma</h1><p>Light. Color. Control.</p><div class="branddots"><i style="background:#E24F62"></i><i style="background:#E7A23B"></i><i style="background:#5FC36B"></i><i style="background:#52B4D1"></i><i style="background:#8B5CF6"></i></div></header>
-<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile" id="tPower"><div class="top"><strong>LED-Steuerung</strong><span id="ble" class="chip">BLE getrennt</span></div>
-<div class="line"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span><button class="power" id="power">Einschalten</button></div>
-</section><section class="card tile" id="tColors"><div class="preview" id="preview"></div><p class="muted center">Farbe auswählen</p><div class="swatches" id="swatches"></div>
+<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile power-tile" id="tPower"><div class="top"><strong>LED-Steuerung</strong><span id="ble" class="chip">BLE getrennt</span></div><div class="statebar"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
 <div class="colorline"><label class="colorpill" for="color"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.2-2.5h2.1A4.2 4.2 0 0 0 22 11a9 9 0 0 0-10-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.5" r="1"/><circle cx="16" cy="7.5" r="1"/></svg><span class="sample" id="sample"></span><span id="hex">#8B5CF6</span></label><input type="color" id="color" value="#8b5cf6"></div>
 </section></main>
 <section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
@@ -62,7 +62,7 @@ const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),hex=()=>('#'+[s.r,s.g,s
 function post(url){editingUntil=Date.now()+1200;fetch(url,{method:'POST'}).then(()=>refresh()).catch(()=>{});}
 function setColor(h){s.music=false;[s.r,s.g,s.b]=rgb(h);render();post('/api/color?r='+s.r+'&g='+s.g+'&b='+s.b)}
 palette.forEach(h=>{let b=document.createElement('button');b.style.background=h;b.setAttribute('aria-label',h);b.onclick=()=>setColor(h);$('swatches').appendChild(b)});{let m=document.createElement('button');m.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';m.style.background='#292929';m.style.color='#fff';m.setAttribute('aria-label','Musikmodus');m.onclick=()=>{s.music=true;render();post('/api/music?on=1')};$('swatches').appendChild(m)}
-function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.brightnessline,#brightness,#swatches').forEach(el=>el.classList.toggle('locked',!on));$('preview').style.background=h;$('sample').style.background=h;$('hex').textContent=h.toUpperCase();$('color').value=h;
+function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.brightnessline,#brightness,#swatches').forEach(el=>el.classList.toggle('locked',!on));$('sample').style.background=h;$('hex').textContent=h.toUpperCase();$('color').value=h;
 $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;$('brightness').style.setProperty('--p',((s.brightness-1)/99*100)+'%');let pct=(s.brightness-1)/99*100;$('brightness').style.background='linear-gradient(to right,#191919 '+pct+'%,#e5e5e5 '+pct+'%)';
 $('pstatus').textContent=s.power==='on'?'Eingeschaltet':s.power==='off'?'Ausgeschaltet':'Status unbekannt';$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';$('powerIcon').setAttribute('stroke',s.power==='on'?'#23a455':'#aaa');
 [...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&palette[i]===h));$('swatches').lastElementChild.classList.toggle('sel',!!s.music);}
