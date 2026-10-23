@@ -9,9 +9,11 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .calib{margin:16px auto 0;max-width:430px}
 .tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .tile{display:flex;flex-direction:column;justify-content:center;padding:20px 18px}
-.power-tile{position:relative;padding:20px 18px}
-.dot{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#e5484d}.dot.ok{background:#79da89}
-.statebar{display:flex;justify-content:center;margin-top:14px}
+.power-tile{position:relative;padding:20px 18px;justify-content:flex-start}
+.dots{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px}
+.dl{font-size:11px;font-weight:600;color:#888;line-height:1}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#e5484d}.dot.ok{background:#79da89}
+.statebar{display:flex;justify-content:center;margin-top:40px}
 .power-tile .power{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
 .tile .brightnessline{margin-bottom:6px}
 @media (max-width:760px){.tri{grid-template-columns:minmax(0,1fr)}}
@@ -40,7 +42,7 @@ input[type=range]:focus{outline:none}
 input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(41,41,41,.18)}
 .locked{opacity:.4;pointer-events:none}
 </style></head><body><div class="shell"><header><h1><svg width="33" height="37" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6m-5 4h4m-2-20a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>LeviLuma</h1><p>Light. Color. Control.</p><div class="branddots"><i style="background:#E24F62"></i><i style="background:#E7A23B"></i><i style="background:#5FC36B"></i><i style="background:#52B4D1"></i><i style="background:#8B5CF6"></i></div></header>
-<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile power-tile" id="tPower"><span id="ble" class="dot" title="BLE getrennt"></span><div class="statebar"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
+<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile power-tile" id="tPower"><div class="dots"><span class="dl">W</span><span id="wifi" class="dot" title="WLAN getrennt"></span><span id="ble" class="dot" title="BLE getrennt"></span><span class="dl">B</span></div><div class="statebar"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
 <div class="colorline"><label class="colorpill" for="color"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.2-2.5h2.1A4.2 4.2 0 0 0 22 11a9 9 0 0 0-10-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.5" r="1"/><circle cx="16" cy="7.5" r="1"/></svg><span class="sample" id="sample"></span><span id="hex">#8B5CF6</span></label><input type="color" id="color" value="#8b5cf6"></div>
 </section></main>
 <section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
@@ -67,7 +69,7 @@ function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.
 $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;$('brightness').style.setProperty('--p',((s.brightness-1)/99*100)+'%');let pct=(s.brightness-1)/99*100;$('brightness').style.background='linear-gradient(to right,#191919 '+pct+'%,#e5e5e5 '+pct+'%)';
 $('pstatus').textContent=s.power==='on'?'Eingeschaltet':s.power==='off'?'Ausgeschaltet':'Status unbekannt';$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';$('powerIcon').setAttribute('stroke',s.power==='on'?'#23a455':'#aaa');
 [...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&palette[i]===h));$('swatches').lastElementChild.classList.toggle('sel',!!s.music);}
-function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let b=$('ble');b.title=d.ble?'BLE verbunden':'BLE getrennt';b.className='dot'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('ble').title='ESP offline';$('ble').className='dot';});}
+function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let w=$('wifi');w.title=d.wifi?'WLAN verbunden':'WLAN getrennt';w.className='dot'+(d.wifi?' ok':'');let b=$('ble');b.title=d.ble?'BLE verbunden':'BLE getrennt';b.className='dot'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('wifi').title='ESP offline';$('wifi').className='dot';$('ble').title='ESP offline';$('ble').className='dot';});}
 const togglePower=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
 $('power').onclick=togglePower;
 $('color').oninput=e=>setColor(e.target.value);
