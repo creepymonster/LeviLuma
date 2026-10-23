@@ -27,7 +27,7 @@ alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer 
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
-static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*stateLbl=nullptr,*caption=nullptr,*statusWifi=nullptr,*statusBle=nullptr,*holdArc=nullptr;
+static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static int tileCol=1;static bool uiWifi=false;
 static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
@@ -104,8 +104,7 @@ static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r
 static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
   bool light=(r*299+g*587+b*114)/1000>170;
   lv_color_t fg=light?lv_color_hex(0x1A1A1A):lv_color_white();
-  lv_obj_set_style_text_color(stateLbl,fg,0);
-  lv_obj_set_style_text_color(caption,fg,0);
+  lv_obj_set_style_text_color(pillLbl,fg,0);
 }
 static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
@@ -143,8 +142,7 @@ static void updateUI(){
   lv_obj_set_style_bg_color(center,color,0);
   lv_obj_set_style_shadow_color(center,color,0);
   setEnabled(center,s.ble,on?LV_OPA_COVER:LV_OPA_60);
-  lv_label_set_text(stateLbl,on?"AN":"AUS");
-  lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
+  lv_label_set_text(pillLbl,on?"Ausschalten":"Einschalten");
   // Statuspunkt: gruen verbunden, rot getrennt
   lv_obj_set_style_bg_color(statusWifi,wifi?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
   lv_obj_set_style_bg_color(statusBle,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
@@ -191,17 +189,18 @@ static void bubbleClicked(lv_event_t *e){
 }
 
 // Haltering fuer An/Aus: laeuft in 500 ms voll, verschwindet beim Loslassen oder nach dem Ausloesen.
-static void holdExec(void *obj,int32_t v){lv_arc_set_value((lv_obj_t*)obj,v);}
+// Halten-Fuellung in der Pille: laeuft in 500 ms von links nach rechts voll, verschwindet beim Loslassen.
+static void holdExec(void *obj,int32_t v){lv_obj_set_width((lv_obj_t*)obj,v);}
 static void holdStart(){
-  lv_anim_delete(holdArc,nullptr);
-  lv_arc_set_value(holdArc,0);lv_obj_set_style_opa(holdArc,LV_OPA_COVER,0);
-  lv_anim_t a;lv_anim_init(&a);lv_anim_set_var(&a,holdArc);lv_anim_set_exec_cb(&a,holdExec);
-  lv_anim_set_values(&a,0,100);lv_anim_set_duration(&a,500);
+  lv_anim_delete(holdFill,nullptr);
+  lv_obj_set_width(holdFill,0);
+  lv_anim_t a;lv_anim_init(&a);lv_anim_set_var(&a,holdFill);lv_anim_set_exec_cb(&a,holdExec);
+  lv_anim_set_values(&a,0,lv_obj_get_width(center));lv_anim_set_duration(&a,500);
   lv_anim_start(&a);
 }
 static void holdStop(){
-  lv_anim_delete(holdArc,nullptr);
-  lv_arc_set_value(holdArc,0);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
+  lv_anim_delete(holdFill,nullptr);
+  lv_obj_set_width(holdFill,0);
 }
 static lv_point_t centerPressPt={0,0};
 static void centerPressed(lv_event_t *e){(void)e;holdStart();lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
@@ -249,14 +248,17 @@ static void makeUI(){
   barLbl=lv_label_create(tileBright);lv_obj_set_style_text_color(barLbl,lv_color_white(),0);lv_obj_set_style_text_font(barLbl,&lv_font_montserrat_32,0);lv_obj_align(barLbl,LV_ALIGN_TOP_MID,0,12);
 
   // Mitte: An/Aus mit Halten
-  center=lv_obj_create(tilePower);lv_obj_set_size(center,108,108);lv_obj_center(center);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);
+  center=lv_obj_create(tilePower);lv_obj_set_size(center,150,48);lv_obj_center(center);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);
   lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);
-  lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);
+  lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);lv_obj_set_style_clip_corner(center,true,0);lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);
   lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
-  stateLbl=lv_label_create(center);lv_obj_set_style_text_color(stateLbl,lv_color_white(),0);
-  lv_obj_set_style_text_font(stateLbl,&lv_font_montserrat_32,0);lv_obj_align(stateLbl,LV_ALIGN_CENTER,0,-13);
-  caption=lv_label_create(center);lv_obj_set_style_text_color(caption,lv_color_white(),0);lv_obj_align(caption,LV_ALIGN_CENTER,0,19);
+  // Fuellung beim Halten (liegt unter der Beschriftung, von der Pille beschnitten)
+  holdFill=lv_obj_create(center);lv_obj_set_size(holdFill,0,48);lv_obj_set_style_radius(holdFill,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(holdFill,0,0);lv_obj_set_style_pad_all(holdFill,0,0);lv_obj_set_style_shadow_width(holdFill,0,0);
+  lv_obj_set_style_bg_color(holdFill,lv_color_white(),0);lv_obj_set_style_bg_opa(holdFill,LV_OPA_30,0);
+  lv_obj_remove_flag(holdFill,LV_OBJ_FLAG_CLICKABLE);lv_obj_align(holdFill,LV_ALIGN_LEFT_MID,0,0);
+  pillLbl=lv_label_create(center);lv_obj_set_style_text_color(pillLbl,lv_color_white(),0);lv_obj_center(pillLbl);
   // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
   statusWifi=lv_obj_create(tilePower);lv_obj_set_size(statusWifi,10,10);lv_obj_set_style_radius(statusWifi,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-11,22);
@@ -266,13 +268,6 @@ static void makeUI(){
   lv_obj_align_to(lblWifi,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
   lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x888888),0);
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
-  // Fortschrittsring waehrend des Haltens (nicht klickbar)
-  holdArc=lv_arc_create(tilePower);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
-  lv_arc_set_rotation(holdArc,270);lv_arc_set_bg_angles(holdArc,0,360);lv_arc_set_range(holdArc,0,100);lv_arc_set_value(holdArc,0);
-  lv_obj_remove_style(holdArc,nullptr,LV_PART_KNOB);
-  lv_obj_set_style_arc_opa(holdArc,LV_OPA_TRANSP,LV_PART_MAIN);lv_obj_set_style_arc_width(holdArc,4,LV_PART_MAIN);
-  lv_obj_set_style_arc_width(holdArc,4,LV_PART_INDICATOR);lv_obj_set_style_arc_color(holdArc,lv_color_white(),LV_PART_INDICATOR);
-  lv_obj_remove_flag(holdArc,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
 
   // Farbliste: drei Blasen untereinander, die mittlere ist aktiv und groesser
   for(int k=0;k<3;k++){
