@@ -161,7 +161,7 @@ static void updateUI(){
   // Farbliste: aktive Farbe in der Mitte (groesser, weisser Rahmen), Nachbarn oben und unten
   int base=selected<0?0:selected;
   int idx[3]={wrapIdx(base-1),base,wrapIdx(base+1)};
-  static const int dy[3]={-78,0,78};
+  static const int dy[3]={-80,0,80};
   for(int k=0;k<3;k++){
     bool mid=k==1, music=idx[k]==MUSIC_IDX;
     bubbleIdx[k]=idx[k];
@@ -169,7 +169,7 @@ static void updateUI(){
     if(music)c=lv_color_hex(0x292929);
     else if(mid&&selected<0)c=color;
     else c=lv_color_make(LeviCal::TARGET[idx[k]][0],LeviCal::TARGET[idx[k]][1],LeviCal::TARGET[idx[k]][2]);
-    int size=mid?76:36;
+    int size=mid?76:44;
     lv_obj_set_size(bubbles[k],size,size);
     lv_obj_align(bubbles[k],LV_ALIGN_CENTER,0,dy[k]);
     lv_obj_set_style_bg_color(bubbles[k],c,0);
@@ -185,22 +185,12 @@ static void barChanged(lv_event_t *e){
   if(snapshot().power!=1)return;
   setBrightness(lv_slider_get_value(bar));
 }
-// Vertikal wischen auf der Farbkachel: eine Farbe weiter oder zurueck.
-static void colorGesture(lv_event_t *e){
-  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
-  State s=snapshot();
-  if(s.power!=1||!s.ble)return;
-  lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
-  int base=selected<0?0:selected;
-  if(d==LV_DIR_UP)selectColor(base+1);
-  else if(d==LV_DIR_DOWN)selectColor(base-1);
-}
-// Antippen einer Nachbarfarbe waehlt sie direkt.
+// Tippen auf die Farbblasen: obere/untere waehlt diese Farbe, Tippen in die Mitte nimmt die naechste.
 static void bubbleClicked(lv_event_t *e){
   int k=(int)(intptr_t)lv_event_get_user_data(e);
   State s=snapshot();
-  if(k==1||s.power!=1||!s.ble)return;
-  selectColor(bubbleIdx[k]);
+  if(s.power!=1||!s.ble)return;
+  selectColor(k==1?bubbleIdx[2]:bubbleIdx[k]);
 }
 
 // Haltering fuer An/Aus: laeuft in 500 ms voll, verschwindet beim Loslassen oder nach dem Ausloesen.
@@ -280,7 +270,6 @@ static void makeUI(){
     lv_obj_add_event_cb(bubbles[k],bubbleClicked,LV_EVENT_CLICKED,(void*)(intptr_t)k);
     bubbleLbl[k]=lv_label_create(bubbles[k]);lv_obj_center(bubbleLbl[k]);lv_obj_set_style_text_color(bubbleLbl[k],lv_color_white(),0);
   }
-  lv_obj_add_event_cb(tileColor,colorGesture,LV_EVENT_GESTURE,nullptr);
   updateUI();
 }
 
