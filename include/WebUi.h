@@ -10,6 +10,7 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .tile{display:flex;flex-direction:column;justify-content:center;padding:20px 18px}
 .power-tile{position:relative;padding:20px 18px}
+.dot{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#e5484d}.dot.ok{background:#79da89}
 .statebar{display:flex;justify-content:center;margin-top:14px}
 .power-tile .power{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
 .tile .brightnessline{margin-bottom:6px}
@@ -17,13 +18,13 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
 .calib button:active{background:#f3f3f3}
 .card{background:white;border-radius:20px;padding:21px 20px 22px;box-shadow:0 4px 20px #00000007}
-.top,.line{display:flex;align-items:center;justify-content:space-between;gap:12px}.top strong{font-size:17px}.chip{padding:6px 10px;border-radius:99px;background:#ededed;color:#686868;font-size:12px;font-weight:650;white-space:nowrap}.chip.ok{background:#d8f5df;color:#1e743e}
-.line{margin:24px 0}.state{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:400}.state svg{width:20px;height:20px}.power{border:0;border-radius:99px;background:#191919;color:#fff;font-size:14px;font-weight:700;padding:12px 16px;cursor:pointer}
+.top,.line{display:flex;align-items:center;justify-content:space-between;gap:12px}.top strong{font-size:17px;font-weight:600}.chip{padding:6px 10px;border-radius:99px;background:#ededed;color:#686868;font-size:12px;font-weight:650;white-space:nowrap}.chip.ok{background:#d8f5df;color:#1e743e}
+.line{margin:24px 0}.state{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:400}.state svg{width:20px;height:20px}.power{border:0;border-radius:99px;background:#191919;color:#fff;font-size:15px;font-weight:600;padding:12px 16px;cursor:pointer}
 .divider{height:1px;background:#ededed;margin:19px 0}.preview{width:84px;height:84px;border-radius:50%;border:4px solid #EDEDEB;background:#8b5cf6;margin:18px auto 10px;border-color:#EDEDEB}
 .preview{border-color:#EDEDEB} .muted{color:#818181}.center{text-align:center;font-size:13px}
 .swatches{display:grid;grid-template-columns:repeat(5,32px);justify-content:center;gap:10px;margin:4px 0 18px}.swatches button{width:32px;height:32px;border-radius:50%;border:1px solid #e1e1e1;cursor:pointer}.swatches button.sel{outline:3px solid #292929;outline-offset:0}
-.colorline{display:flex;justify-content:center;align-items:center;gap:9px}.colorline input[type=color]{position:absolute;opacity:0;width:1px;height:1px}.colorpill{display:flex;align-items:center;gap:9px;border:1px solid #e1e1e1;border-radius:99px;padding:8px 14px;cursor:pointer;font-size:14px;color:#555}.colorpill .sample{width:15px;height:15px;border-radius:50%}
-.brightnessline{display:flex;align-items:center;justify-content:space-between}.brightnessline b{font-size:17px}.brightnessline span{font-size:20px;color:#888}
+.colorline{display:flex;justify-content:center;align-items:center;gap:9px}.colorline input[type=color]{position:absolute;opacity:0;width:1px;height:1px}.colorpill{display:flex;align-items:center;gap:9px;border:1px solid #e1e1e1;border-radius:99px;padding:8px 14px;cursor:pointer;font-size:15px;color:#555}.colorpill .sample{width:15px;height:15px;border-radius:50%}
+.brightnessline{display:flex;align-items:center;justify-content:space-between}.brightnessline b{font-size:15px;font-weight:400}.brightnessline span{font-size:15px;color:#888}
 input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:6px;border-radius:99px;background:linear-gradient(to right,#1c1c1c 75%,#e5e5e5 75%);margin:25px 0 13px;cursor:pointer}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:28px;border-radius:99px;background:#fff;box-shadow:0 1px 6px #0004;border:1px solid #ddd}
 input[type=range]::-moz-range-thumb{width:14px;height:28px;border-radius:99px;background:#fff;box-shadow:0 1px 6px #0004;border:1px solid #ddd}
@@ -39,7 +40,7 @@ input[type=range]:focus{outline:none}
 input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(41,41,41,.18)}
 .locked{opacity:.4;pointer-events:none}
 </style></head><body><div class="shell"><header><h1><svg width="33" height="37" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6m-5 4h4m-2-20a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>LeviLuma</h1><p>Light. Color. Control.</p><div class="branddots"><i style="background:#E24F62"></i><i style="background:#E7A23B"></i><i style="background:#5FC36B"></i><i style="background:#52B4D1"></i><i style="background:#8B5CF6"></i></div></header>
-<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile power-tile" id="tPower"><div class="top"><strong>LED-Steuerung</strong><span id="ble" class="chip">BLE getrennt</span></div><div class="statebar"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
+<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile power-tile" id="tPower"><span id="ble" class="dot" title="BLE getrennt"></span><div class="statebar"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
 <div class="colorline"><label class="colorpill" for="color"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.2-2.5h2.1A4.2 4.2 0 0 0 22 11a9 9 0 0 0-10-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.5" r="1"/><circle cx="16" cy="7.5" r="1"/></svg><span class="sample" id="sample"></span><span id="hex">#8B5CF6</span></label><input type="color" id="color" value="#8b5cf6"></div>
 </section></main>
 <section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
@@ -66,7 +67,7 @@ function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.
 $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;$('brightness').style.setProperty('--p',((s.brightness-1)/99*100)+'%');let pct=(s.brightness-1)/99*100;$('brightness').style.background='linear-gradient(to right,#191919 '+pct+'%,#e5e5e5 '+pct+'%)';
 $('pstatus').textContent=s.power==='on'?'Eingeschaltet':s.power==='off'?'Ausgeschaltet':'Status unbekannt';$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';$('powerIcon').setAttribute('stroke',s.power==='on'?'#23a455':'#aaa');
 [...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&palette[i]===h));$('swatches').lastElementChild.classList.toggle('sel',!!s.music);}
-function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let b=$('ble');b.textContent=d.ble?'BLE verbunden':'BLE getrennt';b.className='chip'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('ble').textContent='ESP offline';$('ble').className='chip';});}
+function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let b=$('ble');b.title=d.ble?'BLE verbunden':'BLE getrennt';b.className='dot'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('ble').title='ESP offline';$('ble').className='dot';});}
 const togglePower=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
 $('power').onclick=togglePower;
 $('color').oninput=e=>setColor(e.target.value);
