@@ -29,7 +29,7 @@ static lv_indev_t *input=nullptr;
 static lv_obj_t *holdArc=nullptr;static bool holding=false;static uint32_t holdStartMs=0;
 static lv_obj_t *arc=nullptr,*center=nullptr,**percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
-struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
+struct State { bool brightLock=false; bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
 static int8_t selected=4;
@@ -82,7 +82,8 @@ static String calibJson(){
 static State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state; xSemaphoreGive(stateLock); return s; }
 
 static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
-static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
+static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); if(!state.brightLock){state.brightness=constrain(b,1,100); ++state.revision;} xSemaphoreGive(stateLock); }
+static void toggleBrightLock(){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightLock=!state.brightLock; ++state.revision; xSemaphoreGive(stateLock); LEVI_LOG("Helligkeit %s", state.brightLock?"gesperrt":"entsperrt"); }
 static void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
 static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
   selected=-1;for(int i=0;i<5;i++)if(LeviPalette::rgb[i][0]==r&&LeviPalette::rgb[i][1]==g&&LeviPalette::rgb[i][2]==b){selected=i;break;} }
@@ -130,7 +131,7 @@ static void updateUI(){
   bool on=s.power==1;
   lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
   if(on)lv_obj_remove_state(arc,LV_STATE_DISABLED);else lv_obj_add_state(arc,LV_STATE_DISABLED);
-  lv_obj_set_style_opa(arc,on?LV_OPA_COVER:LV_OPA_40,0);
+  lv_obj_set_style_opa(arc,(on&&!s.brightLock)?LV_OPA_COVER:LV_OPA_40,0);
   lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
   for(int i=0;i<6;i++){
     if(i==5){lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,190);lv_obj_set_style_text_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);continue;}
@@ -157,7 +158,9 @@ static void screenGesture(lv_event_t *e){
 // wird die Helligkeit auf den Wert vor der Geste zurueckgesetzt, die Geste laeuft zur Farbe weiter.
 static uint8_t arcStartBrightness=75;
 static lv_point_t centerPressPt={0,0};
-static void arcPressed(lv_event_t *e){(void)e;arcStartBrightness=snapshot().brightness;}
+static uint32_t lastArcPressMs=0;
+// Doppeltippen auf den Ring sperrt bzw. entsperrt die Helligkeit.
+static void arcPressed(lv_event_t *e){(void)e;uint32_t now=millis();if(now-lastArcPressMs<350){toggleBrightLock();lastArcPressMs=0;}else lastArcPressMs=now;arcStartBrightness=snapshot().brightness;}
 static void arcGesture(lv_event_t *e){
   if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
   if(snapshot().brightness!=arcStartBrightness)setBrightness(arcStartBrightness);
@@ -283,11 +286,11 @@ static void bleTask(void*){
   }
 }
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
-static void stateJson(){State s=snapshot();String j="{\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
+static void stateJson(){State s=snapshot();String j="{\"brightLock\":";j+=(s.brightLock?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
 static void webInit(){
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
-  web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
+  web.on("/api/brightlock",HTTP_POST,[]{toggleBrightLock();stateJson();});web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
   web.on("/api/raw",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRaw(r.toInt(),g.toInt(),b.toInt());stateJson();});
   web.on("/api/calib",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
   web.on("/api/calib",HTTP_POST,[]{

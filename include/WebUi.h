@@ -30,7 +30,7 @@ input[type=range]::-moz-range-progress{height:8px;border-radius:4px;background:#
 input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid #d8d8d8;box-shadow:0 2px 6px rgba(0,0,0,.22)}
 input[type=range]:focus{outline:none}
 input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(41,41,41,.18)}
-.locked{opacity:.4;pointer-events:none}
+.locked{opacity:.4;pointer-events:none}.bl{opacity:.4}
 </style></head><body><div class="shell"><header><h1><svg width="33" height="37" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6m-5 4h4m-2-20a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>LeviLuma</h1><p>Light. Color. Control.</p><div class="branddots"><i style="background:#E24F62"></i><i style="background:#E7A23B"></i><i style="background:#5FC36B"></i><i style="background:#52B4D1"></i><i style="background:#8B5CF6"></i></div></header>
 <main class="card"><div class="top"><strong>LED-Steuerung</strong><span id="ble" class="chip">BLE getrennt</span></div>
 <div class="line"><span class="state"><svg id="powerIcon" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.1 5.8a9 9 0 1 0 11.8 0"/></svg><span id="pstatus">Status unbekannt</span></span><button class="power" id="power">Einschalten</button></div>
@@ -57,7 +57,7 @@ const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),hex=()=>('#'+[s.r,s.g,s
 function post(url){editingUntil=Date.now()+1200;fetch(url,{method:'POST'}).then(()=>refresh()).catch(()=>{});}
 function setColor(h){s.music=false;[s.r,s.g,s.b]=rgb(h);render();post('/api/color?r='+s.r+'&g='+s.g+'&b='+s.b)}
 palette.forEach(h=>{let b=document.createElement('button');b.style.background=h;b.setAttribute('aria-label',h);b.onclick=()=>setColor(h);$('swatches').appendChild(b)});{let m=document.createElement('button');m.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';m.style.background='#292929';m.style.color='#fff';m.setAttribute('aria-label','Musikmodus');m.onclick=()=>{s.music=true;render();post('/api/music?on=1')};$('swatches').appendChild(m)}
-function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.brightnessline,#brightness,#swatches').forEach(el=>el.classList.toggle('locked',!on));$('preview').style.background=h;$('sample').style.background=h;$('hex').textContent=h.toUpperCase();$('color').value=h;
+function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.brightnessline,#brightness,#swatches').forEach(el=>el.classList.toggle('locked',!on));$('brightness').classList.toggle('bl',!!s.brightLock);$('preview').style.background=h;$('sample').style.background=h;$('hex').textContent=h.toUpperCase();$('color').value=h;
 $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;$('brightness').style.setProperty('--p',((s.brightness-1)/99*100)+'%');let pct=(s.brightness-1)/99*100;$('brightness').style.background='linear-gradient(to right,#191919 '+pct+'%,#e5e5e5 '+pct+'%)';
 $('pstatus').textContent=s.power==='on'?'Eingeschaltet':s.power==='off'?'Ausgeschaltet':'Status unbekannt';$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';$('powerIcon').setAttribute('stroke',s.power==='on'?'#23a455':'#aaa');
 [...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&palette[i]===h));$('swatches').lastElementChild.classList.toggle('sel',!!s.music);}
@@ -65,7 +65,9 @@ function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then
 const togglePower=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
 $('power').onclick=togglePower;
 $('color').oninput=e=>setColor(e.target.value);
-$('brightness').oninput=e=>{s.brightness=+e.target.value;e.target.style.setProperty('--p',((s.brightness-1)/99*100)+'%');render();editingUntil=Date.now()+1200;clearTimeout(sendTimer);sendTimer=setTimeout(()=>post('/api/brightness?value='+s.brightness),35)};
+$('brightness').oninput=e=>{if(s.brightLock){e.target.value=s.brightness;return}s.brightness=+e.target.value;e.target.style.setProperty('--p',((s.brightness-1)/99*100)+'%');render();editingUntil=Date.now()+1200;clearTimeout(sendTimer);sendTimer=setTimeout(()=>post('/api/brightness?value='+s.brightness),35)};
+const toggleLock=()=>fetch('/api/brightlock',{method:'POST'}).then(r=>r.json()).then(d=>{s=d;render()}).catch(()=>{});
+let lastTap=0;$('brightness').addEventListener('pointerdown',()=>{let n=Date.now();if(n-lastTap<350){lastTap=0;toggleLock()}else lastTap=n});
 render();refresh();setInterval(refresh,1000);
 // 17 Zielfarben (wie LED-Calibrator): Weiss (Planck), 75 %, 100 %
 const CAL=[['D65',255,255,255],['D50',255,243,224],['4000K',255,228,189],['3000K',255,197,143],['2700K',255,180,117],
