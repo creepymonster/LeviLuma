@@ -126,7 +126,10 @@ static void updateUI(){
   lv_arc_set_value(arc,s.brightness);
   char label[12];snprintf(label,sizeof(label),"%u%%",s.brightness);
   lv_label_set_text(percent,label);
-  lv_label_set_text(caption,s.power==1?"Tippen: aus":"Tippen: an");
+  bool on=s.power==1;
+  lv_label_set_text(caption,on?"Halten: aus":"Halten: an");
+  if(on)lv_obj_remove_state(arc,LV_STATE_DISABLED);else lv_obj_add_state(arc,LV_STATE_DISABLED);
+  lv_obj_set_style_opa(arc,on?LV_OPA_COVER:LV_OPA_40,0);
   lv_obj_set_style_bg_color(statusDot,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0x777777),0);
   for(int i=0;i<6;i++){
     if(i==5){lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,190);lv_obj_set_style_text_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);continue;}
@@ -135,11 +138,13 @@ static void updateUI(){
     lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);
     lv_obj_set_style_bg_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);
   }
+  for(int i=0;i<6;i++)lv_obj_set_style_opa(dots[i],on?LV_OPA_COVER:LV_OPA_40,0);
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
 }
-static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED&&lv_indev_get_act()){setBrightness(lv_arc_get_value(arc));}}
+static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED&&lv_indev_get_act()&&snapshot().power==1){setBrightness(lv_arc_get_value(arc));}}
 static void screenGesture(lv_event_t *e){
   if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
+  if(snapshot().power!=1)return; // Farbauswahl nur bei eingeschaltetem Band
   lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
   int base=selected<0?0:selected;
   if(d==LV_DIR_LEFT)selectColor(base+1);
@@ -173,7 +178,7 @@ static void makeUI(){
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
   lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcGesture,LV_EVENT_GESTURE,nullptr);
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_CLICKED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
+  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
   percent=lv_label_create(center);lv_obj_set_style_text_color(percent,lv_color_white(),0);
   lv_obj_set_style_text_font(percent,&lv_font_montserrat_32,0);lv_obj_align(percent,LV_ALIGN_CENTER,0,-13);
