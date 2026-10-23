@@ -7,6 +7,9 @@
 #define LEVI_DISPLAY_SPI_MHZ 40
 #define LEVI_DISPLAY_INVERT true
 #define LEVI_BACKLIGHT_ACTIVE_HIGH true
+// Drehung des Displays in Grad: 0, 90, 180 oder 270. Touch und Anzeige drehen sich mit.
+// Nur die Ausrichtung des Panels; die Bedienoberflaeche bleibt gleich.
+#define LEVI_DISPLAY_ROTATION 0
 // Kalibrierung (Standard nach Reset). Ohne Eintrag gilt FastLED TypicalSMD5050.
 // Linear-Gains pro Kanal (nur genutzt, wenn LEVI_CALIB_POINTS nicht gesetzt ist):
 #define LEVI_CALIB_GR 1.000f

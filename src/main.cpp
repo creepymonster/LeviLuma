@@ -437,7 +437,12 @@ void setup(){
   LEVI_LOG("LeviLuma startet");
   stateLock=xSemaphoreCreateMutex();calibLoad();
   ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
-  lcd.init();lcd.setRotation(0);lcd.fillScreen(TFT_BLACK);
+  lcd.init();
+#ifndef LEVI_DISPLAY_ROTATION
+#define LEVI_DISPLAY_ROTATION 0
+#endif
+  lcd.setRotation(LEVI_DISPLAY_ROTATION/90); // LovyanGFX: 0=0 Grad, 1=90, 2=180, 3=270
+  lcd.fillScreen(TFT_BLACK);
   lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
   input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,readTouch);lv_indev_set_display(input,display);
