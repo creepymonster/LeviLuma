@@ -78,7 +78,7 @@ static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static int tileCol=1;static bool uiWifi=false;
-static lv_obj_t *bubbles[3]{},*bubbleLbl[3]{};static int bubbleIdx[3]={0,0,0};
+static lv_obj_t *dots[LeviCal::N+1]{};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
@@ -204,24 +204,12 @@ static void updateUI(){
   if(lv_slider_get_value(bar)!=s.brightness)lv_slider_set_value(bar,s.brightness,LV_ANIM_OFF);
   char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)s.brightness);
   lv_label_set_text(barLbl,label);
-  // Farbliste: aktive Farbe in der Mitte (groesser, weisser Rahmen), Nachbarn oben und unten
-  int base=selected<0?0:selected;
-  int idx[3]={wrapIdx(base-1),base,wrapIdx(base+1)};
-  static const int dy[3]={-80,0,80};
-  for(int k=0;k<3;k++){
-    bool mid=k==1, music=idx[k]==MUSIC_IDX;
-    bubbleIdx[k]=idx[k];
-    lv_color_t c;
-    if(music)c=lv_color_hex(0x292929);
-    else if(mid&&selected<0)c=color;
-    else c=lv_color_make(LeviCal::TARGET[idx[k]][0],LeviCal::TARGET[idx[k]][1],LeviCal::TARGET[idx[k]][2]);
-    int size=mid?76:44;
-    lv_obj_set_size(bubbles[k],size,size);
-    lv_obj_align(bubbles[k],LV_ALIGN_CENTER,0,dy[k]);
-    lv_obj_set_style_bg_color(bubbles[k],c,0);
-    lv_obj_set_style_border_width(bubbles[k],mid?2:0,0);
-    lv_label_set_text(bubbleLbl[k],music?LV_SYMBOL_AUDIO:"");
-    setEnabled(bubbles[k],active);
+  // Farbpunkte: aktive Farbe mit weissem Rahmen
+  for(int k=0;k<LIST_COUNT;k++){
+    lv_obj_set_style_border_width(dots[k],k==selected?2:0,0);
+    if(k==MUSIC_IDX)lv_obj_set_style_bg_color(dots[k],lv_color_hex(0x333333),0);
+    else lv_obj_set_style_bg_color(dots[k],lv_color_make(LeviCal::TARGET[k][0],LeviCal::TARGET[k][1],LeviCal::TARGET[k][2]),0);
+    setEnabled(dots[k],active);
   }
 }
 
@@ -231,15 +219,14 @@ static void barChanged(lv_event_t *e){
   if(snapshot().power!=1)return;
   setBrightness(lv_slider_get_value(bar));
 }
-// Tippen auf die Farbblasen: obere/untere waehlt diese Farbe, Tippen in die Mitte nimmt die naechste.
-static void bubbleClicked(lv_event_t *e){
+// Ein Tipp auf einen Farbpunkt waehlt genau diese Farbe.
+static void dotClicked(lv_event_t *e){
   int k=(int)(intptr_t)lv_event_get_user_data(e);
   State s=snapshot();
   if(s.power!=1||!s.ble)return;
-  selectColor(k==1?bubbleIdx[2]:bubbleIdx[k]);
+  selectColor(k);
 }
 
-// Haltering fuer An/Aus: laeuft in 500 ms voll, verschwindet beim Loslassen oder nach dem Ausloesen.
 // Halten-Fuellung in der Pille: laeuft in 500 ms von links nach rechts voll, verschwindet beim Loslassen.
 static void holdExec(void *obj,int32_t v){lv_obj_set_width((lv_obj_t*)obj,v);}
 static void holdStart(){
@@ -333,14 +320,14 @@ static void makeUI(){
   tileCol=1;
 
   // Helligkeit: vertikaler Balken, Prozent oben
-  // Helligkeit: schmale Spur, Fuellung in der aktuellen Farbe, weisse Kugel am Ende, Prozent darueber
-  bar=lv_slider_create(tileBright);lv_slider_set_range(bar,1,100);lv_obj_set_size(bar,18,160);lv_obj_align(bar,LV_ALIGN_CENTER,0,28);
+  // Helligkeit: waagerechte Spur, darueber der Prozentwert mit etwas Abstand
+  bar=lv_slider_create(tileBright);lv_slider_set_range(bar,1,100);lv_obj_set_size(bar,180,18);lv_obj_align(bar,LV_ALIGN_CENTER,0,22);
   lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(bar,lv_color_hex(0x2A2A2A),LV_PART_MAIN);lv_obj_set_style_border_width(bar,0,0);
   lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_INDICATOR);lv_obj_set_style_border_width(bar,0,LV_PART_INDICATOR);
   lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_bg_color(bar,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(bar,LV_OPA_COVER,LV_PART_KNOB);
   lv_obj_set_style_border_width(bar,0,LV_PART_KNOB);lv_obj_set_style_shadow_width(bar,0,LV_PART_KNOB);lv_obj_set_style_pad_all(bar,6,LV_PART_KNOB);
   lv_obj_add_event_cb(bar,barChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  barLbl=lv_label_create(tileBright);lv_obj_set_style_text_color(barLbl,lv_color_white(),0);lv_obj_set_style_text_font(barLbl,&lv_font_montserrat_28,0);lv_obj_align(barLbl,LV_ALIGN_TOP_MID,0,24);
+  barLbl=lv_label_create(tileBright);lv_obj_set_style_text_color(barLbl,lv_color_white(),0);lv_obj_set_style_text_font(barLbl,&lv_font_montserrat_28,0);lv_obj_align(barLbl,LV_ALIGN_CENTER,0,-14);
 
   // Mitte: An/Aus mit Halten
   center=lv_obj_create(tilePower);lv_obj_set_size(center,150,48);lv_obj_center(center);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);
@@ -366,14 +353,14 @@ static void makeUI(){
   lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x888888),0);
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
-  // Farbliste: drei Blasen untereinander, die mittlere ist aktiv und groesser
-  for(int k=0;k<3;k++){
-    bubbles[k]=lv_obj_create(tileColor);lv_obj_remove_flag(bubbles[k],LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(bubbles[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(bubbles[k],0,0);lv_obj_set_style_border_color(bubbles[k],lv_color_white(),0);
-    lv_obj_set_style_pad_all(bubbles[k],0,0);lv_obj_set_style_shadow_width(bubbles[k],0,0);
-    lv_obj_add_flag(bubbles[k],LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(bubbles[k],bubbleClicked,LV_EVENT_CLICKED,(void*)(intptr_t)k);
-    bubbleLbl[k]=lv_label_create(bubbles[k]);lv_obj_center(bubbleLbl[k]);lv_obj_set_style_text_color(bubbleLbl[k],lv_color_white(),0);
+  // Farbpunkte: 5 Spalten, 4 Zeilen (17 Kalibrierfarben plus Musik)
+  for(int k=0;k<LIST_COUNT;k++){
+    dots[k]=lv_obj_create(tileColor);lv_obj_set_size(dots[k],14,14);lv_obj_remove_flag(dots[k],LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(dots[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_pad_all(dots[k],0,0);
+    lv_obj_set_style_border_color(dots[k],lv_color_white(),0);lv_obj_set_style_shadow_width(dots[k],0,0);
+    lv_obj_align(dots[k],LV_ALIGN_CENTER,(k%5-2)*34,(k/5)*34-51);
+    lv_obj_add_flag(dots[k],LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(dots[k],dotClicked,LV_EVENT_CLICKED,(void*)(intptr_t)k);
   }
   updateUI();
 }
