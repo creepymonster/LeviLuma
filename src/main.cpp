@@ -23,10 +23,6 @@
 #ifndef LEVI_DISPLAY_ROTATION
 #define LEVI_DISPLAY_ROTATION 0
 #endif
-// 1: Touch-Koordinaten um 180 Grad drehen (falls Berührungen genau verkehrt herum ankommen)
-#ifndef LEVI_TOUCH_FLIP180
-#define LEVI_TOUCH_FLIP180 0
-#endif
 // Touch: CST816S direkt ueber I2C (Wire). Liefert Rohkoordinaten im Panel-Koordinatensystem;
 // mapTouch dreht sie passend zur Displaydrehung, damit LVGL die Oberflaeche richtig trifft.
 namespace Cst {
@@ -70,7 +66,6 @@ static void mapTouch(uint16_t rx,uint16_t ry,uint16_t &x,uint16_t &y){
     case 3: x=ry; y=239-rx; break;        // 270 Grad
     default: x=rx; y=ry;                  // 0 Grad
   }
-  if(LEVI_TOUCH_FLIP180){x=239-x;y=239-y;}
 }
 
 static LGFX_Board lcd;
