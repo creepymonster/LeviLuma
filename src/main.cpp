@@ -26,7 +26,7 @@ static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
-static lv_obj_t *holdArc=nullptr,*iconBle=nullptr;static int arcPreview=-1,uiPreview=-2;static int8_t lastConn=-1;
+static lv_obj_t *holdArc=nullptr,*iconBle=nullptr;static int arcPreview=-1,uiPreview=-2;static bool arcGestured=false;static int8_t lastConn=-1;
 static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
 struct State { bool brightLock=false; bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
@@ -170,25 +170,35 @@ static void screenGesture(lv_event_t *e){
   if(d==LV_DIR_LEFT)selectColor(base+1);
   else if(d==LV_DIR_RIGHT)selectColor(base-1);
 }
-// Ring: Vorschau waehrend des Ziehens, uebernommen wird nur beim Loslassen. Tippen und horizontales
-// Wischen (Farbwechsel) aendern die Helligkeit nicht.
+// Ring: Vorschau waehrend des Ziehens, uebernommen wird nur beim Loslassen. Wischgesten (Farbwechsel)
+// die auf dem Ring beginnen, aendern die Helligkeit nicht und werden nicht an den Bildschirm weitergereicht.
 static lv_point_t arcPressPt={0,0},centerPressPt={0,0};
 static uint32_t lastArcPressMs=0;
 // Doppeltippen auf den Ring sperrt bzw. entsperrt die Helligkeit.
 static void arcPressed(lv_event_t *e){
-  (void)e;uint32_t now=millis();
+  (void)e;arcGestured=false;uint32_t now=millis();
   if(now-lastArcPressMs<350){toggleBrightLock();lastArcPressMs=0;}else lastArcPressMs=now;
   lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&arcPressPt);
 }
+// Geste auf dem Ring: Farbwechsel, Vorschau verwerfen, Ring zurueck auf die aktuelle Helligkeit.
+static void arcGesture(lv_event_t *e){
+  arcGestured=true;arcPreview=-1;
+  lv_arc_set_value(arc,snapshot().brightness);
+  lv_event_stop_bubbling(e);
+  if(lv_event_get_code(e)!=LV_EVENT_GESTURE)return;
+  lv_dir_t d=lv_indev_get_gesture_dir(lv_indev_active());
+  int base=selected<0?0:selected;
+  if(d==LV_DIR_LEFT)selectColor(base+1);
+  else if(d==LV_DIR_RIGHT)selectColor(base-1);
+}
 static void arcReleased(lv_event_t *e){
-  int v=arcPreview;arcPreview=-1;
-  if(lv_event_get_code(e)!=LV_EVENT_RELEASED||v<0)return;
+  int v=arcPreview;bool gestured=arcGestured;arcPreview=-1;
+  if(lv_event_get_code(e)!=LV_EVENT_RELEASED||v<0||gestured)return;
   lv_indev_t *in=lv_indev_get_act();if(!in)return;
   lv_point_t p;lv_indev_get_point(in,&p);
   int dx=p.x-arcPressPt.x,dy=p.y-arcPressPt.y;
   int ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;
   if(ax+ay<12)return;           // Tippen aendert nichts
-  if(ax>ay*2&&ax>40)return;     // waagerechtes Wischen ist ein Farbwechsel
   setBrightness(v);
 }
 // Haltering fuer An/Aus: laeuft in 500 ms voll, verschwindet beim Loslassen oder nach dem Ausloesen.
@@ -222,7 +232,7 @@ static void makeUI(){
   lv_obj_set_style_arc_width(arc,16,LV_PART_MAIN);lv_obj_set_style_arc_color(arc,lv_color_hex(0x242424),LV_PART_MAIN);
   lv_obj_set_style_arc_width(arc,16,LV_PART_INDICATOR);lv_obj_set_style_arc_rounded(arc,true,LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
-  lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_PRESS_LOST,nullptr);
+  lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcGesture,LV_EVENT_GESTURE,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(arc,arcReleased,LV_EVENT_PRESS_LOST,nullptr);
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
   center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
