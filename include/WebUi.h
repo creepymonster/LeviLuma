@@ -9,13 +9,13 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .calib{margin:16px auto 0;max-width:430px}
 .tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .tile{display:flex;flex-direction:column;justify-content:center;padding:20px 18px}
-.power-tile{position:relative;padding:20px 18px;justify-content:flex-start}
-.dots{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px}
+.power-tile{display:flex;flex-direction:column;align-items:center;padding:20px 18px;gap:12px}
+.dots{display:flex;align-items:center;gap:6px}
 .dl{font-size:11px;font-weight:600;color:#888;line-height:1}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#e5484d}.dot.ok{background:#79da89}
-.statebar{position:absolute;left:0;right:0;bottom:16px;display:flex;justify-content:center}
+.statebar{display:flex;justify-content:center;margin-top:auto}
 .statebar .state{font-size:11px;font-weight:600;color:#888}
-.power-tile .power{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.power-tile .power{margin:auto 0}
 .tile .brightnessline{margin-bottom:6px}
 @media (max-width:760px){.tri{grid-template-columns:minmax(0,1fr)}}
 .calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
