@@ -9,6 +9,8 @@
 // Drehung des Displays in Grad: 0, 90, 180 oder 270. Touch und Anzeige drehen sich mit.
 // Nur die Ausrichtung des Panels; die Bedienoberflaeche bleibt gleich.
 #define LEVI_DISPLAY_ROTATION 0
+// Touch-Versatz zur Displaydrehung (LovyanGFX offset_rotation, 0..7). Bei gedrehtem Display ausprobieren.
+#define LEVI_TOUCH_OFFSET_ROTATION 0
 // Kalibrierung (Standard nach Reset). Ohne Eintrag gilt FastLED TypicalSMD5050.
 // Linear-Gains pro Kanal (nur genutzt, wenn LEVI_CALIB_POINTS nicht gesetzt ist):
 #define LEVI_CALIB_GR 1.000f
