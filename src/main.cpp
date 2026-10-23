@@ -26,7 +26,8 @@ static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
-static lv_obj_t *arc=nullptr,*center=nullptr,*percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
+static lv_obj_t *holdArc=nullptr;static bool holding=false;static uint32_t holdStartMs=0;
+static lv_obj_t *arc=nullptr,*center=nullptr,**percent=nullptr,*caption=nullptr,*statusDot=nullptr,*dots[6]{};
 
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
 static State state;
@@ -139,6 +140,8 @@ static void updateUI(){
     lv_obj_set_style_bg_color(dots[i],i==selected?lv_color_white():lv_color_hex(0x666666),0);
   }
   for(int i=0;i<6;i++)lv_obj_set_style_opa(dots[i],on?LV_OPA_COVER:LV_OPA_40,0);
+  lv_obj_set_style_opa(holdArc,holding?LV_OPA_COVER:LV_OPA_TRANSP,0);
+  if(holding){uint32_t el=millis()-holdStartMs;lv_arc_set_value(holdArc,el>=500?100:(int)(el*100/500));} // 500 ms bis An/Aus
   lv_obj_set_style_opa(center,s.power==0?LV_OPA_60:LV_OPA_COVER,0);
 }
 static void arcChanged(lv_event_t *e){if(lv_event_get_code(e)==LV_EVENT_VALUE_CHANGED&&lv_indev_get_act()&&snapshot().power==1){setBrightness(lv_arc_get_value(arc));}}
@@ -160,7 +163,8 @@ static void arcGesture(lv_event_t *e){
   if(snapshot().brightness!=arcStartBrightness)setBrightness(arcStartBrightness);
 }
 // Mitte: nur ein Tippen (ohne Bewegung) schaltet die Power, Wischen nicht.
-static void centerPressed(lv_event_t *e){(void)e;lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
+static void centerPressed(lv_event_t *e){(void)e;holding=true;holdStartMs=millis();lv_indev_t *in=lv_indev_get_act();if(in)lv_indev_get_point(in,&centerPressPt);}
+static void centerReleased(lv_event_t *e){(void)e;holding=false;}
 static void centerClicked(lv_event_t *e){
   (void)e;
   lv_indev_t *in=lv_indev_get_act();if(!in)return;
@@ -178,7 +182,7 @@ static void makeUI(){
   lv_obj_set_style_bg_color(arc,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(arc,LV_OPA_COVER,LV_PART_KNOB);lv_obj_set_style_radius(arc,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,10,LV_PART_KNOB);
   lv_obj_add_event_cb(arc,arcPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(arc,arcGesture,LV_EVENT_GESTURE,nullptr);
   lv_obj_add_event_cb(arc,arcChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
+  center=lv_obj_create(screen);lv_obj_set_size(center,108,108);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);lv_obj_center(center);lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);lv_obj_set_style_shadow_width(center,0,0);lv_obj_set_style_shadow_opa(center,LV_OPA_30,0);lv_obj_remove_flag(center,LV_OBJ_FLAG_SCROLLABLE);
   percent=lv_label_create(center);lv_obj_set_style_text_color(percent,lv_color_white(),0);
   lv_obj_set_style_text_font(percent,&lv_font_montserrat_32,0);lv_obj_align(percent,LV_ALIGN_CENTER,0,-13);
@@ -187,6 +191,13 @@ static void makeUI(){
   lv_obj_set_style_border_width(statusDot,0,0);lv_obj_align(statusDot,LV_ALIGN_TOP_MID,0,30);
   for(int i=0;i<5;i++){dots[i]=lv_obj_create(screen);lv_obj_set_size(dots[i],6,6);lv_obj_set_style_radius(dots[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_border_width(dots[i],0,0);lv_obj_align(dots[i],LV_ALIGN_TOP_MID,(2*i-5)*6,196);}
   dots[5]=lv_label_create(screen);lv_label_set_text(dots[5],LV_SYMBOL_AUDIO);lv_obj_align(dots[5],LV_ALIGN_TOP_MID,(2*5-5)*6,190);
+  // Fortschrittsring waehrend des Haltens (nicht klickbar, damit die Mitte die Eingabe behaelt)
+  holdArc=lv_arc_create(screen);lv_obj_set_size(holdArc,116,116);lv_obj_center(holdArc);
+  lv_arc_set_rotation(holdArc,270);lv_arc_set_bg_angles(holdArc,0,360);lv_arc_set_range(holdArc,0,100);lv_arc_set_value(holdArc,0);
+  lv_obj_remove_style(holdArc,nullptr,LV_PART_KNOB);
+  lv_obj_set_style_arc_opa(holdArc,LV_OPA_TRANSP,LV_PART_MAIN);lv_obj_set_style_arc_width(holdArc,4,LV_PART_MAIN);
+  lv_obj_set_style_arc_width(holdArc,4,LV_PART_INDICATOR);lv_obj_set_style_arc_color(holdArc,lv_color_white(),LV_PART_INDICATOR);
+  lv_obj_remove_flag(holdArc,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_opa(holdArc,LV_OPA_TRANSP,0);
   updateUI();
 }
 
