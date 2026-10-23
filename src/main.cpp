@@ -252,6 +252,7 @@ static void handleSwipe(uint32_t now){
   }
   if(st==DRAG){
     int dx=x-x0;
+    LEVI_LOG("Wischen: dx=%d Start-Kachel-x=%d", dx, base);
     int col=(-base+120)/240;             // Kachel beim Start
     if(dx<-60)col++;
     else if(dx>60)col--;
