@@ -343,7 +343,7 @@ void loop(){
   static bool idleCentered=false;
   bool idle=now-lastTouchMs>LEVI_RECENTER_MS;
 #if !LEVI_TOUCH_TEST
-  if(idle&&!idleCentered)lv_obj_set_tile_id(tv,0,0,LV_ANIM_ON);
+  if(idle&&!idleCentered)lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);
 #endif
   idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
