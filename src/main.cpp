@@ -1,13 +1,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WebServer.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
 #include <NimBLEDevice.h>
 #include <lvgl.h>
 #include "LGFX_Board.h"
 #include "LotusProtocol.h"
-#include "WebUi.h"
+#include "Web.h"
 #include "Config.h"
 #include "Palette.h"
 #include "CalibCore.h"
@@ -25,7 +24,6 @@
 #define LEVI_DISPLAY_ROTATION 0
 #endif
 static LGFX_Board lcd;
-static WebServer web(80);
 SemaphoreHandle_t stateLock=nullptr;
 static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
@@ -111,7 +109,7 @@ static void calibLoad(){
   calCommit(m,custom);
 }
 // Neue Punkte (51 Werte) speichern. Gibt false zurueck, wenn NVS nicht schreiben konnte.
-static bool calibSave(const uint8_t *pts){
+bool calibSave(const uint8_t *pts){
   LeviCal::Model m=calSnapshot();
   memcpy(m.pts,pts,sizeof(m.pts));
   LeviCal::solve(m);
@@ -124,7 +122,7 @@ static bool calibSave(const uint8_t *pts){
   return true;
 }
 // Entfernt die gespeicherte Kalibrierung. Gibt false zurueck, wenn NVS nicht erreichbar war.
-static bool calibReset(){
+bool calibReset(){
   Preferences p;
   if(!p.begin("levi",false)){LEVI_LOG("NVS: Oeffnen zum Loeschen fehlgeschlagen");return false;}
   bool removed=p.remove("pts");
@@ -134,7 +132,7 @@ static bool calibReset(){
   calCommit(m,false);
   return true;
 }
-static String calibJson(){
+String calibJson(){
   bool custom=false;LeviCal::Model cm=calSnapshot(&custom);
   String j="{\"custom\":";j+=custom?"true":"false";j+=",\"points\":[";
   const uint8_t *flat=&cm.pts[0][0];
@@ -145,12 +143,12 @@ State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state; xSemap
 void stateSetBle(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.ble=on; xSemaphoreGive(stateLock); }
 void stateMarkSent(uint32_t rev){ xSemaphoreTake(stateLock,portMAX_DELAY); if(state.sentRevision<rev)state.sentRevision=rev; xSemaphoreGive(stateLock); }
 
-static void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
-static void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
-static void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
-static void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
+void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
+void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
+void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
+void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
   selected=-1;for(int i=0;i<LeviCal::N;i++)if(LeviCal::TARGET[i][0]==r&&LeviCal::TARGET[i][1]==g&&LeviCal::TARGET[i][2]==b){selected=(int8_t)i;break;} }
-static void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=MUSIC_IDX;}
+void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=MUSIC_IDX;}
 static void selectColor(int idx){int n=wrapIdx(idx);if(n==MUSIC_IDX){setMusic(true);return;}setRGB(LeviCal::TARGET[n][0],LeviCal::TARGET[n][1],LeviCal::TARGET[n][2]);}
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
@@ -320,31 +318,6 @@ static void makeUI(){
   updateUI();
 }
 
-static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
-static void stateJson(){State s=snapshot();String j="{\"wifi\":";j+=(WiFi.status()==WL_CONNECTED?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+",\"revision\":"+String(s.revision)+",\"sentRevision\":"+String(s.sentRevision)+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
-static void webInit(){
-  web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
-  web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
-  web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
-  web.on("/api/raw",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRaw(r.toInt(),g.toInt(),b.toInt());stateJson();});
-  web.on("/api/calib",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
-  web.on("/api/calib",HTTP_POST,[]{
-    // p = 51 Werte (17 Zielfarben x R,G,B), komma-getrennt, je 0..255
-    String p=web.arg("p");uint8_t tmp[LeviCal::N*3];int n=0,start=0;bool ok=true;
-    while(true){
-      int c=p.indexOf(',',start);String tok=(c<0)?p.substring(start):p.substring(start,c);tok.trim();
-      if(n>=LeviCal::N*3){ok=false;break;}           // mehr als 51 Werte
-      if(!integer(tok,255)){ok=false;break;}         // nur Ziffern, 1-3 Stellen, 0..255
-      tmp[n++]=(uint8_t)tok.toInt();
-      if(c<0)break;start=c+1;
-    }
-    if(!ok||n!=LeviCal::N*3){web.send(400,"text/plain","p=51 Werte 0..255");return;}
-    if(!calibSave(tmp)){web.send(500,"text/plain","NVS-Fehler beim Speichern");return;}
-    LEVI_LOG("Kalibrierung gespeichert (17 Punkte)");
-    web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
-  web.on("/api/calib/reset",HTTP_POST,[]{if(!calibReset()){web.send(500,"text/plain","NVS-Fehler");return;}LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
-  web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
-}
 static const char *wlStatusName(wl_status_t s){
   switch(s){
     case WL_IDLE_STATUS: return "IDLE";
@@ -409,13 +382,13 @@ void setup(){
   lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
   input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,readTouch);lv_indev_set_display(input,display);
-  makeUI();lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webInit();
+  makeUI();lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webStart();
   bleStart();
 }
 void loop(){
   static uint32_t lastUI=0;uint32_t now=millis();
   {int32_t tx=0,ty=0;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=(uint16_t)tx;touchY=(uint16_t)ty;}}
-  lv_timer_handler();web.handleClient();
+  lv_timer_handler();webLoop();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
   // Lange ungenutzt: zurueck auf den Startbildschirm (Mitte), einmal pro Ruhephase

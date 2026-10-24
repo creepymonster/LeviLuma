@@ -22,3 +22,15 @@ void stateMarkSent(uint32_t rev);
 
 // Kalibrierung: vollstaendige Kopie des Modells (BLE-Task und Web-JSON).
 LeviCal::Model calSnapshot(bool *custom=nullptr);
+
+// Setter (aendern den Zustand unter stateLock, nur aus dem Loop-Task aufrufen).
+void setPower(bool on);
+void setBrightness(int b);
+void setRaw(uint8_t r,uint8_t g,uint8_t b);
+void setRGB(uint8_t r,uint8_t g,uint8_t b);
+void setMusic(bool on);
+
+// Kalibrierung speichern, loeschen und als JSON ausgeben (NVS).
+bool calibSave(const uint8_t *pts);
+bool calibReset();
+String calibJson();
