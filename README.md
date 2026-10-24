@@ -21,7 +21,6 @@ PlatformIO / Arduino / LovyanGFX / LVGL 9 / NimBLE-Arduino.
 - Hintergrundbeleuchtung wird erst nach dem ersten LVGL-Frame aktiviert.
 
 ## Wichtige Grenzen
-- Auf realer Hardware und mit PlatformIO hier **nicht kompiliert/getestet**.
 - LED-Status ist optimistisch; FFF4 lieferte keine brauchbare Bestätigung.
 - `default_16MB.csv` setzt 16 MB Flash voraus; Board-Angabe vor Upload prüfen.
 - DMA/Double-Buffer und Animationen sind noch nicht implementiert. Zuerst stabilen
