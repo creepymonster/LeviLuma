@@ -30,3 +30,5 @@
 // #define LEVI_FADE_STEPS 8
 // Touch-Drehung in LovyanGFX, 0..7 (Standard 0; am Geraet pruefen):
 // #define LEVI_TOUCH_OFFSET_ROTATION 0
+// Touch: Ueberbrueckung kurzer Aussetzer in ms (Standard 40). Groesser = traegerer Release:
+// #define LEVI_TOUCH_BRIDGE_MS 40

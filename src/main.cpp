@@ -68,10 +68,15 @@ static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
 // Touch-Treiber: eine Beruehrung im gedimmten Zustand weckt nur das Display und wird nicht
 // an die Oberflaeche weitergegeben, bis der Finger wieder oben ist. Kurze Aussetzer des CST816S
 // (Loslassen unter 100 ms) werden ueberbrueckt. Gesten erkennt LVGL.
+// Kurze Aussetzer des Touch-Controllers (Loslassen unter dieser Dauer) werden ueberbrueckt. 40 ms statt 100 ms,
+// damit der echte Release schneller ankommt. Per Config.h (LEVI_TOUCH_BRIDGE_MS) einstellbar.
+#ifndef LEVI_TOUCH_BRIDGE_MS
+#define LEVI_TOUCH_BRIDGE_MS 40
+#endif
 static void readTouch(lv_indev_t*,lv_indev_data_t *d){
   static uint32_t seenMs=0;
   if(touchDown){seenMs=millis();lastTouchMs=seenMs;}
-  bool down=touchDown||(millis()-seenMs<100);
+  bool down=touchDown||(millis()-seenMs<LEVI_TOUCH_BRIDGE_MS);
   if(!down)touchBlocked=false;
   else if(touchDown&&screenDim){wake();touchBlocked=true;}
   d->state=(down&&!touchBlocked)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
