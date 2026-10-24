@@ -37,5 +37,5 @@
 // #define LEVI_TOUCH_TEST 0
 // Farben vertauscht? Dann 0 setzen (RGB565-Byte-Reihenfolge der Display-Uebertragung). Standard 1.
 // #define LEVI_RGB565_SWAP 1
-// Flush-Zeiten (Mittel und Maximum) alle 5 s ins Log, zum Messen beim Wischen. Standard 0.
+// Wartezeiten auf die DMA-Uebertragung (Mittel und Maximum) alle 5 s ins Log. Standard 0.
 // #define LEVI_FLUSH_STATS 0

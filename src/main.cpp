@@ -31,7 +31,8 @@ static_assert(LEVI_DISPLAY_ROTATION==0 || LEVI_DISPLAY_ROTATION==90 || LEVI_DISP
 #endif
 static LGFX_Board lcd;
 static constexpr uint16_t W=240,H=240;
-alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
+alignas(4) static uint8_t drawBuf[240*24*2];   // 11520 bytes RGB565; LVGL buffer aligned
+alignas(4) static uint8_t drawBuf2[240*24*2];  // zweiter Puffer: LVGL rendert, waehrend DMA aus dem ersten sendet
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
@@ -66,28 +67,41 @@ static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
 #ifndef LEVI_RGB565_SWAP
 #define LEVI_RGB565_SWAP 1
 #endif
-// Flush-Zeiten messen: 1 = alle 5 s Mittel und Maximum ins Log.
+// Flush-Zeiten messen: 1 = alle 5 s Mittel und Maximum der Wartezeiten auf die DMA ins Log.
 #ifndef LEVI_FLUSH_STATS
 #define LEVI_FLUSH_STATS 0
 #endif
-static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
-  int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
+// Asynchroner Flush: die Uebertragung laeuft per DMA, LVGL rendert in den zweiten Puffer.
+// flushPending ist das Display, dessen Puffer noch von der DMA gelesen wird.
+static lv_display_t *flushPending=nullptr;
+// Wartet auf das Ende der laufenden DMA und gibt den Puffer an LVGL frei.
+static void flushRelease(){
+  if(!flushPending)return;
 #if LEVI_FLUSH_STATS
   uint32_t t0=micros();
 #endif
-  lcd.startWrite();lcd.setAddrWindow(a->x1,a->y1,width,height);
-  lcd.pushPixels((const uint16_t*)px, width * height, LEVI_RGB565_SWAP);
-  lcd.endWrite();
+  lcd.waitDMA();
 #if LEVI_FLUSH_STATS
   static uint32_t sumUs=0,maxUs=0,count=0,logMs=0;
   uint32_t dt=micros()-t0;sumUs+=dt;if(dt>maxUs)maxUs=dt;count++;
   uint32_t nowMs=millis();
   if(nowMs-logMs>=5000){
-    if(count)LEVI_LOG("Flush: %lu Aufrufe, Mittel %lu us, Max %lu us",(unsigned long)count,(unsigned long)(sumUs/count),(unsigned long)maxUs);
+    if(count)LEVI_LOG("Flush: %lu Aufrufe, Warten auf DMA Mittel %lu us, Max %lu us",(unsigned long)count,(unsigned long)(sumUs/count),(unsigned long)maxUs);
     sumUs=0;maxUs=0;count=0;logMs=nowMs;
   }
 #endif
-  lv_display_flush_ready(disp);
+  lv_display_flush_ready(flushPending);
+  flushPending=nullptr;
+}
+static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
+  flushRelease();   // vorige Uebertragung abschliessen, damit ihr Puffer frei ist
+  int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
+#if LEVI_RGB565_SWAP
+  lcd.pushImageDMA(a->x1,a->y1,width,height,(const lgfx::swap565_t*)px);
+#else
+  lcd.pushImageDMA(a->x1,a->y1,width,height,(const uint16_t*)px);
+#endif
+  flushPending=disp;
 }
 // Touch-Treiber: eine Beruehrung im gedimmten Zustand weckt nur das Display und wird nicht
 // an die Oberflaeche weitergegeben, bis der Finger wieder oben ist. Kurze Aussetzer des CST816S
@@ -365,10 +379,11 @@ void setup(){
 #endif
   lcd.setRotation(LEVI_DISPLAY_ROTATION/90); // LovyanGFX: 0=0 Grad, 1=90, 2=180, 3=270
   lcd.fillScreen(TFT_BLACK);
+  lcd.startWrite();   // Bus fuer die DMA-Uebertragungen dauerhaft belegen (Display ist der einzige SPI-Teilnehmer)
   lv_init();
   lv_tick_set_cb(levTickMs); // LVGL-Zeitbasis: Animationen, Long-Press, Timer
   display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
-  lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
+  lv_display_set_buffers(display,drawBuf,drawBuf2,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
   input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,readTouch);lv_indev_set_display(input,display);
 #if LEVI_TOUCH_TEST
   touchTestInit();
@@ -381,6 +396,7 @@ void setup(){
 void loop(){
   static uint32_t lastUI=0;uint32_t now=millis();
   {int32_t tx=0,ty=0;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=(uint16_t)tx;touchY=(uint16_t)ty;}}
+  flushRelease();   // letzte DMA-Uebertragung abschliessen, bevor LVGL weiterrendert
   lv_timer_handler();webLoop();
 #if !LEVI_TOUCH_TEST
   if(now-lastUI>20){lastUI=now;updateUI();}
