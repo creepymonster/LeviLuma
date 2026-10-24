@@ -23,51 +23,6 @@
 #ifndef LEVI_DISPLAY_ROTATION
 #define LEVI_DISPLAY_ROTATION 0
 #endif
-// Touch: CST816S direkt ueber I2C (Wire). Liefert Rohkoordinaten im Panel-Koordinatensystem;
-// mapTouch dreht sie passend zur Displaydrehung, damit LVGL die Oberflaeche richtig trifft.
-namespace Cst {
-static constexpr uint8_t ADDR=0x15;
-static constexpr int PIN_SDA=6, PIN_SCL=7, PIN_RST=13;
-static uint32_t lastOkMs=0;
-static bool readRegs(uint8_t reg,uint8_t *buf,uint8_t n){
-  Wire.beginTransmission(ADDR);Wire.write(reg);
-  if(Wire.endTransmission(false)!=0)return false;
-  if(Wire.requestFrom((int)ADDR,(int)n)!=n)return false;
-  for(uint8_t i=0;i<n;i++)buf[i]=Wire.read();
-  return true;
-}
-static void reset(){
-  pinMode(PIN_RST,OUTPUT);digitalWrite(PIN_RST,LOW);delay(10);digitalWrite(PIN_RST,HIGH);delay(60);
-}
-static void init(){
-  Wire.begin(PIN_SDA,PIN_SCL,400000);
-  reset();lastOkMs=millis();
-}
-// true, wenn ein Finger auf dem Display ist. Antwortet der Chip nicht mehr, wird er zurueckgesetzt.
-static bool read(uint16_t &x,uint16_t &y){
-  uint8_t d[6];
-  if(!readRegs(0x01,d,6)){
-    if(millis()-lastOkMs>500){LEVI_LOG("Touch: keine Antwort, Reset");reset();lastOkMs=millis();}
-    return false;
-  }
-  lastOkMs=millis();
-  if(d[1]==0)return false;
-  x=((d[2]&0x0F)<<8)|d[3];
-  y=((d[4]&0x0F)<<8)|d[5];
-  return true;
-}
-}
-static void mapTouch(uint16_t rx,uint16_t ry,uint16_t &x,uint16_t &y){
-  if(rx>239)rx=239;
-  if(ry>239)ry=239;
-  switch((LEVI_DISPLAY_ROTATION/90)&3){
-    case 1: x=239-ry; y=rx; break;        // 90 Grad
-    case 2: x=239-rx; y=239-ry; break;    // 180 Grad
-    case 3: x=ry; y=239-rx; break;        // 270 Grad
-    default: x=rx; y=ry;                  // 0 Grad
-  }
-}
-
 static LGFX_Board lcd;
 static WebServer web(80);
 static SemaphoreHandle_t stateLock;
@@ -472,7 +427,6 @@ void setup(){
 #define LEVI_DISPLAY_ROTATION 0
 #endif
   lcd.setRotation(LEVI_DISPLAY_ROTATION/90); // LovyanGFX: 0=0 Grad, 1=90, 2=180, 3=270
-  Cst::init();
   lcd.fillScreen(TFT_BLACK);
   lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
@@ -482,7 +436,7 @@ void setup(){
 }
 void loop(){
   static uint32_t tick=millis(),lastUI=0;uint32_t now=millis();lv_tick_inc(now-tick);tick=now;
-  {uint16_t rx=0,ry=0;touchDown=Cst::read(rx,ry);if(touchDown)mapTouch(rx,ry,touchX,touchY);}
+  {int32_t tx=0,ty=0;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=(uint16_t)tx;touchY=(uint16_t)ty;}}
   lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
