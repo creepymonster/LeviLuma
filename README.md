@@ -23,7 +23,6 @@ PlatformIO / Arduino / LovyanGFX / LVGL 9 / NimBLE-Arduino.
 ## Wichtige Grenzen
 - Auf realer Hardware und mit PlatformIO hier **nicht kompiliert/getestet**.
 - LED-Status ist optimistisch; FFF4 lieferte keine brauchbare Bestätigung.
-- Die Helligkeit wird durch Skalierung der RGB-Werte simuliert, kein bestätigter nativer Befehl.
 - `default_16MB.csv` setzt 16 MB Flash voraus; Board-Angabe vor Upload prüfen.
 - DMA/Double-Buffer und Animationen sind noch nicht implementiert. Zuerst stabilen
   Display-/Touch-/BLE-Betrieb prüfen.
@@ -36,7 +35,7 @@ Touch: SDA6 SCL7 IRQ5 RESET13.
 
 ## BLE
 ELK-BLEDDM 96, Service FFF0, Write FFF3.
-Ein/Aus und RGB-Befehle entsprechen den am Gerät getesteten Paketen.
+Ein/Aus, RGB und Helligkeit (natives Paket, `Lotus::brightness`) entsprechen den am Gerät getesteten Paketen.
 
 ## Warnungsbereinigung
 `LV_COLOR_DEPTH` wurde durch `LV_COLOR_FORMAT_DEFAULT LV_COLOR_FORMAT_RGB565` ersetzt, um die im bereitgestellten Build-Log vielfach wiederholte Deprecation-Warnung zu beseitigen. Noch kein erneuter PlatformIO-Build in dieser Umgebung ausgeführt.
