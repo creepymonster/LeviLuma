@@ -34,7 +34,7 @@ static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nu
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static bool uiWifi=false;
 static lv_obj_t *dots[LeviCal::N+1]{};
-struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; };
+struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; uint32_t sentRevision=0; };  // sentRevision: letzte Revision, die vollstaendig an BLE gesendet wurde (Sendebestaetigung, keine Ausfuehrungsbestaetigung)
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
 static int8_t selected=-1;   // Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe
@@ -379,6 +379,8 @@ static void bleTask(void*){
           ok=writer->writeValue(packet,9,false);if(ok)fadeLeft--;
         }
         if(attempted&&!ok) LEVI_LOG("BLE: Schreiben fehlgeschlagen");
+        // Nichts mehr offen (kein Befehl, keine Ueberblendung): alles bis zu dieser Revision ist gesendet
+        if(!attempted&&fadeLeft==0){xSemaphoreTake(stateLock,portMAX_DELAY);if(state.sentRevision<s.revision)state.sentRevision=s.revision;xSemaphoreGive(stateLock);}
         if(ok) vTaskDelay(pdMS_TO_TICKS(200));
       }
     }
@@ -386,7 +388,7 @@ static void bleTask(void*){
   }
 }
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
-static void stateJson(){State s=snapshot();String j="{\"wifi\":";j+=(WiFi.status()==WL_CONNECTED?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
+static void stateJson(){State s=snapshot();String j="{\"wifi\":";j+=(WiFi.status()==WL_CONNECTED?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+",\"revision\":"+String(s.revision)+",\"sentRevision\":"+String(s.sentRevision)+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
 static void webInit(){
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
