@@ -309,6 +309,9 @@ static void touchTestInit(){
 }
 #endif
 
+// Zeitbasis fuer LVGL (ms seit Start). Wird in setup() nach lv_init() gesetzt.
+static uint32_t levTickMs(){return millis();}
+
 void setup(){
   Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
   LEVI_LOG("LeviLuma startet");
@@ -320,7 +323,9 @@ void setup(){
 #endif
   lcd.setRotation(LEVI_DISPLAY_ROTATION/90); // LovyanGFX: 0=0 Grad, 1=90, 2=180, 3=270
   lcd.fillScreen(TFT_BLACK);
-  lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
+  lv_init();
+  lv_tick_set_cb(levTickMs); // LVGL-Zeitbasis: Animationen, Long-Press, Timer
+  display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
   input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,readTouch);lv_indev_set_display(input,display);
 #if LEVI_TOUCH_TEST
