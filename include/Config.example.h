@@ -32,3 +32,6 @@
 // #define LEVI_TOUCH_OFFSET_ROTATION 0
 // Touch: Ueberbrueckung kurzer Aussetzer in ms (Standard 40). Groesser = traegerer Release:
 // #define LEVI_TOUCH_BRIDGE_MS 40
+// Touch-Testscreen: 1 = Tippen zeichnet einen Kreis an der Tippposition (Bildschirm wird vorher geleert).
+// Zum Pruefen der Touch-Koordinaten und der Drehung. Standard 0 (normale Bedienung).
+// #define LEVI_TOUCH_TEST 0

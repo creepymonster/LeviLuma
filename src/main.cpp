@@ -23,6 +23,12 @@
 #ifndef LEVI_DISPLAY_ROTATION
 #define LEVI_DISPLAY_ROTATION 0
 #endif
+static_assert(LEVI_DISPLAY_ROTATION==0 || LEVI_DISPLAY_ROTATION==90 || LEVI_DISPLAY_ROTATION==180 || LEVI_DISPLAY_ROTATION==270,
+              "LEVI_DISPLAY_ROTATION muss 0, 90, 180 oder 270 sein");
+// Touch-Testscreen: 1 = nur Test-Oberflaeche (Tippen zeichnet Kreis + Koordinaten), 0 = normale Bedienung.
+#ifndef LEVI_TOUCH_TEST
+#define LEVI_TOUCH_TEST 0
+#endif
 static LGFX_Board lcd;
 static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
@@ -272,6 +278,36 @@ static void wifiConnect(){
   LEVI_LOG("WLAN: verbinde mit \"%s\"", LEVI_WIFI_SSID);
   WiFi.mode(WIFI_STA);WiFi.setAutoReconnect(true);WiFi.setSleep(true);WiFi.setTxPower(LEVI_WIFI_TX_DBM<=8.5f?WIFI_POWER_8_5dBm:WIFI_POWER_11dBm);WiFi.setHostname(LEVI_WIFI_HOSTNAME);WiFi.begin(LEVI_WIFI_SSID,LEVI_WIFI_PASSWORD);lastWifiAttempt=millis();
 }
+#if LEVI_TOUCH_TEST
+// Tippen: Bildschirm leeren, dann Kreis an der Tippposition mit den Koordinaten daneben zeichnen.
+static void touchTestPressed(lv_event_t *e){
+  lv_obj_t *pad=(lv_obj_t*)lv_event_get_target(e);
+  lv_point_t p;lv_indev_get_point(lv_indev_active(),&p);
+  lv_obj_clean(pad);
+  lv_obj_t *c=lv_obj_create(pad);
+  lv_obj_remove_flag(c,LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(c,30,30);lv_obj_set_pos(c,p.x-15,p.y-15);
+  lv_obj_set_style_radius(c,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(c,LV_OPA_TRANSP,0);
+  lv_obj_set_style_border_width(c,3,0);lv_obj_set_style_border_color(c,lv_color_hex(0xFF0000),0);
+  char buf[24];snprintf(buf,sizeof(buf),"%d, %d",(int)p.x,(int)p.y);
+  lv_obj_t *l=lv_label_create(pad);
+  lv_label_set_text(l,buf);lv_obj_set_style_text_color(l,lv_color_white(),0);
+  lv_obj_set_pos(l,p.x+18,p.y-8);
+  LEVI_LOG("Touch-Test: %d, %d", (int)p.x, (int)p.y);
+}
+static void touchTestInit(){
+  lv_obj_t *screen=lv_screen_active();
+  lv_obj_t *pad=lv_obj_create(screen);
+  lv_obj_set_size(pad,240,240);lv_obj_set_pos(pad,0,0);
+  lv_obj_set_style_bg_color(pad,lv_color_hex(0x000000),0);lv_obj_set_style_bg_opa(pad,LV_OPA_COVER,0);
+  lv_obj_set_style_border_width(pad,0,0);lv_obj_set_style_pad_all(pad,0,0);
+  lv_obj_remove_flag(pad,LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(pad,LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(pad,touchTestPressed,LV_EVENT_PRESSED,nullptr);
+  LEVI_LOG("Touch-Testscreen aktiv (LEVI_TOUCH_TEST 1)");
+}
+#endif
+
 void setup(){
   Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
   LEVI_LOG("LeviLuma startet");
@@ -286,19 +322,28 @@ void setup(){
   lv_init();display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display,drawBuf,nullptr,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
   input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,readTouch);lv_indev_set_display(input,display);
-  makeUI();lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webStart();
+#if LEVI_TOUCH_TEST
+  touchTestInit();
+#else
+  makeUI();
+#endif
+  lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webStart();
   bleStart();
 }
 void loop(){
   static uint32_t lastUI=0;uint32_t now=millis();
   {int32_t tx=0,ty=0;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=(uint16_t)tx;touchY=(uint16_t)ty;}}
   lv_timer_handler();webLoop();
+#if !LEVI_TOUCH_TEST
   if(now-lastUI>20){lastUI=now;updateUI();}
+#endif
   if(!screenDim&&now-lastTouchMs>20000){screenDim=true;backlight(35);}
   // Lange ungenutzt: zurueck auf den Startbildschirm (Mitte), einmal pro Ruhephase
   static bool idleCentered=false;
   bool idle=now-lastTouchMs>LEVI_RECENTER_MS;
+#if !LEVI_TOUCH_TEST
   if(idle&&!idleCentered)lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);
+#endif
   idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
   // Nach einem abgeschlossenen Scan den Verbindungsversuch neu starten
