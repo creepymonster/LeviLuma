@@ -7,7 +7,7 @@ static const char LEVI_HTML[] PROGMEM=R"LEVIHTML(<!doctype html><html lang="de">
 header{text-align:center;padding:5px 0 20px}h1{font-size:36px;letter-spacing:-1.3px;margin:0;font-weight:760;display:flex;align-items:center;justify-content:center;gap:8px}
 svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{display:flex;justify-content:center;gap:9px;margin-top:16px}.branddots i{width:15px;height:15px;border-radius:50%}
 .calib{margin:16px auto 0;max-width:430px}
-.tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.tri{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 .tile{display:flex;flex-direction:column;justify-content:center;padding:20px 18px}
 .power-tile{display:flex;flex-direction:column;align-items:center;padding:20px 18px;gap:12px}
 .dots{display:flex;align-items:center;gap:6px}
@@ -17,7 +17,6 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .statebar .state{font-size:11px;font-weight:600;color:#888}
 .power-tile .power{margin:auto 0}
 .tile .brightnessline{margin-bottom:6px}
-@media (max-width:760px){.tri{grid-template-columns:minmax(0,1fr)}}
 .calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
 .calib button:active{background:#f3f3f3}
 .card{background:white;border-radius:20px;padding:21px 20px 22px;box-shadow:0 4px 20px #00000007}
@@ -43,9 +42,9 @@ input[type=range]:focus{outline:none}
 input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(41,41,41,.18)}
 .locked{opacity:.4;pointer-events:none}
 </style></head><body><div class="shell"><header><h1><svg width="33" height="37" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6m-5 4h4m-2-20a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>LeviLuma</h1><p>Light. Color. Control.</p><div class="branddots"><i style="background:#E24F62"></i><i style="background:#E7A23B"></i><i style="background:#5FC36B"></i><i style="background:#52B4D1"></i><i style="background:#8B5CF6"></i></div></header>
-<main class="tri"><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section><section class="card tile power-tile" id="tPower"><div class="dots"><span class="dl">W</span><span id="wifi" class="dot" title="WLAN getrennt"></span><span id="ble" class="dot" title="BLE getrennt"></span><span class="dl">B</span></div><div class="statebar"><span class="state"><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
+<main class="tri"><section class="card tile power-tile" id="tPower"><div class="dots"><span class="dl">W</span><span id="wifi" class="dot" title="WLAN getrennt"></span><span id="ble" class="dot" title="BLE getrennt"></span><span class="dl">B</span></div><div class="statebar"><span class="state"><span id="pstatus">Status unbekannt</span></span></div><button class="power" id="power">Einschalten</button></section><section class="card tile" id="tColors"><div class="swatches" id="swatches"></div>
 <div class="colorline"><label class="colorpill" for="color"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.2-2.5h2.1A4.2 4.2 0 0 0 22 11a9 9 0 0 0-10-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.5" r="1"/><circle cx="16" cy="7.5" r="1"/></svg><span class="sample" id="sample"></span><span id="hex">#8B5CF6</span></label><input type="color" id="color" value="#8b5cf6"></div>
-</section></main>
+</section><section class="card tile" id="tBright"><div class="brightnessline"><b>Helligkeit</b><span id="value">75%</span></div><input id="brightness" type="range" min="1" max="100" value="75"></section></main>
 <section class="card calib"><div class="top"><strong>Kalibrierung</strong></div>
 <p class="muted" id="calCurrent">Lade Kalibrierung …</p>
 <textarea id="calOut" readonly rows="4" style="width:100%;box-sizing:border-box;font:13px ui-monospace,Menlo,monospace;border:1px solid #e1e1e1;border-radius:12px;padding:10px;background:#fafafa;color:#171717;resize:none"></textarea>

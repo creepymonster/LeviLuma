@@ -175,12 +175,13 @@ static void makeUI(){
   tv=lv_tileview_create(screen);lv_obj_set_size(tv,240,240);lv_obj_center(tv);
   lv_obj_set_style_bg_color(tv,lv_color_hex(0x000000),0);lv_obj_set_style_bg_opa(tv,LV_OPA_COVER,0);
   lv_obj_set_style_border_width(tv,0,0);lv_obj_set_style_pad_all(tv,0,0);lv_obj_set_scrollbar_mode(tv,LV_SCROLLBAR_MODE_OFF);
-  tileBright=lv_tileview_add_tile(tv,0,0,(lv_dir_t)LV_DIR_RIGHT);
-  tilePower=lv_tileview_add_tile(tv,1,0,(lv_dir_t)(LV_DIR_LEFT|LV_DIR_RIGHT));
-  tileColor=lv_tileview_add_tile(tv,2,0,(lv_dir_t)LV_DIR_LEFT);
-  lv_obj_t *tiles[3]={tileBright,tilePower,tileColor};
+  // Untereinander: An/Aus oben, Farbe in der Mitte, Helligkeit unten (Wischen nur vertikal)
+  tilePower=lv_tileview_add_tile(tv,0,0,(lv_dir_t)LV_DIR_BOTTOM);
+  tileColor=lv_tileview_add_tile(tv,0,1,(lv_dir_t)(LV_DIR_TOP|LV_DIR_BOTTOM));
+  tileBright=lv_tileview_add_tile(tv,0,2,(lv_dir_t)LV_DIR_TOP);
+  lv_obj_t *tiles[3]={tilePower,tileColor,tileBright};
   for(int i=0;i<3;i++){lv_obj_set_style_bg_opa(tiles[i],LV_OPA_TRANSP,0);lv_obj_set_style_pad_all(tiles[i],0,0);lv_obj_set_style_border_width(tiles[i],0,0);lv_obj_set_scrollbar_mode(tiles[i],LV_SCROLLBAR_MODE_OFF);}
-  lv_obj_set_tile_id(tv,1,0,LV_ANIM_OFF);
+  lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);
 
   // Helligkeit: vertikaler Balken, Prozent oben
   // Helligkeit: waagerechte Spur, darueber der Prozentwert mit etwas Abstand
@@ -342,7 +343,7 @@ void loop(){
   static bool idleCentered=false;
   bool idle=now-lastTouchMs>LEVI_RECENTER_MS;
 #if !LEVI_TOUCH_TEST
-  if(idle&&!idleCentered)lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);
+  if(idle&&!idleCentered)lv_obj_set_tile_id(tv,0,0,LV_ANIM_ON);
 #endif
   idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
