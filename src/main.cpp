@@ -66,29 +66,57 @@ static uint8_t currentBacklight=255;
 #define LEVI_CALIB_GB 0.940f
 #endif
 // Standard-Kalibrierung aus Config.h (sonst FastLED TypicalSMD5050).
+// Kalibrierung: calModel und calCustom werden nur unter calLock gelesen oder geschrieben.
+// Leser (BLE-Task, Web) holen sich eine vollstaendige Kopie, Schreiber rechnen die neue Kopie
+// ausserhalb des Locks und tauschen sie dann atomar aus.
+static SemaphoreHandle_t calLock=nullptr;
 static LeviCal::Model calModel;
 static bool calCustom=false;   // true, wenn eine Kalibrierung aus dem Web im NVS liegt
+static LeviCal::Model calSnapshot(bool *custom=nullptr){
+  xSemaphoreTake(calLock,portMAX_DELAY);
+  LeviCal::Model m=calModel;
+  if(custom)*custom=calCustom;
+  xSemaphoreGive(calLock);
+  return m;
+}
+static void calCommit(const LeviCal::Model &m,bool custom){
+  xSemaphoreTake(calLock,portMAX_DELAY);
+  calModel=m;calCustom=custom;
+  xSemaphoreGive(calLock);
+}
 // Standard: Config-Tabelle (LEVI_CALIB_POINTS) oder lineare Gains (sonst FastLED TypicalSMD5050).
-static void calibDefaults(){
-  LeviCal::defaultPts(calModel,LEVI_CALIB_GR,LEVI_CALIB_GG,LEVI_CALIB_GB);
+static void calibDefaultPts(LeviCal::Model &m){
+  LeviCal::defaultPts(m,LEVI_CALIB_GR,LEVI_CALIB_GG,LEVI_CALIB_GB);
 #ifdef LEVI_CALIB_POINTS
   static const uint8_t cfgPts[LeviCal::N*3]={LEVI_CALIB_POINTS};
-  memcpy(calModel.pts,cfgPts,sizeof(cfgPts));
+  memcpy(m.pts,cfgPts,sizeof(cfgPts));
 #endif
 }
-static void calibCompute(){LeviCal::solve(calModel);}
 static void calibLoad(){
-  calibDefaults();calCustom=false;
+  LeviCal::Model m;calibDefaultPts(m);bool custom=false;
   Preferences p;p.begin("levi",true);
-  if(p.getBytesLength("pts")==sizeof(calModel.pts)){p.getBytes("pts",calModel.pts,sizeof(calModel.pts));calCustom=true;}
+  if(p.getBytesLength("pts")==sizeof(m.pts)){p.getBytes("pts",m.pts,sizeof(m.pts));custom=true;}
   p.end();
-  calibCompute();
+  LeviCal::solve(m);
+  calCommit(m,custom);
 }
-static void calibSave(){Preferences p;p.begin("levi",false);p.putBytes("pts",calModel.pts,sizeof(calModel.pts));p.end();calCustom=true;calibCompute();}
-static void calibReset(){Preferences p;p.begin("levi",false);p.remove("pts");p.end();calibDefaults();calCustom=false;calibCompute();}
+// Neue Punkte (51 Werte) speichern: Gewichte ausserhalb des Locks berechnen, dann tauschen.
+static void calibSave(const uint8_t *pts){
+  LeviCal::Model m=calSnapshot();
+  memcpy(m.pts,pts,sizeof(m.pts));
+  LeviCal::solve(m);
+  Preferences p;p.begin("levi",false);p.putBytes("pts",m.pts,sizeof(m.pts));p.end();
+  calCommit(m,true);
+}
+static void calibReset(){
+  Preferences p;p.begin("levi",false);p.remove("pts");p.end();
+  LeviCal::Model m;calibDefaultPts(m);LeviCal::solve(m);
+  calCommit(m,false);
+}
 static String calibJson(){
-  String j="{\"custom\":";j+=calCustom?"true":"false";j+=",\"points\":[";
-  const uint8_t *flat=&calModel.pts[0][0];
+  bool custom=false;LeviCal::Model cm=calSnapshot(&custom);
+  String j="{\"custom\":";j+=custom?"true":"false";j+=",\"points\":[";
+  const uint8_t *flat=&cm.pts[0][0];
   for(int i=0;i<LeviCal::N*3;i++){if(i)j+=',';j+=String(flat[i]);}
   j+="]}";return j;
 }
@@ -345,7 +373,7 @@ static void bleTask(void*){
             fadeN=(s.raw||instantColor)?1:LEVI_FADE_STEPS;fadeLeft=fadeN;instantColor=false;
           }
           int step=fadeN-fadeLeft+1;uint8_t cc[3]={s.r,s.g,s.b};
-          if(!fadeRaw){shown=ColorMath::mix(fadeFrom,fadeTo,(float)step/fadeN);ColorMath::toRgb(shown,cc);LeviCal::apply(calModel,cc[0],cc[1],cc[2],cc);}
+          if(!fadeRaw){shown=ColorMath::mix(fadeFrom,fadeTo,(float)step/fadeN);ColorMath::toRgb(shown,cc);LeviCal::Model cm=calSnapshot();LeviCal::apply(cm,cc[0],cc[1],cc[2],cc);}
           Lotus::color(cc[0],cc[1],cc[2],packet);
           LEVI_LOG("BLE: Farbe Schritt %d/%d -> %u,%u,%u%s",step,fadeN,(unsigned)cc[0],(unsigned)cc[1],(unsigned)cc[2],fadeRaw?" (raw)":"");
           ok=writer->writeValue(packet,9,false);if(ok)fadeLeft--;
@@ -376,7 +404,7 @@ static void webInit(){
       if(c<0)break;start=c+1;
     }
     if(!ok||n!=LeviCal::N*3){web.send(400,"text/plain","p=51 Werte 0..255");return;}
-    memcpy(calModel.pts,tmp,sizeof(tmp));calibSave();
+    calibSave(tmp);
     LEVI_LOG("Kalibrierung gespeichert (17 Punkte)");
     web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
   web.on("/api/calib/reset",HTTP_POST,[]{calibReset();LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
@@ -435,7 +463,7 @@ static void wifiConnect(){
 void setup(){
   Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
   LEVI_LOG("LeviLuma startet");
-  stateLock=xSemaphoreCreateMutex();calibLoad();
+  stateLock=xSemaphoreCreateMutex();calLock=xSemaphoreCreateMutex();calibLoad();
   ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
   lcd.init();
 #ifndef LEVI_DISPLAY_ROTATION
