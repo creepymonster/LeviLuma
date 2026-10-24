@@ -403,14 +403,28 @@ static void onWifiEvent(arduino_event_id_t event,arduino_event_info_t info){
     default: break;
   }
 }
-static void wlanScanLog(){
-  int n=WiFi.scanNetworks(false,false,false,300);
-  bool seen=false;
-  for(int i=0;i<n;i++){
-    if(WiFi.SSID(i)==LEVI_WIFI_SSID){seen=true;LEVI_LOG("WLAN: \"%s\" sichtbar, RSSI %d dBm, Kanal %d", LEVI_WIFI_SSID, WiFi.RSSI(i), WiFi.channel(i));}
+// Asynchroner WLAN-Scan: blockiert die Oberflaeche nicht. Ergebnis wird in der Schleife abgeholt.
+static bool wlanScanning=false;
+static void wlanScanStart(){
+  WiFi.scanNetworks(true,false,false,300);
+  wlanScanning=true;
+}
+// Gibt true zurueck, sobald ein laufender Scan abgeschlossen ist.
+static bool wlanScanPoll(){
+  if(!wlanScanning)return false;
+  int n=WiFi.scanComplete();
+  if(n==WIFI_SCAN_RUNNING)return false;
+  wlanScanning=false;
+  if(n<0){LEVI_LOG("WLAN-Scan fehlgeschlagen (%d)", n);}
+  else{
+    bool seen=false;
+    for(int i=0;i<n;i++){
+      if(WiFi.SSID(i)==LEVI_WIFI_SSID){seen=true;LEVI_LOG("WLAN: \"%s\" sichtbar, RSSI %d dBm, Kanal %d", LEVI_WIFI_SSID, WiFi.RSSI(i), WiFi.channel(i));}
+    }
+    LEVI_LOG("WLAN-Scan: %d Netze, Ziel-SSID %s", n, seen?"gefunden":"NICHT gefunden");
   }
-  LEVI_LOG("WLAN-Scan: %d Netze, Ziel-SSID %s", n, seen?"gefunden":"NICHT gefunden");
   WiFi.scanDelete();
+  return true;
 }
 static void wifiConnect(){
   static bool eventsRegistered=false;
@@ -447,6 +461,8 @@ void loop(){
   if(idle&&!idleCentered)lv_obj_set_tile_id(tv,1,0,LV_ANIM_ON);
   idleCentered=idle;
   static bool mdns=false;static wl_status_t lastWl=WL_NO_SHIELD;
+  // Nach einem abgeschlossenen Scan den Verbindungsversuch neu starten
+  if(wlanScanPoll()){WiFi.disconnect();wifiConnect();}
   wl_status_t wl=WiFi.status();
   if(wl!=lastWl){LEVI_LOG("WLAN: Status %s -> %s", wlStatusName(lastWl), wlStatusName(wl));lastWl=wl;}
   if(wl==WL_CONNECTED){if(!mdns){mdns=MDNS.begin(LEVI_WIFI_HOSTNAME);if(mdns)MDNS.addService("http","tcp",80);LEVI_LOG("mDNS: %s.local %s", LEVI_WIFI_HOSTNAME, mdns?"aktiv":"FEHLER");}}
@@ -456,9 +472,13 @@ void loop(){
     if(now-lastWifiAttempt>15000){
       lastWifiAttempt=now;
       LEVI_LOG("WLAN: neuer Verbindungsversuch (Status %s)", wlStatusName(wl));
-      if(wl==WL_NO_SSID_AVAIL||wl==WL_CONNECT_FAILED) wlanScanLog();
-      WiFi.disconnect();
-      wifiConnect();
+      if(wl==WL_NO_SSID_AVAIL||wl==WL_CONNECT_FAILED){
+        // Scan zuerst (asynchron), der Neustart der Verbindung folgt in wlanScanPoll()
+        if(!wlanScanning)wlanScanStart();
+      }else{
+        WiFi.disconnect();
+        wifiConnect();
+      }
     }
   }
   delay(5);
