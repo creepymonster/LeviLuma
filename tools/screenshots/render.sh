@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Rendert die LCD-UI aus src/main.cpp in feste PNG-Dateien.
-# Aufruf: tools/screenshots/render.sh <repo-root> <lvgl-quellordner> <ausgabeordner>
+# Rendert die LCD-UI aus src/main.cpp in feste PNG-Dateien, je Aufloesung in einem Unterordner.
+# Aufruf: tools/screenshots/render.sh <repo-root> <lvgl-quellordner> <ausgabe-wurzel>
+# Ergebnis: <ausgabe-wurzel>/<B>x<H>/*.png
 set -euo pipefail
-REPO="$(cd "$1" && pwd)"; LVGL="$(cd "$2" && pwd)"; OUT="$3"
+REPO="$(cd "$1" && pwd)"; LVGL="$(cd "$2" && pwd)"; OUT_ROOT="$3"
 BUILD="$(mktemp -d)"
+
+# Aufloesung aus main.cpp: Unterordner je Display, z. B. screenshots/240x240/
+res_w=$(grep -o 'static constexpr uint16_t W=[0-9]*' "$REPO/src/main.cpp" | grep -o '[0-9]*$')
+res_h=$(grep -o 'H=[0-9]*' "$REPO/src/main.cpp" | head -1 | grep -o '[0-9]*$')
+OUT="$OUT_ROOT/${res_w}x${res_h}"
 mkdir -p "$OUT"
 
 # UI-Abschnitt aus main.cpp: von den Zustandsvariablen bis vor wlStatusName (Flush, Touch, UI, Farben)

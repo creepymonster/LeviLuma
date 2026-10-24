@@ -32,8 +32,8 @@ static void setMusic(bool){}
 
 #include "ui_part.inc"
 
-static const int FW=240;
 static uint8_t *fb=nullptr;
+static constexpr int FW=W, FH=H;   // Aufloesung kommt aus main.cpp (W, H)
 static void flushCb(lv_display_t *d,const lv_area_t *a,uint8_t *px){
   const uint16_t *src=(const uint16_t*)px;
   int w=lv_area_get_width(a),h=lv_area_get_height(a);
@@ -50,15 +50,15 @@ static void shot(lv_display_t *d,const char *name){
   lv_refr_now(d);
   FILE *f=fopen((outDir+"/"+name+".ppm").c_str(),"wb");
   if(!f){fprintf(stderr,"kann %s nicht schreiben\n",name);return;}
-  fprintf(f,"P6\n%d %d\n255\n",FW,FW);fwrite(fb,1,FW*FW*3,f);fclose(f);
+  fprintf(f,"P6\n%d %d\n255\n",FW,FH);fwrite(fb,1,FW*FH*3,f);fclose(f);
 }
 int main(int argc,char **argv){
   outDir=argc>1?argv[1]:".";
   lv_init();
   lv_tick_set_cb([](){return (uint32_t)0;});
-  static uint8_t buf[240*240*2];
-  fb=new uint8_t[FW*FW*3]();
-  lv_display_t *d=lv_display_create(240,240);
+  static uint8_t buf[W*H*2];
+  fb=new uint8_t[FW*FH*3]();
+  lv_display_t *d=lv_display_create(W,H);
   lv_display_set_buffers(d,buf,nullptr,sizeof(buf),LV_DISPLAY_RENDER_MODE_FULL);
   lv_display_set_flush_cb(d,flushCb);
   display=d;
