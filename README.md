@@ -1,40 +1,70 @@
-# LeviLuma V3 – Waveshare ESP32-S3 Touch LCD 1.28
+# LeviLuma – LED-Steuerung mit Waveshare ESP32-S3 Touch LCD 1.28
 
-PlatformIO / Arduino / LovyanGFX / LVGL 9 / NimBLE-Arduino.
+Firmware für den Waveshare ESP32-S3-Touch-LCD-1.28 (rundes Display), die einen BLE-LED-Strip der ELK-/Lotus-Lantern-Familie steuert.
+Die Bedienung läuft am Display (Touch) und über eine Weboberfläche im WLAN.
+
+Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9, NimBLE-Arduino.
 
 ## Start
-1. `include/Config.example.h` nach `include/Config.h` kopieren und WLAN eintragen.
-2. Projektordner in VS Code/PlatformIO öffnen.
-3. Build, Upload, Serial Monitor (115200).
-4. Weboberfläche: `http://leviluma.local/` oder IP des ESP32.
+1. `include/Config.example.h` nach `include/Config.h` kopieren und WLAN-Zugangsdaten eintragen. `Config.h` nicht ins Repo committen.
+2. Projektordner in VS Code mit PlatformIO öffnen.
+3. Build, Upload und Serial Monitor (115200 Baud).
+4. Weboberfläche: `http://leviluma.local/` oder die IP des ESP32.
 
-## Änderungen in V3
-- Helles Webdesign mit Glühbirne, weißer Karte auf Grau, Statuschip und schwarzem Power-Button.
-- LCD: 216px-Ring (16px), Ringöffnung rechts, weißer Knopf, 108px-Mitte mit Halo,
-  32px-Prozentzahl, Statuspunkt bei y=34 und Farbmarkierungen bei y=200.
-- Einheitliche Palette: E24F62, E7A23B, 5FC36B, 52B4D1, 8B5CF6.
-- LVGL-Schriften aktiviert, RGB565-Puffer 4-Byte-ausgerichtet.
-- BLE-Übertragung hält Revision offen, wenn 33-ms-Limit noch nicht erreicht ist.
-- LCD aktualisiert nur bei Zustandsänderung; Touch wird einmal je Schleife gelesen.
-- Weckberührung wird bis zum Loslassen unterdrückt.
-- WLAN Auto-Reconnect und mDNS-Neustart; reduzierte WLAN-Sendeleistung.
-- Hintergrundbeleuchtung wird erst nach dem ersten LVGL-Frame aktiviert.
+## Bedienung
+**Display:** Drei Seiten untereinander: oben An/Aus, Mitte Farbe, unten Helligkeit. Hoch und runter wischen wechselt die Seite.
+- An/Aus: die Pille 500 ms halten.
+- Farbe: Tippen springt zur nächsten Farbe, am Ende wieder vorn.
+- Helligkeit: Balken wischen oder tippen.
+- Nach längerer Pause springt die Anzeige zurück auf An/Aus, und das Display wird gedimmt.
 
-## Wichtige Grenzen
-- LED-Status ist optimistisch; FFF4 lieferte keine brauchbare Bestätigung.
-- `default_16MB.csv` setzt 16 MB Flash voraus; Board-Angabe vor Upload prüfen.
-- DMA/Double-Buffer und Animationen sind noch nicht implementiert. Zuerst stabilen
-  Display-/Touch-/BLE-Betrieb prüfen.
-- Web-API ist im lokalen Netzwerk nicht authentifiziert. Nur in vertrauenswürdigem WLAN verwenden.
-- Für 0 % Helligkeit ist der Power-Button vorgesehen; Regler 1–100 %.
+**Web:** Dieselben drei Karten untereinander, dazu Kalibrierung der Farben.
 
-## GPIO
-Display: SCLK10 MOSI11 CS9 DC8 RESET14 BACKLIGHT2.
-Touch: SDA6 SCL7 IRQ5 RESET13.
+## Konfiguration (`include/Config.h`)
+Pflicht: `LEVI_WIFI_SSID`, `LEVI_WIFI_PASSWORD`, `LEVI_WIFI_HOSTNAME`, `LEVI_WIFI_TX_DBM`.
 
-## BLE
-ELK-BLEDDM 96, Service FFF0, Write FFF3.
-Ein/Aus, RGB und Helligkeit (natives Paket, `Lotus::brightness`) entsprechen den am Gerät getesteten Paketen.
+Optional, mit Standardwert (alle in `Config.example.h` dokumentiert):
+- `LEVI_DISPLAY_ROTATION` – 0, 90, 180 oder 270 Grad (andere Werte brechen den Build ab).
+- `LEVI_TOUCH_OFFSET_ROTATION` – Touch-Drehung in LovyanGFX (0–7). Muss für die Montage am Gerät geprüft werden.
+- `LEVI_TOUCH_BRIDGE_MS` – Überbrückung kurzer Touch-Aussetzer (Standard 40 ms).
+- `LEVI_TOUCH_TEST` – 1 zeigt nur einen Touch-Testscreen: Tippen zeichnet einen Kreis mit den Koordinaten.
+- `LEVI_RGB565_SWAP` – Byte-Reihenfolge der Display-Übertragung (Standard 1). Bei vertauschten Farben auf 0 setzen.
+- `LEVI_FLUSH_STATS` – 1 loggt alle 5 s die Wartezeiten auf die Display-Übertragung.
+- `LEVI_RECENTER_MS` – Zeit ohne Bedienung bis zur Rückkehr auf An/Aus (Standard 60000).
+- `LEVI_DISPLAY_SPI_MHZ`, `LEVI_DISPLAY_INVERT`, `LEVI_BACKLIGHT_ACTIVE_HIGH`, `LEVI_BRIGHTNESS_MAX`
+- `LEVI_CALIB_*`, `LEVI_CALIB_POINTS` – Standard-Kalibrierung. Eigene Kalibrierung über die Web-Oberfläche.
+- `LEVI_MIC_EQ_MODE`, `LEVI_FADE_STEPS`
 
-## Warnungsbereinigung
-`LV_COLOR_DEPTH` wurde durch `LV_COLOR_FORMAT_DEFAULT LV_COLOR_FORMAT_RGB565` ersetzt, um die im bereitgestellten Build-Log vielfach wiederholte Deprecation-Warnung zu beseitigen. Noch kein erneuter PlatformIO-Build in dieser Umgebung ausgeführt.
+## Weboberfläche und API
+Die API hat keine Authentifizierung. Nur in einem vertrauenswürdigen Netz betreiben.
+
+| Endpunkt | Zweck |
+|---|---|
+| `GET /api/state` | Zustand als JSON, inklusive `revision` und `sentRevision` |
+| `POST /api/power?on=0\|1` | Ein/Aus |
+| `POST /api/brightness?value=0..100` | Helligkeit |
+| `POST /api/color?r=&g=&b=` | Farbe mit Kalibrierung |
+| `POST /api/raw?r=&g=&b=` | Farbe ohne Kalibrierung |
+| `POST /api/music?on=0\|1` | Musikmodus |
+| `GET /api/calib` | Kalibrierung lesen |
+| `POST /api/calib?p=…` | 51 Werte (17 Farben × RGB, je 0–255) speichern |
+| `POST /api/calib/reset` | Kalibrierung auf den Standard zurücksetzen |
+
+`sentRevision` zeigt, bis zu welcher Änderung alle Befehle an das Band gesendet wurden. Das ist eine Sendebestätigung, keine Bestätigung, dass das Band sie ausgeführt hat.
+
+## Hardware
+- Waveshare ESP32-S3-Touch-LCD-1.28, **16 MB Flash** (per `esptool flash_id` geprüft).
+- Display GC9A01, 240×240, SPI: SCLK 10, MOSI 11, CS 9, DC 8, RESET 14. Hintergrundbeleuchtung PWM auf GPIO 2.
+- Touch CST816S, I2C: SDA 6, SCL 7, RESET 13. Der Touch-Interrupt wird nicht genutzt, die Abfrage läuft zyklisch.
+- LED-Strip: BLE, Gerätenamen beginnen mit `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK` oder `LEDBLE`. Service `FFF0`, Schreib-Characteristic `FFF3`.
+
+## Getestet am Gerät
+- Ein/Aus, RGB und Helligkeit (natives Paket).
+- Touch, Seitenwechsel, Farbpunkte, Helligkeitsbalken.
+- Musikmodus und Mikrofon-EQ sind nicht als getestet markiert.
+
+## Bekannte Grenzen
+- Der LED-Status ist optimistisch: Das Band bestätigt Befehle nicht zuverlässig.
+- Die Touch-Drehung für die Montage am Gerät ist per `LEVI_TOUCH_OFFSET_ROTATION` einzustellen und bei Bedarf zu prüfen.
+- Das Waveshare ESP32-C6-Touch-LCD-2.8 wird noch nicht unterstützt.
+- Die Farbauswahl als Blasen-Wabe (Apple-Watch-Stil) ist geplant, aber nicht umgesetzt.
