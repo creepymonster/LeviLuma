@@ -1,6 +1,6 @@
 #pragma once
 // Gemeinsamer Zustand fuer LVGL-UI, BLE und Web-API.
-// Schreiben nur ueber die Funktionen in main.cpp (unter stateLock), Lesen ueber snapshot() als Kopie.
+// Schreiben nur ueber die Setter aus state.cpp (unter stateLock), Lesen ueber snapshot() als Kopie.
 #include <stdint.h>
 #include <stdio.h>
 #include <Arduino.h>
@@ -16,6 +16,16 @@
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; uint32_t sentRevision=0; };
 
 extern SemaphoreHandle_t stateLock;
+void stateInit();   // Mutexe anlegen und Kalibrierung laden (einmal in setup)
+
+// Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe.
+// Besitz: nur der Loop-Task (LVGL-UI, Web-Handler setRGB/setMusic). Der BLE-Task liest 'selected' nicht,
+// er arbeitet nur mit der Snapshot-Kopie von State. Deshalb ist kein Mutex noetig. Wenn BLE je darauf zugreift, unter stateLock verschieben.
+extern int8_t selected;
+
+// Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
+inline constexpr int MUSIC_IDX=LeviCal::N;
+inline constexpr int LIST_COUNT=LeviCal::N+1;
 State snapshot();
 void stateSetBle(bool on);
 void stateMarkSent(uint32_t rev);

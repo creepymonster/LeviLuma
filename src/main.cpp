@@ -24,7 +24,6 @@
 #define LEVI_DISPLAY_ROTATION 0
 #endif
 static LGFX_Board lcd;
-SemaphoreHandle_t stateLock=nullptr;
 static constexpr uint16_t W=240,H=240;
 alignas(4) static uint8_t drawBuf[240*24*2]; // 11520 bytes RGB565; LVGL buffer aligned
 static lv_display_t *display=nullptr;
@@ -33,15 +32,8 @@ static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nu
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static bool uiWifi=false;
 static lv_obj_t *dots[LeviCal::N+1]{};
-static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
-// Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe.
-// Besitz: nur der Loop-Task (LVGL-UI, Web-Handler setRGB/setMusic). Der BLE-Task liest 'selected' nicht,
-// er arbeitet nur mit der Snapshot-Kopie von State. Deshalb ist kein Mutex noetig. Wenn BLE je darauf zugreift, unter stateLock verschieben.
-static int8_t selected=-1;
 // Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
-static constexpr int MUSIC_IDX=LeviCal::N;
-static constexpr int LIST_COUNT=LeviCal::N+1;
 static int wrapIdx(int i){return ((i%LIST_COUNT)+LIST_COUNT)%LIST_COUNT;}
 static uint32_t uiRevision=UINT32_MAX;
 static bool uiBle=false;
@@ -56,99 +48,6 @@ static bool screenDim=false;
 #endif
 static uint8_t currentBacklight=255;
 
-// Kalibrierung: Kanal-Gains und Gamma, im NVS gespeichert. Ausgabe = gamma(gain*in).
-#ifndef LEVI_CALIB_GR
-#define LEVI_CALIB_GR 1.000f
-#endif
-#ifndef LEVI_CALIB_GG
-#define LEVI_CALIB_GG 0.690f
-#endif
-#ifndef LEVI_CALIB_GB
-#define LEVI_CALIB_GB 0.940f
-#endif
-// Standard-Kalibrierung aus Config.h (sonst FastLED TypicalSMD5050).
-// Kalibrierung: calModel und calCustom werden nur unter calLock gelesen oder geschrieben.
-// Leser (BLE-Task, Web) holen sich eine vollstaendige Kopie, Schreiber rechnen die neue Kopie
-// ausserhalb des Locks und tauschen sie dann atomar aus.
-static SemaphoreHandle_t calLock=nullptr;
-static LeviCal::Model calModel;
-static bool calCustom=false;   // true, wenn eine Kalibrierung aus dem Web im NVS liegt
-LeviCal::Model calSnapshot(bool *custom){
-  xSemaphoreTake(calLock,portMAX_DELAY);
-  LeviCal::Model m=calModel;
-  if(custom)*custom=calCustom;
-  xSemaphoreGive(calLock);
-  return m;
-}
-static void calCommit(const LeviCal::Model &m,bool custom){
-  xSemaphoreTake(calLock,portMAX_DELAY);
-  calModel=m;calCustom=custom;
-  xSemaphoreGive(calLock);
-}
-// Standard: Config-Tabelle (LEVI_CALIB_POINTS) oder lineare Gains (sonst FastLED TypicalSMD5050).
-static void calibDefaultPts(LeviCal::Model &m){
-  LeviCal::defaultPts(m,LEVI_CALIB_GR,LEVI_CALIB_GG,LEVI_CALIB_GB);
-#ifdef LEVI_CALIB_POINTS
-  static const uint8_t cfgPts[LeviCal::N*3]={LEVI_CALIB_POINTS};
-  memcpy(m.pts,cfgPts,sizeof(cfgPts));
-#endif
-}
-// NVS-Zugriffe: jeder Fehler wird geloggt und als Rueckgabewert gemeldet.
-static void calibLoad(){
-  LeviCal::Model m;calibDefaultPts(m);bool custom=false;
-  Preferences p;
-  if(!p.begin("levi",true)){LEVI_LOG("NVS: Oeffnen zum Lesen fehlgeschlagen, Standard-Kalibrierung");}
-  else{
-    if(p.getBytesLength("pts")==sizeof(m.pts)){
-      if(p.getBytes("pts",m.pts,sizeof(m.pts))==sizeof(m.pts))custom=true;
-      else{LEVI_LOG("NVS: Kalibrierung lesen fehlgeschlagen, Standard");calibDefaultPts(m);}
-    }
-    p.end();
-  }
-  LeviCal::solve(m);
-  calCommit(m,custom);
-}
-// Neue Punkte (51 Werte) speichern. Gibt false zurueck, wenn NVS nicht schreiben konnte.
-bool calibSave(const uint8_t *pts){
-  LeviCal::Model m=calSnapshot();
-  memcpy(m.pts,pts,sizeof(m.pts));
-  LeviCal::solve(m);
-  Preferences p;
-  if(!p.begin("levi",false)){LEVI_LOG("NVS: Oeffnen zum Schreiben fehlgeschlagen");return false;}
-  size_t written=p.putBytes("pts",m.pts,sizeof(m.pts));
-  p.end();
-  if(written!=sizeof(m.pts)){LEVI_LOG("NVS: Kalibrierung schreiben fehlgeschlagen (%u Bytes)",(unsigned)written);return false;}
-  calCommit(m,true);
-  return true;
-}
-// Entfernt die gespeicherte Kalibrierung. Gibt false zurueck, wenn NVS nicht erreichbar war.
-bool calibReset(){
-  Preferences p;
-  if(!p.begin("levi",false)){LEVI_LOG("NVS: Oeffnen zum Loeschen fehlgeschlagen");return false;}
-  bool removed=p.remove("pts");
-  p.end();
-  if(!removed)LEVI_LOG("NVS: Kalibrierung loeschen fehlgeschlagen (evtl. noch keine gespeichert)");
-  LeviCal::Model m;calibDefaultPts(m);LeviCal::solve(m);
-  calCommit(m,false);
-  return true;
-}
-String calibJson(){
-  bool custom=false;LeviCal::Model cm=calSnapshot(&custom);
-  String j="{\"custom\":";j+=custom?"true":"false";j+=",\"points\":[";
-  const uint8_t *flat=&cm.pts[0][0];
-  for(int i=0;i<LeviCal::N*3;i++){if(i)j+=',';j+=String(flat[i]);}
-  j+="]}";return j;
-}
-State snapshot(){ xSemaphoreTake(stateLock,portMAX_DELAY); State s=state; xSemaphoreGive(stateLock); return s; }
-void stateSetBle(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.ble=on; xSemaphoreGive(stateLock); }
-void stateMarkSent(uint32_t rev){ xSemaphoreTake(stateLock,portMAX_DELAY); if(state.sentRevision<rev)state.sentRevision=rev; xSemaphoreGive(stateLock); }
-
-void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?1:0; ++state.revision; xSemaphoreGive(stateLock); }
-void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
-void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
-void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
-  selected=-1;for(int i=0;i<LeviCal::N;i++)if(LeviCal::TARGET[i][0]==r&&LeviCal::TARGET[i][1]==g&&LeviCal::TARGET[i][2]==b){selected=(int8_t)i;break;} }
-void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=MUSIC_IDX;}
 static void selectColor(int idx){int n=wrapIdx(idx);if(n==MUSIC_IDX){setMusic(true);return;}setRGB(LeviCal::TARGET[n][0],LeviCal::TARGET[n][1],LeviCal::TARGET[n][2]);}
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
@@ -371,7 +270,7 @@ static void wifiConnect(){
 void setup(){
   Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
   LEVI_LOG("LeviLuma startet");
-  stateLock=xSemaphoreCreateMutex();calLock=xSemaphoreCreateMutex();calibLoad();
+  stateInit();
   ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
   lcd.init();
 #ifndef LEVI_DISPLAY_ROTATION
