@@ -24,8 +24,8 @@ void stateInit();   // Mutexe anlegen und Kalibrierung laden (einmal in setup)
 extern int8_t selected;
 
 // Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
-inline constexpr int MUSIC_IDX=LeviCal::N;
-inline constexpr int LIST_COUNT=LeviCal::N+1;
+static constexpr int MUSIC_IDX=LeviCal::N;
+static constexpr int LIST_COUNT=LeviCal::N+1;
 State snapshot();
 void stateSetBle(bool on);
 void stateMarkSent(uint32_t rev);
