@@ -435,7 +435,7 @@ void setup(){
   xTaskCreatePinnedToCore(bleTask,"ble",8192,nullptr,1,nullptr,0);
 }
 void loop(){
-  static uint32_t tick=millis(),lastUI=0;uint32_t now=millis();lv_tick_inc(now-tick);tick=now;
+  static uint32_t lastUI=0;uint32_t now=millis();
   {int32_t tx=0,ty=0;touchDown=lcd.getTouch(&tx,&ty);if(touchDown){touchX=(uint16_t)tx;touchY=(uint16_t)ty;}}
   lv_timer_handler();web.handleClient();
   if(now-lastUI>20){lastUI=now;updateUI();}

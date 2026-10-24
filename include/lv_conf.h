@@ -18,4 +18,8 @@
 #define LV_FONT_MONTSERRAT_48 1
 #define LV_USE_SLIDER 1
 #define LV_USE_TILEVIEW 1
+/* Zeit kommt direkt aus millis(), kein manuelles lv_tick_inc mehr noetig. */
+#define LV_TICK_CUSTOM 1
+#define LV_TICK_CUSTOM_INCLUDE "Arduino.h"
+#define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())
 #endif
