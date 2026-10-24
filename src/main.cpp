@@ -36,14 +36,11 @@ static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
-static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;static bool uiWifi=false;
+static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;
 static lv_obj_t *dots[LeviCal::N+1]{};
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
 // Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
 static int wrapIdx(int i){return ((i%LIST_COUNT)+LIST_COUNT)%LIST_COUNT;}
-static uint32_t uiRevision=UINT32_MAX;
-static bool uiBle=false;
-static int8_t uiSelected=-2;
 static bool touchDown=false;
 static uint16_t touchX=120,touchY=120;
 static bool touchBlocked=false;
@@ -65,11 +62,32 @@ static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
   lv_obj_set_style_text_color(pillLbl,fg,0);
   lv_obj_set_style_text_color(pillLbl2,fg,0);
 }
+// RGB565-Bytes tauschen (LovyanGFX). Falls Farben vertauscht wirken: LEVI_RGB565_SWAP 0 setzen.
+#ifndef LEVI_RGB565_SWAP
+#define LEVI_RGB565_SWAP 1
+#endif
+// Flush-Zeiten messen: 1 = alle 5 s Mittel und Maximum ins Log.
+#ifndef LEVI_FLUSH_STATS
+#define LEVI_FLUSH_STATS 0
+#endif
 static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
   int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
+#if LEVI_FLUSH_STATS
+  uint32_t t0=micros();
+#endif
   lcd.startWrite();lcd.setAddrWindow(a->x1,a->y1,width,height);
-  lcd.pushPixels((const uint16_t*)px, width * height, true);
-  lcd.endWrite();lv_display_flush_ready(disp);
+  lcd.pushPixels((const uint16_t*)px, width * height, LEVI_RGB565_SWAP);
+  lcd.endWrite();
+#if LEVI_FLUSH_STATS
+  static uint32_t sumUs=0,maxUs=0,count=0,logMs=0;
+  uint32_t dt=micros()-t0;sumUs+=dt;if(dt>maxUs)maxUs=dt;count++;
+  uint32_t nowMs=millis();
+  if(nowMs-logMs>=5000){
+    if(count)LEVI_LOG("Flush: %lu Aufrufe, Mittel %lu us, Max %lu us",(unsigned long)count,(unsigned long)(sumUs/count),(unsigned long)maxUs);
+    sumUs=0;maxUs=0;count=0;logMs=nowMs;
+  }
+#endif
+  lv_display_flush_ready(disp);
 }
 // Touch-Treiber: eine Beruehrung im gedimmten Zustand weckt nur das Display und wird nicht
 // an die Oberflaeche weitergegeben, bis der Finger wieder oben ist. Kurze Aussetzer des CST816S
@@ -93,38 +111,62 @@ static void setEnabled(lv_obj_t *o,bool en,lv_opa_t opaOn=LV_OPA_COVER){
   if(en)lv_obj_remove_state(o,LV_STATE_DISABLED);else lv_obj_add_state(o,LV_STATE_DISABLED);
   lv_obj_set_style_opa(o,en?opaOn:LV_OPA_40,0);
 }
-static void updateUI(){
-  State s=snapshot();
-  bool wifi=WiFi.status()==WL_CONNECTED;
-  if(s.revision==uiRevision && s.ble==uiBle && selected==uiSelected && wifi==uiWifi)return;
-  uiRevision=s.revision;uiBle=s.ble;uiSelected=selected;uiWifi=wifi;
-  bool on=s.power==1;
-  bool active=on&&s.ble;   // Helligkeit und Farben nur eingeschaltet und mit Band verbunden
-  lv_color_t color=rgbColor(s.r,s.g,s.b);
-  applyContrast(s.r,s.g,s.b);
+// Anzeige nur dort aktualisieren, wo sich der Wert geaendert hat.
+struct UiView { bool on,ble,wifi,active; uint8_t r,g,b,brightness; int8_t selected; };
+static UiView uiLast{};
+static bool uiInit=false;
+static void updatePowerUI(const UiView &v){
+  lv_color_t color=rgbColor(v.r,v.g,v.b);
+  applyContrast(v.r,v.g,v.b);
   // Mitte: An/Aus ist auch ausgeschaltet bedienbar, sobald verbunden
   lv_obj_set_style_bg_color(center,color,0);
   lv_obj_set_style_shadow_color(center,color,0);
-  setEnabled(center,s.ble,on?LV_OPA_COVER:LV_OPA_60);
-  lv_label_set_text(pillLbl,on?"Ausschalten":"Einschalten");
-  lv_label_set_text(pillLbl2,on?"Ausschalten":"Einschalten");
-  // Statuspunkt: gruen verbunden, rot getrennt
-  lv_obj_set_style_bg_color(statusWifi,wifi?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
-  lv_obj_set_style_bg_color(statusBle,s.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
-  // Helligkeit
-  lv_obj_set_style_bg_color(bar,color,LV_PART_INDICATOR);
-  setEnabled(bar,active);
-  setEnabled(barLbl,active);
-  if(lv_slider_get_value(bar)!=s.brightness)lv_slider_set_value(bar,s.brightness,LV_ANIM_OFF);
-  char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)s.brightness);
+  setEnabled(center,v.ble,v.on?LV_OPA_COVER:LV_OPA_60);
+  lv_label_set_text(pillLbl,v.on?"Ausschalten":"Einschalten");
+  lv_label_set_text(pillLbl2,v.on?"Ausschalten":"Einschalten");
+}
+static void updateConnectionUI(const UiView &v){
+  // Statuspunkte: gruen verbunden, rot getrennt
+  lv_obj_set_style_bg_color(statusWifi,v.wifi?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
+  lv_obj_set_style_bg_color(statusBle,v.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
+}
+static void updateBrightnessUI(const UiView &v){
+  lv_obj_set_style_bg_color(bar,rgbColor(v.r,v.g,v.b),LV_PART_INDICATOR);
+  setEnabled(bar,v.active);
+  setEnabled(barLbl,v.active);
+  if(lv_slider_get_value(bar)!=v.brightness)lv_slider_set_value(bar,v.brightness,LV_ANIM_OFF);
+  char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)v.brightness);
   lv_label_set_text(barLbl,label);
+}
+static void updateColorUI(const UiView &v){
   // Farbpunkte: aktive Farbe mit weissem Rahmen
   for(int k=0;k<LeviCal::N;k++){
-    lv_obj_set_style_border_width(dots[k],k==selected?2:0,0);
-    if(k==MUSIC_IDX)lv_obj_set_style_bg_color(dots[k],lv_color_hex(0x333333),0);
-    else lv_obj_set_style_bg_color(dots[k],lv_color_make(LeviCal::TARGET[k][0],LeviCal::TARGET[k][1],LeviCal::TARGET[k][2]),0);
-    setEnabled(dots[k],active);
+    lv_obj_set_style_border_width(dots[k],k==v.selected?2:0,0);
+    setEnabled(dots[k],v.active);
   }
+}
+// Die festen Farben der Punkte werden nur einmal gesetzt.
+static void setColorDotsOnce(){
+  for(int k=0;k<LeviCal::N;k++)lv_obj_set_style_bg_color(dots[k],lv_color_make(LeviCal::TARGET[k][0],LeviCal::TARGET[k][1],LeviCal::TARGET[k][2]),0);
+  lv_obj_set_style_bg_color(dots[MUSIC_IDX],lv_color_hex(0x333333),0);
+}
+static void updateUI(){
+  State s=snapshot();
+  UiView v{s.power==1,s.ble,WiFi.status()==WL_CONNECTED,false,s.r,s.g,s.b,s.brightness,selected};
+  v.active=v.on&&v.ble;   // Helligkeit und Farben nur eingeschaltet und mit Band verbunden
+  bool first=!uiInit;uiInit=true;
+  const UiView &l=uiLast;
+  bool powerChanged=first||v.on!=l.on||v.ble!=l.ble||v.r!=l.r||v.g!=l.g||v.b!=l.b;
+  bool connChanged=first||v.wifi!=l.wifi||v.ble!=l.ble;
+  bool brightChanged=first||v.brightness!=l.brightness||v.active!=l.active||v.r!=l.r||v.g!=l.g||v.b!=l.b;
+  bool colorChanged=first||v.selected!=l.selected||v.active!=l.active;
+  if(!(powerChanged||connChanged||brightChanged||colorChanged))return;
+  if(first)setColorDotsOnce();
+  if(powerChanged)updatePowerUI(v);
+  if(connChanged)updateConnectionUI(v);
+  if(brightChanged)updateBrightnessUI(v);
+  if(colorChanged)updateColorUI(v);
+  uiLast=v;
 }
 
 // Helligkeitsbalken: nur Benutzereingaben (Indev aktiv) setzen den Zustand, nicht die Anzeige selbst.
