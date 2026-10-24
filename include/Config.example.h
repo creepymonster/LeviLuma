@@ -19,3 +19,14 @@
 // #define LEVI_CALIB_POINTS 255,255,255, 255,243,224, ...
 // Helligkeitsbereich des Bandes: 100 = Werte 0..100 (Rust-Referenz), 255 = Prozent auf 0..255 (Python-Referenz)
 #define LEVI_BRIGHTNESS_MAX 100
+
+// ---- Optionale Einstellungen (auskommentiert = Standardwert im Code) ----
+// Pflicht ist nur WLAN (oben). Diese Datei enthaelt bewusst nur Platzhalter, keine echten Zugangsdaten.
+// Sekunden ohne Bedienung bis zur Rueckkehr auf die Mittelseite (Standard 60000 ms):
+// #define LEVI_RECENTER_MS 60000
+// Mikrofon-EQ-Modus nach "Mikrofon an" (Standard 0):
+// #define LEVI_MIC_EQ_MODE 0
+// Anzahl der Schritte bei der Farbueberblendung (Standard 8):
+// #define LEVI_FADE_STEPS 8
+// Touch-Drehung in LovyanGFX, 0..7 (Standard 0; am Geraet pruefen):
+// #define LEVI_TOUCH_OFFSET_ROTATION 0

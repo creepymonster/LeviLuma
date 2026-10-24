@@ -37,7 +37,10 @@ static lv_obj_t *dots[LeviCal::N+1]{};
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; uint32_t sentRevision=0; };  // sentRevision: letzte Revision, die vollstaendig an BLE gesendet wurde (Sendebestaetigung, keine Ausfuehrungsbestaetigung)
 static State state;
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
-static int8_t selected=-1;   // Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe
+// Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe.
+// Besitz: nur der Loop-Task (LVGL-UI, Web-Handler setRGB/setMusic). Der BLE-Task liest 'selected' nicht,
+// er arbeitet nur mit der Snapshot-Kopie von State. Deshalb ist kein Mutex noetig. Wenn BLE je darauf zugreift, unter stateLock verschieben.
+static int8_t selected=-1;
 // Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
 static constexpr int MUSIC_IDX=LeviCal::N;
 static constexpr int LIST_COUNT=LeviCal::N+1;
@@ -92,26 +95,44 @@ static void calibDefaultPts(LeviCal::Model &m){
   memcpy(m.pts,cfgPts,sizeof(cfgPts));
 #endif
 }
+// NVS-Zugriffe: jeder Fehler wird geloggt und als Rueckgabewert gemeldet.
 static void calibLoad(){
   LeviCal::Model m;calibDefaultPts(m);bool custom=false;
-  Preferences p;p.begin("levi",true);
-  if(p.getBytesLength("pts")==sizeof(m.pts)){p.getBytes("pts",m.pts,sizeof(m.pts));custom=true;}
-  p.end();
+  Preferences p;
+  if(!p.begin("levi",true)){LEVI_LOG("NVS: Oeffnen zum Lesen fehlgeschlagen, Standard-Kalibrierung");}
+  else{
+    if(p.getBytesLength("pts")==sizeof(m.pts)){
+      if(p.getBytes("pts",m.pts,sizeof(m.pts))==sizeof(m.pts))custom=true;
+      else{LEVI_LOG("NVS: Kalibrierung lesen fehlgeschlagen, Standard");calibDefaultPts(m);}
+    }
+    p.end();
+  }
   LeviCal::solve(m);
   calCommit(m,custom);
 }
-// Neue Punkte (51 Werte) speichern: Gewichte ausserhalb des Locks berechnen, dann tauschen.
-static void calibSave(const uint8_t *pts){
+// Neue Punkte (51 Werte) speichern. Gibt false zurueck, wenn NVS nicht schreiben konnte.
+static bool calibSave(const uint8_t *pts){
   LeviCal::Model m=calSnapshot();
   memcpy(m.pts,pts,sizeof(m.pts));
   LeviCal::solve(m);
-  Preferences p;p.begin("levi",false);p.putBytes("pts",m.pts,sizeof(m.pts));p.end();
+  Preferences p;
+  if(!p.begin("levi",false)){LEVI_LOG("NVS: Oeffnen zum Schreiben fehlgeschlagen");return false;}
+  size_t written=p.putBytes("pts",m.pts,sizeof(m.pts));
+  p.end();
+  if(written!=sizeof(m.pts)){LEVI_LOG("NVS: Kalibrierung schreiben fehlgeschlagen (%u Bytes)",(unsigned)written);return false;}
   calCommit(m,true);
+  return true;
 }
-static void calibReset(){
-  Preferences p;p.begin("levi",false);p.remove("pts");p.end();
+// Entfernt die gespeicherte Kalibrierung. Gibt false zurueck, wenn NVS nicht erreichbar war.
+static bool calibReset(){
+  Preferences p;
+  if(!p.begin("levi",false)){LEVI_LOG("NVS: Oeffnen zum Loeschen fehlgeschlagen");return false;}
+  bool removed=p.remove("pts");
+  p.end();
+  if(!removed)LEVI_LOG("NVS: Kalibrierung loeschen fehlgeschlagen (evtl. noch keine gespeichert)");
   LeviCal::Model m;calibDefaultPts(m);LeviCal::solve(m);
   calCommit(m,false);
+  return true;
 }
 static String calibJson(){
   bool custom=false;LeviCal::Model cm=calSnapshot(&custom);
@@ -406,10 +427,10 @@ static void webInit(){
       if(c<0)break;start=c+1;
     }
     if(!ok||n!=LeviCal::N*3){web.send(400,"text/plain","p=51 Werte 0..255");return;}
-    calibSave(tmp);
+    if(!calibSave(tmp)){web.send(500,"text/plain","NVS-Fehler beim Speichern");return;}
     LEVI_LOG("Kalibrierung gespeichert (17 Punkte)");
     web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
-  web.on("/api/calib/reset",HTTP_POST,[]{calibReset();LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
+  web.on("/api/calib/reset",HTTP_POST,[]{if(!calibReset()){web.send(500,"text/plain","NVS-Fehler");return;}LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
   web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
 }
 static const char *wlStatusName(wl_status_t s){
