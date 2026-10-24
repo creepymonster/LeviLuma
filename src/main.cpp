@@ -274,7 +274,7 @@ static void makeUI(){
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
   // Farbpunkte: 5 Spalten, 4 Zeilen (17 Kalibrierfarben plus Musik)
-  for(int k=0;k<LeviCal::N;k++){
+  for(int k=0;k<=LeviCal::N;k++){
     dots[k]=lv_obj_create(tileColor);lv_obj_set_size(dots[k],14,14);lv_obj_remove_flag(dots[k],LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(dots[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_pad_all(dots[k],0,0);
     lv_obj_set_style_border_color(dots[k],lv_color_white(),0);lv_obj_set_style_shadow_width(dots[k],0,0);
