@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "platformio.ini"
+      - ".github/workflows/build.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "include/**"
+      - "platformio.ini"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    name: PlatformIO build (waveshare_esp32s3)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: PlatformIO installieren
+        run: pip install --upgrade platformio
+
+      - name: PlatformIO-Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/packages
+            ~/.platformio/platforms
+            ~/.platformio/penv
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            pio-${{ runner.os }}-
+
+      # Config.h ist absichtlich nicht im Repo (WLAN-Zugangsdaten). Fuer den Build
+      # reicht die Vorlage mit Platzhaltern, Zugangsdaten werden hier nicht benoetigt.
+      - name: Konfiguration aus Vorlage erzeugen
+        run: cp include/Config.example.h include/Config.h
+
+      - name: Firmware bauen
+        run: pio run -e waveshare_esp32s3
