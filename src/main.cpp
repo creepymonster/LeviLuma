@@ -368,11 +368,12 @@ static void webInit(){
   web.on("/api/calib",HTTP_POST,[]{
     // p = 51 Werte (17 Zielfarben x R,G,B), komma-getrennt, je 0..255
     String p=web.arg("p");uint8_t tmp[LeviCal::N*3];int n=0,start=0;bool ok=true;
-    while(n<LeviCal::N*3){
+    while(true){
       int c=p.indexOf(',',start);String tok=(c<0)?p.substring(start):p.substring(start,c);tok.trim();
-      if(tok.length()<1||tok.length()>3){ok=false;break;}
-      int v=tok.toInt();if(v<0||v>255){ok=false;break;}
-      tmp[n++]=(uint8_t)v;if(c<0)break;start=c+1;
+      if(n>=LeviCal::N*3){ok=false;break;}           // mehr als 51 Werte
+      if(!integer(tok,255)){ok=false;break;}         // nur Ziffern, 1-3 Stellen, 0..255
+      tmp[n++]=(uint8_t)tok.toInt();
+      if(c<0)break;start=c+1;
     }
     if(!ok||n!=LeviCal::N*3){web.send(400,"text/plain","p=51 Werte 0..255");return;}
     memcpy(calModel.pts,tmp,sizeof(tmp));calibSave();
