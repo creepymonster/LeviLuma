@@ -68,6 +68,24 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 - Anzeige wird nur bei geänderten Werten aktualisiert (`updateUI` mit Teilbereichen).
 - Der Flush ist asynchron mit Doppelpuffer (DMA). `flushRelease()` gibt den Puffer frei.
 
+### Farbklima der LCD-UI
+Der Hintergrund ist schwarz (OLED-freundlich). Flächen, Text und Akzente bilden eine ruhige, neutrale Basis. Die einzige bunte Fläche ist die aktuelle LED-Farbe, damit sie wirkt.
+
+Vorschlag (noch nicht umgesetzt, Werte sind Ziel-Hexcodes):
+- Hintergrund: `#000000`
+- Fläche (Pille aus, Helligkeitsspur): `#1A1B22`
+- Rahmen und Trennlinien: `#2C2D36`
+- Text primär: `#F4F4F8`
+- Text sekundär (Prozent, „W“/„B“, Hinweise): `#9A9BA8`
+- Status verbunden: `#5EE6A8` (Mint), getrennt: `#FF6B6B` (Koralle)
+- Pille **an**: volle LED-Farbe ohne Schatten-Glow, Beschriftung dunkel (`#111111`) bei hellen Farben, sonst weiß. Der Kontrast-Schalter `applyContrast()` bleibt dafür zuständig.
+- Pille **aus**: Fläche `#1A1B22` mit 1,5 px Rahmen in der LED-Farbe (gedämpft), Text sekundär. Die Pille wird nicht mehr halb transparent in der LED-Farbe gezeichnet.
+- Helligkeitsregler: Spur `#22232B`, Füllung in LED-Farbe, Knopf `#F4F4F8`.
+- Halten-Füllung: weiß mit 18 % Deckkraft.
+- Deaktiviert: Deckkraft 40 %, keine Farbänderung.
+
+Regeln: Keine zusätzliche Akzentfarbe neben der LED-Farbe und den beiden Statusfarben. Keine Schatten oder Glows. Text muss mindestens 4,5:1 Kontrast zu seinem Untergrund haben (WCAG AA).
+
 ### Web-UI
 - Eine Seite, ausgeliefert aus `WebUi.h`. Drei Karten untereinander in derselben Reihenfolge wie am Display (An/Aus, Farbe, Helligkeit).
 - Endpunkte (in `src/web.cpp`):
