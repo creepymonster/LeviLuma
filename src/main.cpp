@@ -118,37 +118,13 @@ static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r
 #ifndef LEVI_FLUSH_STATS
 #define LEVI_FLUSH_STATS 0
 #endif
-// Asynchroner Flush: die Uebertragung laeuft per DMA, LVGL rendert in den zweiten Puffer.
-// flushPending ist das Display, dessen Puffer noch von der DMA gelesen wird.
-static lv_display_t *flushPending=nullptr;
-// Wartet auf das Ende der laufenden DMA und gibt den Puffer an LVGL frei.
-static void flushRelease(){
-  if(!flushPending)return;
-#if LEVI_FLUSH_STATS
-  uint32_t t0=micros();
-#endif
-  lcd.waitDMA();
-#if LEVI_FLUSH_STATS
-  static uint32_t sumUs=0,maxUs=0,count=0,logMs=0;
-  uint32_t dt=micros()-t0;sumUs+=dt;if(dt>maxUs)maxUs=dt;count++;
-  uint32_t nowMs=millis();
-  if(nowMs-logMs>=5000){
-    if(count)LEVI_LOG("Flush: %lu Aufrufe, Warten auf DMA Mittel %lu us, Max %lu us",(unsigned long)count,(unsigned long)(sumUs/count),(unsigned long)maxUs);
-    sumUs=0;maxUs=0;count=0;logMs=nowMs;
-  }
-#endif
-  lv_display_flush_ready(flushPending);
-  flushPending=nullptr;
-}
 static void flush(lv_display_t *disp,const lv_area_t *a,uint8_t *px){
-  flushRelease();   // vorige Uebertragung abschliessen, damit ihr Puffer frei ist
+  // Synchrone Uebertragung (wie vor dem DMA-Umbau): LVGL wartet, bis die Pixel im Display sind.
   int32_t width=a->x2-a->x1+1,height=a->y2-a->y1+1;
-#if LEVI_RGB565_SWAP
-  lcd.pushImageDMA(a->x1,a->y1,width,height,(const lgfx::swap565_t*)px);
-#else
-  lcd.pushImageDMA(a->x1,a->y1,width,height,(const uint16_t*)px);
-#endif
-  flushPending=disp;
+  lcd.startWrite();lcd.setAddrWindow(a->x1,a->y1,width,height);
+  lcd.pushPixels((const uint16_t*)px,width*height,LEVI_RGB565_SWAP);
+  lcd.endWrite();
+  lv_display_flush_ready(disp);
 }
 // Touch-Treiber: eine Beruehrung im gedimmten Zustand weckt nur das Display und wird nicht
 // an die Oberflaeche weitergegeben, bis der Finger wieder oben ist. Kurze Aussetzer des CST816S
@@ -466,7 +442,6 @@ void setup(){
   lcd.setRotation(LEVI_DISPLAY_ROTATION/90); // LovyanGFX: 0=0 Grad, 1=90, 2=180, 3=270
   Cst::init();
   lcd.fillScreen(TFT_BLACK);LEVI_LOG("DBG: fillScreen fertig");
-  lcd.startWrite();   // Bus fuer die DMA-Uebertragungen dauerhaft belegen (Display ist der einzige SPI-Teilnehmer)
   lv_init();LEVI_LOG("DBG: lv_init fertig");
   lv_tick_set_cb(levTickMs); // LVGL-Zeitbasis: Animationen, Long-Press, Timer
   display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
@@ -483,7 +458,6 @@ void setup(){
 void loop(){
   static uint32_t lastUI=0;uint32_t now=millis();
   {uint16_t rx=0,ry=0;touchDown=Cst::read(rx,ry);if(touchDown)mapTouch(rx,ry,touchX,touchY);}
-  flushRelease();   // letzte DMA-Uebertragung abschliessen, bevor LVGL weiterrendert
   lv_timer_handler();webLoop();
 #if !LEVI_TOUCH_TEST
   if(now-lastUI>20){lastUI=now;updateUI();}
