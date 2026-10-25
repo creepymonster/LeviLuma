@@ -44,6 +44,7 @@ Optional, mit Standardwert (alle in `Config.example.h` dokumentiert):
 - `LEVI_TOUCH_OFFSET_ROTATION` – Touch-Drehung in LovyanGFX (0–7). Muss für die Montage am Gerät geprüft werden.
 - `LEVI_TOUCH_BRIDGE_MS` – Überbrückung kurzer Touch-Aussetzer (Standard 40 ms).
 - `LEVI_PICKER_LIST` – Farbset des Farbwählers (LCD und Web) mit Namen: `LEVI_PICKER_ENTRY("Name", R, G, B)`, 1–24 Einträge, Name höchstens 15 Zeichen. Unabhängig von der Kalibrierung.
+- `LEVI_NAME` – Anzeigename in der Weboberfläche (Kopf, Fuß, Seitentitel), Standard `LeviLuma`. Der Netzwerkname bleibt `LEVI_WIFI_HOSTNAME`.
 - `LEVI_TOUCH_TEST` – 1 zeigt nur einen Touch-Testscreen: Tippen zeichnet einen Kreis mit den Koordinaten.
 - `LEVI_RGB565_SWAP` – Byte-Reihenfolge der Display-Übertragung (Standard 1). Bei vertauschten Farben auf 0 setzen.
 - `LEVI_RECENTER_MS` – Zeit ohne Bedienung bis zur Rückkehr auf An/Aus (Standard 60000).

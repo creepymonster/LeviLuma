@@ -9,6 +9,11 @@
 #include "WebUi.h"
 #include "Web.h"
 
+// Anzeigename in Kopf, Fuss und Seitentitel (Config.h: LEVI_NAME). mDNS-Hostname bleibt getrennt (LEVI_WIFI_HOSTNAME).
+#ifndef LEVI_NAME
+#define LEVI_NAME "LeviLuma"
+#endif
+
 static WebServer web(80);
 
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
@@ -32,7 +37,11 @@ static String paletteJson(){
 }
 
 void webStart(){
-  web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
+  web.on("/",HTTP_GET,[]{
+    static String page;
+    if(page.isEmpty()){page=FPSTR(LEVI_HTML);page.replace("@@NAME@@",LEVI_NAME);}
+    web.send(200,"text/html; charset=utf-8",page);
+  });web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
   web.on("/api/brightness",HTTP_POST,[]{String v=web.arg("value");if(!integer(v,100)){web.send(400,"text/plain","value=0..100");return;}setBrightness(v.toInt());stateJson();});
   web.on("/api/raw",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRaw(r.toInt(),g.toInt(),b.toInt());stateJson();});

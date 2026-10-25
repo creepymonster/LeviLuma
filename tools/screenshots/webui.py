@@ -9,7 +9,7 @@ repo, out_root = sys.argv[1], sys.argv[2]
 out = os.path.join(out_root, "web")
 os.makedirs(out, exist_ok=True)
 
-header = open(os.path.join(repo, "include/WebUi.h"), encoding="utf-8").read()
+header = open(os.path.join(repo, "include/WebUi.h"), encoding="utf-8").read().replace("@@NAME@@", "LeviLuma")
 page_html = re.search(r'R"LEVIHTML\((.*?)\)LEVIHTML"', header, re.S).group(1)
 
 palette_h = open(os.path.join(repo, "include/Palette.h"), encoding="utf-8").read()

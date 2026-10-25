@@ -60,6 +60,9 @@
 
 // Touch-Testscreen: 1 = Tippen zeichnet einen Kreis an der Tippposition (Bildschirm wird vorher geleert).
 // Zum Pruefen der Touch-Koordinaten und der Drehung. Standard 0 (normale Bedienung).
+// Anzeigename in Weboberflaeche (Kopf, Fuss, Seitentitel). Standard "LeviLuma".
+// #define LEVI_NAME "LeviLuma"
+
 // #define LEVI_TOUCH_TEST 0
 
 // Farben vertauscht? Dann 0 setzen (RGB565-Byte-Reihenfolge der Display-Uebertragung). Standard 1.
