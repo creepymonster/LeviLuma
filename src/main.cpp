@@ -235,12 +235,12 @@ static void centerClicked(lv_event_t *e){ // LONG_PRESSED
   setPower(snapshot().power!=1);
 }
 
-// Farbklima und Typografie: shadcn-Theme (lvgl_theme_shadcn), dunkel, Primaerfarbe Gelb.
+// Farbklima und Typografie: shadcn-Theme (lvgl_theme_shadcn), dunkle Basis zinc_dark, unveraendert.
 static lv_theme_shadcn_palette_t themePalette{};
 static void themeInit(lv_display_t *disp){
   static const lv_theme_shadcn_fonts_t fonts={.small=&lv_font_montserrat_16,.normal=&lv_font_montserrat_16,.large=&lv_font_montserrat_28,
                                               .h1=&lv_font_montserrat_48,.h2=&lv_font_montserrat_32,.h3=&lv_font_montserrat_28};
-  lv_theme_shadcn_palette_from_primary(&themePalette,lv_theme_shadcn_palette_zinc_dark(),lv_color_hex(0xFFE66D),lv_color_hex(0x111111));
+  themePalette=*lv_theme_shadcn_palette_zinc_dark();
   lv_theme_shadcn_init(disp,&themePalette,&fonts,LV_THEME_SHADCN_FLAG_NONE);
 }
 static void makeUI(){

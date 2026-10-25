@@ -71,24 +71,24 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 - Der Flush ist asynchron mit Doppelpuffer (DMA). `flushRelease()` gibt den Puffer frei.
 
 ### Farbklima der LCD-UI
-Die LCD-UI nutzt das Theme `lvgl_theme_shadcn` (Dark Mode, Basis `zinc_dark`) und ersetzt die frühere eigene Farbtabelle. Quelle: https://github.com/AlixANNERAUD/lvgl_theme_shadcn, eingebunden als `alix-anneraud/lvgl_theme_shadcn@^0.3.1` in `platformio.ini`. Voraussetzung: LVGL ≥ 9.6.
+Die LCD-UI nutzt das Theme `lvgl_theme_shadcn` (Dark Mode, Palette `zinc_dark` unverändert). Es ersetzt die frühere eigene Farbtabelle. Quelle: https://github.com/AlixANNERAUD/lvgl_theme_shadcn, eingebunden als `alix-anneraud/lvgl_theme_shadcn@^0.3.1` in `platformio.ini`. Voraussetzung: LVGL ≥ 9.6.
 
 Initialisierung in `src/main.cpp` (`themeInit`):
-- Primärfarbe `#FFE66D` (Gelb), Primary-Foreground `#111111`, erzeugt per `lv_theme_shadcn_palette_from_primary`.
+- Palette unverändert `lv_theme_shadcn_palette_zinc_dark()`. Keine eigene Primärfarbe.
 - Fonts: Montserrat 16 (small/normal), 28 (large/h3), 32 (h2), 48 (h1).
 
 Verwendung:
 - Hintergrund: Theme-Hintergrund (nahezu Schwarz).
-- An-Pille: Variante `DEFAULT` (gefüllt, Primärfarbe).
+- An-Pille: Variante `DEFAULT` (gefüllt, Theme-Primärfarbe).
 - Aus-Pille: Variante `OUTLINE`.
-- Gefüllter Regler und Indikator: Theme-Primärfarbe. Ungefüllter Teil: Theme-Track.
+- Gefüllter Regler und Indikator: Theme-Primärfarbe (hell). Ungefüllter Teil: Theme-Track.
 - Sekundärtext (z. B. Hex-Anzeige im Farbwähler): `LV_THEME_SHADCN_TEXT_MUTED`.
 - Primärtext: Theme-Textfarbe.
 - Deaktiviert (kein BLE): Deckkraft 60 % bei aus, 100 % bei an (`setEnabled`).
 
 Eigene Farben, die nicht vom Theme kommen: Statuspunkte (Grün an `#79DA89`, Rot aus `#E5484D`, Weiß unbekannt), Symbole WLAN/Bluetooth/Glühbirne (Grau `#9AA3AE` bzw. `#888888`), Farbpunkte des Farbwählers aus `LeviPalette`.
 
-Regeln: Keine eigenen Hintergrundfarben für Bedienelemente setzen, damit das Theme wirkt. Abweichungen nur mit Begründung in dieser Datei festhalten.
+Regeln: Keine Farben für Bedienelemente (Pille, Regler, Text, Hintergrund) überschreiben, damit das Theme wirkt. Abweichungen nur mit Begründung in dieser Datei festhalten.
 
 ### Web-UI
 - Eine Seite, ausgeliefert aus `WebUi.h`. Drei Karten untereinander in derselben Reihenfolge wie am Display (An/Aus, Farbe, Helligkeit).
