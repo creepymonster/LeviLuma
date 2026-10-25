@@ -28,7 +28,7 @@ struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1
 static State gState;
 static State snapshot(){return gState;}
 static int8_t selected=-1;
-static constexpr int MUSIC_IDX=LeviCal::N;
+static constexpr int MUSIC_IDX=LeviPalette::N;
 static constexpr int LIST_COUNT=LeviCal::N+1;
 static void setPower(bool){}
 static void setBrightness(int){}

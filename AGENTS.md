@@ -11,7 +11,7 @@ LeviLuma steuert einen LED-Strip der ELK-/Lotus-Lantern-Familie über BLE (Servi
 - **LCD-UI** auf dem Display des Boards (LVGL, Touch).
 - **Web-UI** im WLAN, erreichbar unter `leviluma.local` (mDNS) oder über die IP.
 
-Gesteuert werden: Ein/Aus, Helligkeit (1–100 %), Farbe (Farbset aus `LEVI_PICKER_LIST` mit Namen, Standard 16 Farben, und freie RGB-Werte), Musikmodus (Mikrofon) und eine Kalibrierung der Farben über die Web-UI.
+Gesteuert werden: Ein/Aus, Helligkeit (1–100 %), Farbe (Farbset aus `LEVI_PICKER_LIST` mit Namen, Standard 15 Farben, und freie RGB-Werte), Musikmodus (Mikrofon) und eine Kalibrierung der Farben über die Web-UI.
 
 ## Hardware
 

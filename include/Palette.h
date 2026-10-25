@@ -10,7 +10,6 @@
 
 #ifndef LEVI_PICKER_LIST
 #define LEVI_PICKER_LIST \
-  LEVI_PICKER_ENTRY("Warmweiß", 255, 244, 229), \
   LEVI_PICKER_ENTRY("Weiß", 255, 255, 255), \
   LEVI_PICKER_ENTRY("Bernstein", 255, 176, 0), \
   LEVI_PICKER_ENTRY("Koralle", 255, 107, 107), \
