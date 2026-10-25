@@ -24,7 +24,7 @@ void stateInit();   // Mutexe anlegen und Kalibrierung laden (einmal in setup)
 // er arbeitet nur mit der Snapshot-Kopie von State. Deshalb ist kein Mutex noetig. Wenn BLE je darauf zugreift, unter stateLock verschieben.
 extern int8_t selected;
 
-// Farbliste des Farbwaehlers (LeviPalette, Config LEVI_PICKER_RGB), danach der Musikmodus.
+// Farbliste des Farbwaehlers (LeviPalette, Config LEVI_PICKER_LIST), danach der Musikmodus.
 static constexpr int MUSIC_IDX=LeviPalette::N;
 static constexpr int LIST_COUNT=LeviPalette::N+1;
 State snapshot();

@@ -13,13 +13,19 @@ static WebServer web(80);
 
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
 static void stateJson(){State s=snapshot();String j="{\"wifi\":";j+=(WiFi.status()==WL_CONNECTED?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+",\"revision\":"+String(s.revision)+",\"sentRevision\":"+String(s.sentRevision)+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
-// Farbset des Farbwaehlers (LEVI_PICKER_RGB) als JSON, z. B. {"colors":["#ffffff",...],"music":true}.
+// Farbset des Farbwaehlers als JSON: {"colors":[{"name":"Rot","hex":"#ff4040"},...],"music":true}.
+static String jsonEscape(const char *t){
+  String o;
+  for(const char *c=t;*c;c++){if(*c=='"'||*c=='\\')o+='\\';o+=*c;}
+  return o;
+}
 static String paletteJson(){
   String j="{\"colors\":[";
   for(int i=0;i<LeviPalette::N;i++){
     uint8_t r,g,b;LeviPalette::get(i,r,g,b);
-    char hex[10];snprintf(hex,sizeof(hex),"\"#%02x%02x%02x\"",r,g,b);
-    if(i)j+=',';j+=hex;
+    char hex[10];snprintf(hex,sizeof(hex),"#%02x%02x%02x",r,g,b);
+    if(i)j+=',';
+    j+="{\"name\":\""+jsonEscape(LeviPalette::name(i))+"\",\"hex\":\""+String(hex)+"\"}";
   }
   j+="],\"music\":true}";
   return j;

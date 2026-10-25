@@ -39,8 +39,9 @@ static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nu
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;
 static lv_obj_t *dots[LeviPalette::N+1]{};
+static lv_obj_t *pickerName=nullptr,*pickerHex=nullptr;   // Name und Hex-Wert in der Mitte des Farbwaehlers
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
-// Farbliste des Farbwaehlers (LeviPalette, Config LEVI_PICKER_RGB), danach der Musikmodus.
+// Farbliste des Farbwaehlers (LeviPalette, Config LEVI_PICKER_LIST), danach der Musikmodus.
 static int wrapIdx(int i){return ((i%LIST_COUNT)+LIST_COUNT)%LIST_COUNT;}
 static bool touchDown=false;
 static uint16_t touchX=120,touchY=120;
@@ -152,12 +153,25 @@ static void updateBrightnessUI(const UiView &v){
   char label[12];snprintf(label,sizeof(label),"%u%%",(unsigned)v.brightness);
   lv_label_set_text(barLbl,label);
 }
+static void updatePickerLabels(const UiView &v);
 static void updateColorUI(const UiView &v){
   // Farbpunkte: aktive Farbe mit weissem Rahmen
   for(int k=0;k<LeviPalette::N;k++){
     lv_obj_set_style_border_width(dots[k],k==v.selected?2:0,0);
     setEnabled(dots[k],v.active);
   }
+  updatePickerLabels(v);
+}
+// Name des Eintrags (oder Musik / Eigene Farbe) und Hex-Wert in der Kreismitte.
+static void updatePickerLabels(const UiView &v){
+  char name[40]="",hex[12]="";
+  if(v.selected==MUSIC_IDX){snprintf(name,sizeof(name),"Musik");}
+  else{
+    if(v.selected>=0&&v.selected<LeviPalette::N)snprintf(name,sizeof(name),"%s",LeviPalette::name(v.selected));
+    else snprintf(name,sizeof(name),"Eigene Farbe");
+    snprintf(hex,sizeof(hex),"#%02X%02X%02X",(unsigned)v.r,(unsigned)v.g,(unsigned)v.b);
+  }
+  lv_label_set_text(pickerName,name);lv_label_set_text(pickerHex,hex);
 }
 // Die festen Farben der Punkte werden nur einmal gesetzt.
 static void setColorDotsOnce(){
@@ -173,7 +187,7 @@ static void updateUI(){
   bool powerChanged=first||v.on!=l.on||v.ble!=l.ble||v.r!=l.r||v.g!=l.g||v.b!=l.b;
   bool connChanged=first||v.wifi!=l.wifi||v.ble!=l.ble;
   bool brightChanged=first||v.brightness!=l.brightness||v.active!=l.active||v.r!=l.r||v.g!=l.g||v.b!=l.b;
-  bool colorChanged=first||v.selected!=l.selected||v.active!=l.active;
+  bool colorChanged=first||v.selected!=l.selected||v.active!=l.active||v.r!=l.r||v.g!=l.g||v.b!=l.b;
   if(!(powerChanged||connChanged||brightChanged||colorChanged))return;
   if(first)setColorDotsOnce();
   if(powerChanged)updatePowerUI(v);
@@ -273,14 +287,18 @@ static void makeUI(){
   lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x888888),0);
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
-  // Farbpunkte: 5 Spalten, Zeilen passend zur Anzahl (Farben plus Musik), vertikal zentriert
-  const int rows=(LeviPalette::N+1+4)/5, y0=-(rows-1)*17;
-  for(int k=0;k<=LeviPalette::N;k++){
+  // Farbpunkte auf einem Kreis (passt zum runden Display), oben beginnend, im Uhrzeigersinn. Letzter Punkt: Musik.
+  const int nDots=LeviPalette::N+1;
+  const float ringR=90.0f;
+  for(int k=0;k<nDots;k++){
     dots[k]=lv_obj_create(tileColor);lv_obj_set_size(dots[k],14,14);lv_obj_remove_flag(dots[k],LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(dots[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_pad_all(dots[k],0,0);
     lv_obj_set_style_border_color(dots[k],lv_color_white(),0);lv_obj_set_style_shadow_width(dots[k],0,0);
-    lv_obj_align(dots[k],LV_ALIGN_CENTER,(k%5-2)*34,(k/5)*34+y0);
+    float a=-1.5707963f+6.2831853f*k/nDots;
+    lv_obj_align(dots[k],LV_ALIGN_CENTER,(int)lroundf(cosf(a)*ringR),(int)lroundf(sinf(a)*ringR));
   }
+  pickerName=lv_label_create(tileColor);lv_obj_set_style_text_color(pickerName,lv_color_white(),0);lv_obj_set_style_text_font(pickerName,&lv_font_montserrat_16,0);lv_obj_align(pickerName,LV_ALIGN_CENTER,0,-10);
+  pickerHex=lv_label_create(tileColor);lv_obj_set_style_text_color(pickerHex,lv_color_hex(0x9AA3AE),0);lv_obj_set_style_text_font(pickerHex,&lv_font_montserrat_16,0);lv_obj_align(pickerHex,LV_ALIGN_CENTER,0,12);
   lv_obj_add_flag(tileColor,LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(tileColor,nextColorClicked,LV_EVENT_CLICKED,nullptr);
   updateUI();

@@ -41,7 +41,13 @@
 
 // Farbset des Farbwaehlers (LCD und Web-UI), flache Liste R,G,B,R,G,B,... mit 1 bis 24 Farben.
 // Unabhaengig von der Kalibrierung. Standard: 17 Farben der Web-UI (Weiss bis Cyan, siehe Palette.h).
-// #define LEVI_PICKER_RGB 255,255,255, 255,64,64, 64,255,64, 64,64,255
+// Farbset des Farbwaehlers (LCD und Web-UI). Eintraege: LEVI_PICKER_ENTRY("Name", R, G, B),
+// 1 bis 24 Stueck, Name hoechstens 15 Zeichen. Unabhaengig von der Kalibrierung.
+// Standard: 17 benannte Farben (siehe Palette.h).
+// #define LEVI_PICKER_LIST \
+//   LEVI_PICKER_ENTRY("Warmweiß", 255, 243, 224), \
+//   LEVI_PICKER_ENTRY("Rot", 255, 64, 64), \
+//   LEVI_PICKER_ENTRY("Blau", 64, 64, 255)
 
 // Anzahl der Schritte bei der Farbueberblendung (Standard 8):
 // #define LEVI_FADE_STEPS 8
