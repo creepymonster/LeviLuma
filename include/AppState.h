@@ -14,7 +14,7 @@
 
 // sentRevision: letzte Revision, die vollstaendig an BLE gesendet wurde.
 // Das ist eine Sendebestaetigung, keine Ausfuehrungsbestaetigung.
-struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; uint32_t sentRevision=0; };
+struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=100; uint32_t revision=0; uint32_t colorRev=0; uint32_t sentRevision=0; };
 
 extern SemaphoreHandle_t stateLock;
 void stateInit();   // Mutexe anlegen und Kalibrierung laden (einmal in setup)
