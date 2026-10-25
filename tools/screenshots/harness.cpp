@@ -67,7 +67,7 @@ int main(int argc,char **argv){
   lv_display_set_buffers(d,buf,nullptr,sizeof(buf),LV_DISPLAY_RENDER_MODE_FULL);
   lv_display_set_flush_cb(d,flushCb);
   display=d;
-  makeUI();
+  layoutRound240();
 
   gState.power=0;gState.ble=false;updateUI();
   lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);shot(d,"01_off_disconnected");

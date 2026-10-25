@@ -219,7 +219,9 @@ static void themeInit(lv_display_t *disp){
   themePalette=*lv_theme_shadcn_palette_zinc_dark();
   lv_theme_shadcn_init(disp,&themePalette,&fonts,LV_THEME_SHADCN_FLAG_NONE);
 }
-static void makeUI(){
+// Layout fuer das runde 240x240-Display (Kacheln untereinander). Weitere Varianten
+// (z. B. breites Display) bekommen eine eigene Funktion und werden in buildLayout() gewaehlt.
+static void layoutRound240(){
   themeInit(lv_display_get_default());
   lv_obj_t *screen=lv_screen_active();
   lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
@@ -384,6 +386,11 @@ static void touchTestInit(){
 // Zeitbasis fuer LVGL (ms seit Start). Wird in setup() nach lv_init() gesetzt.
 static uint32_t levTickMs(){return millis();}
 
+// Waehlt das Layout zum Display. Heute nur die runde Variante.
+static void buildLayout(){
+  layoutRound240();
+}
+
 void setup(){
   Serial.begin(115200);{uint32_t t0=millis();while(!Serial&&millis()-t0<2000)delay(10);}delay(200);
   LEVI_LOG("LeviLuma startet");
@@ -403,7 +410,7 @@ void setup(){
 #if LEVI_TOUCH_TEST
   touchTestInit();
 #else
-  makeUI();LEVI_LOG("DBG: makeUI fertig");
+  buildLayout();LEVI_LOG("DBG: makeUI fertig");
 #endif
   lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webStart();
   bleStart();
