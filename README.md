@@ -5,6 +5,22 @@ Die Bedienung läuft am Display (Touch) und über eine Weboberfläche im WLAN.
 
 Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9.6, lvgl_theme_shadcn (Dark Mode), NimBLE-Arduino.
 
+## Screenshots
+
+Die Bilder werden bei jeder Änderung an Firmware oder UI automatisch neu erzeugt (GitHub Action `screenshots.yml`).
+
+**Display (240×240)**
+
+| Aus, ohne Verbindung | An | Farbauswahl | Helligkeit |
+|---|---|---|---|
+| ![Aus](screenshots/240x240/01_off_disconnected.png) | ![An](screenshots/240x240/02_on_center.png) | ![Farbe](screenshots/240x240/03_color.png) | ![Helligkeit](screenshots/240x240/04_brightness.png) |
+
+**Weboberfläche**
+
+| Desktop (1280×800) | Mobil (390×844) |
+|---|---|
+| ![Desktop](screenshots/web/desktop_1280x800.png) | ![Mobil](screenshots/web/mobile_390x844.png) |
+
 ## Start
 1. `include/Config.example.h` nach `include/Config.h` kopieren und WLAN-Zugangsdaten eintragen. `Config.h` nicht ins Repo committen.
 2. Projektordner in VS Code mit PlatformIO öffnen.
