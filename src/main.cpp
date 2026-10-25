@@ -10,6 +10,7 @@
 #include "Config.h"
 #include "Palette.h"
 #include "BulbIcon.h"
+#include "WifiIcon.h"
 #include "CalibCore.h"
 #include "AppState.h"
 #include "Ble.h"
@@ -38,7 +39,8 @@ static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
-static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;
+static lv_obj_t *lblBle=nullptr,*wifiIcon=nullptr;
+static lv_image_dsc_t wifiDsc{};
 static lv_obj_t *statusPwr=nullptr,*bulbImg=nullptr;   // Einschalt-Status (weiss unbekannt, rot aus, gruen an) mit Gluehbirne
 static lv_image_dsc_t bulbDsc{};
 static lv_obj_t *dots[LeviPalette::N+1]{};
@@ -293,8 +295,13 @@ static void makeUI(){
   bulbImg=lv_image_create(tilePower);lv_image_set_src(bulbImg,&bulbDsc);
   lv_obj_set_style_image_recolor(bulbImg,lv_color_hex(0x888888),0);lv_obj_set_style_image_recolor_opa(bulbImg,LV_OPA_COVER,0);
   lv_obj_align_to(bulbImg,statusPwr,LV_ALIGN_OUT_TOP_MID,0,-3);
-  lblWifi=lv_label_create(tilePower);lv_label_set_text(lblWifi,"W");lv_obj_set_style_text_color(lblWifi,lv_color_hex(0x9AA3AE),0);
-  lv_obj_align_to(lblWifi,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
+  // WLAN-Symbol links vom WLAN-Kreis (A8-Bitmap, gleiche Farbe wie B)
+  wifiDsc.header.magic=LV_IMAGE_HEADER_MAGIC;wifiDsc.header.cf=LV_COLOR_FORMAT_A8;wifiDsc.header.flags=0;
+  wifiDsc.header.w=16;wifiDsc.header.h=16;wifiDsc.header.stride=16;wifiDsc.header.reserved_2=0;
+  wifiDsc.data_size=sizeof(kWifiA8);wifiDsc.data=kWifiA8;
+  wifiIcon=lv_image_create(tilePower);lv_image_set_src(wifiIcon,&wifiDsc);
+  lv_obj_set_style_image_recolor(wifiIcon,lv_color_hex(0x9AA3AE),0);lv_obj_set_style_image_recolor_opa(wifiIcon,LV_OPA_COVER,0);
+  lv_obj_align_to(wifiIcon,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
   lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x9AA3AE),0);
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
