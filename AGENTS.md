@@ -79,12 +79,11 @@ Initialisierung in `src/main.cpp` (`themeInit`):
 
 Verwendung:
 - Hintergrund: Theme-Hintergrund (nahezu Schwarz).
-- An-Pille: Variante `DEFAULT` (gefüllt, Theme-Primärfarbe).
-- Aus-Pille: Variante `OUTLINE`.
+- Mitte-Pille (An und Aus): Variante `DEFAULT` (gefüllt, Theme-Primärfarbe). Der Text wechselt zwischen „Einschalten“ und „Ausschalten“.
 - Gefüllter Regler und Indikator: Theme-Primärfarbe (hell). Ungefüllter Teil: Theme-Track.
 - Sekundärtext (z. B. Hex-Anzeige im Farbwähler): `LV_THEME_SHADCN_TEXT_MUTED`.
 - Primärtext: Theme-Textfarbe.
-- Deaktiviert (kein BLE): Deckkraft 60 % bei aus, 100 % bei an (`setEnabled`).
+- Deaktiviert (kein BLE): nur `LV_STATE_DISABLED`, ohne eigene Deckkraft und ohne Outline. Die Darstellung übernimmt das Theme, wie beim Demo-Button „Disabled“.
 
 Eigene Farben, die nicht vom Theme kommen: Statuspunkte (Grün an `#79DA89`, Rot aus `#E5484D`, Weiß unbekannt), Symbole WLAN/Bluetooth/Glühbirne (Grau `#9AA3AE` bzw. `#888888`), Farbpunkte des Farbwählers aus `LeviPalette`.
 

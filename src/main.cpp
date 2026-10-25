@@ -132,10 +132,11 @@ struct UiView { bool on,ble,wifi,active; uint8_t r,g,b,brightness; int8_t select
 static UiView uiLast{};
 static bool uiInit=false;
 static void updatePowerUI(const UiView &v){
-  // Farben kommen vom Theme: An = Primaerfarbe (gefuellt), Aus = Outline
-  lv_theme_shadcn_set_variant(center,v.on?LV_THEME_SHADCN_VARIANT_DEFAULT:LV_THEME_SHADCN_VARIANT_OUTLINE);
-  // Mitte: An/Aus ist auch ausgeschaltet bedienbar, sobald verbunden
-  setEnabled(center,v.ble,v.on?LV_OPA_COVER:LV_OPA_60);   // ohne BLE: halbtransparent und nicht bedienbar
+  // Farben kommen vom Theme: immer die Default-Variante, der Disabled-Zustand ist die Theme-Darstellung
+  lv_theme_shadcn_set_variant(center,LV_THEME_SHADCN_VARIANT_DEFAULT);
+  // Ohne BLE nicht bedienbar, ohne eigene Deckkraft: das Theme zeichnet den Disabled-Zustand
+  if(v.ble)lv_obj_remove_state(center,LV_STATE_DISABLED);else lv_obj_add_state(center,LV_STATE_DISABLED);
+  lv_obj_set_style_opa(center,LV_OPA_COVER,0);
   lv_label_set_text(pillLbl,v.on?"Ausschalten":"Einschalten");
 }
 static void updateConnectionUI(const UiView &v){
