@@ -43,7 +43,7 @@
 // Unabhaengig von der Kalibrierung. Standard: 17 Farben der Web-UI (Weiss bis Cyan, siehe Palette.h).
 // Farbset des Farbwaehlers (LCD und Web-UI). Eintraege: LEVI_PICKER_ENTRY("Name", R, G, B),
 // 1 bis 24 Stueck, Name hoechstens 15 Zeichen. Unabhaengig von der Kalibrierung.
-// Standard: 17 benannte Farben (siehe Palette.h).
+// Standard: 16 benannte Farben (siehe Palette.h).
 // #define LEVI_PICKER_LIST \
 //   LEVI_PICKER_ENTRY("Warmweiß", 255, 243, 224), \
 //   LEVI_PICKER_ENTRY("Rot", 255, 64, 64), \

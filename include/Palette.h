@@ -10,23 +10,22 @@
 
 #ifndef LEVI_PICKER_LIST
 #define LEVI_PICKER_LIST \
+  LEVI_PICKER_ENTRY("Warmweiß", 255, 244, 229), \
   LEVI_PICKER_ENTRY("Weiß", 255, 255, 255), \
-  LEVI_PICKER_ENTRY("Warmweiß", 255, 243, 224), \
-  LEVI_PICKER_ENTRY("Creme", 255, 228, 189), \
-  LEVI_PICKER_ENTRY("Pfirsich", 255, 197, 143), \
-  LEVI_PICKER_ENTRY("Apricot", 255, 180, 117), \
-  LEVI_PICKER_ENTRY("Rot", 255, 64, 64), \
-  LEVI_PICKER_ENTRY("Gelb", 255, 255, 64), \
-  LEVI_PICKER_ENTRY("Hellgrün", 64, 255, 64), \
-  LEVI_PICKER_ENTRY("Türkis", 64, 255, 255), \
-  LEVI_PICKER_ENTRY("Blau", 64, 64, 255), \
-  LEVI_PICKER_ENTRY("Magenta", 255, 64, 255), \
-  LEVI_PICKER_ENTRY("Orange", 255, 128, 64), \
-  LEVI_PICKER_ENTRY("Mint", 0, 255, 128), \
-  LEVI_PICKER_ENTRY("Azurblau", 0, 128, 255), \
-  LEVI_PICKER_ENTRY("Violett", 128, 0, 255), \
-  LEVI_PICKER_ENTRY("Pink", 255, 0, 128), \
-  LEVI_PICKER_ENTRY("Himmelblau", 0, 192, 255)
+  LEVI_PICKER_ENTRY("Bernstein", 255, 176, 0), \
+  LEVI_PICKER_ENTRY("Koralle", 255, 107, 107), \
+  LEVI_PICKER_ENTRY("Rot", 230, 40, 50), \
+  LEVI_PICKER_ENTRY("Orange", 255, 120, 40), \
+  LEVI_PICKER_ENTRY("Gelb", 255, 230, 109), \
+  LEVI_PICKER_ENTRY("Limette", 150, 230, 80), \
+  LEVI_PICKER_ENTRY("Smaragd", 40, 200, 110), \
+  LEVI_PICKER_ENTRY("Mint", 80, 230, 190), \
+  LEVI_PICKER_ENTRY("Türkis", 0, 210, 210), \
+  LEVI_PICKER_ENTRY("Himmelblau", 90, 170, 255), \
+  LEVI_PICKER_ENTRY("Königsblau", 50, 90, 240), \
+  LEVI_PICKER_ENTRY("Indigo", 110, 90, 240), \
+  LEVI_PICKER_ENTRY("Flieder", 190, 140, 255), \
+  LEVI_PICKER_ENTRY("Magenta", 230, 70, 200)
 #endif
 
 namespace LeviPalette {
