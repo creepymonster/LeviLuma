@@ -20,6 +20,7 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .calib button{background:#fff;color:#171717;border:1px solid #e1e1e1;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;margin:4px}
 .calib button:active{background:#f3f3f3}
 .card{background:white;border-radius:20px;padding:21px 20px 22px;box-shadow:0 4px 20px #00000007}
+.power-tile{padding-top:34px}
 .top,.line{display:flex;align-items:center;justify-content:space-between;gap:12px}.top strong{font-size:17px;font-weight:600}.chip{padding:6px 10px;border-radius:99px;background:#ededed;color:#686868;font-size:12px;font-weight:650;white-space:nowrap}.chip.ok{background:#d8f5df;color:#1e743e}
 .line{margin:24px 0}.state{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:400}.state svg{width:20px;height:20px}.power{border:0;border-radius:99px;background:#191919;color:#fff;font-size:15px;font-weight:600;padding:12px 16px;cursor:pointer}
 .divider{height:1px;background:#ededed;margin:19px 0}.preview{width:84px;height:84px;border-radius:50%;border:4px solid #EDEDEB;background:#8b5cf6;margin:18px auto 10px;border-color:#EDEDEB}
