@@ -33,21 +33,23 @@
 // ---- Optionale Einstellungen (auskommentiert = Standardwert im Code) ----
 // Pflicht ist nur WLAN (oben). Diese Datei enthaelt bewusst nur Platzhalter, keine echten Zugangsdaten.
 
+// Anzeigename in der Weboberflaeche (Kopf, Fuss, Seitentitel). Standard "LeviLuma".
+// Der Netzwerkname bleibt LEVI_WIFI_HOSTNAME.
+// #define LEVI_NAME "LeviLuma"
+
 // Sekunden ohne Bedienung bis zur Rueckkehr auf die Mittelseite (Standard 60000 ms):
 // #define LEVI_RECENTER_MS 60000
 
 // Mikrofon-EQ-Modus nach "Mikrofon an" (Standard 0):
 // #define LEVI_MIC_EQ_MODE 0
 
-// Farbset des Farbwaehlers (LCD und Web-UI), flache Liste R,G,B,R,G,B,... mit 1 bis 24 Farben.
-// Unabhaengig von der Kalibrierung. Standard: 15 Farben, nach Farbton sortiert (siehe Palette.h).
 // Farbset des Farbwaehlers (LCD und Web-UI). Eintraege: LEVI_PICKER_ENTRY("Name", R, G, B),
 // 1 bis 24 Stueck, Name hoechstens 15 Zeichen. Unabhaengig von der Kalibrierung.
-// Standard: 15 benannte Farben (siehe Palette.h).
+// Standard: 15 benannte Farben, nach Farbton sortiert (siehe Palette.h).
 // #define LEVI_PICKER_LIST \
-//   LEVI_PICKER_ENTRY("Warmweiß", 255, 243, 224), \
-//   LEVI_PICKER_ENTRY("Rot", 255, 64, 64), \
-//   LEVI_PICKER_ENTRY("Blau", 64, 64, 255)
+//   LEVI_PICKER_ENTRY("Weiss", 255, 255, 255), \
+//   LEVI_PICKER_ENTRY("Rot", 230, 40, 50), \
+//   LEVI_PICKER_ENTRY("Blau", 50, 90, 240)
 
 // Anzahl der Schritte bei der Farbueberblendung (Standard 1 = springt direkt zur Farbe):
 // #define LEVI_FADE_STEPS 1
@@ -60,9 +62,6 @@
 
 // Touch-Testscreen: 1 = Tippen zeichnet einen Kreis an der Tippposition (Bildschirm wird vorher geleert).
 // Zum Pruefen der Touch-Koordinaten und der Drehung. Standard 0 (normale Bedienung).
-// Anzeigename in Weboberflaeche (Kopf, Fuss, Seitentitel). Standard "LeviLuma".
-// #define LEVI_NAME "LeviLuma"
-
 // #define LEVI_TOUCH_TEST 0
 
 // Farben vertauscht? Dann 0 setzen (RGB565-Byte-Reihenfolge der Display-Uebertragung). Standard 1.
