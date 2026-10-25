@@ -30,7 +30,6 @@ Optional, mit Standardwert (alle in `Config.example.h` dokumentiert):
 - `LEVI_PICKER_LIST` – Farbset des Farbwählers (LCD und Web) mit Namen: `LEVI_PICKER_ENTRY("Name", R, G, B)`, 1–24 Einträge, Name höchstens 15 Zeichen. Unabhängig von der Kalibrierung.
 - `LEVI_TOUCH_TEST` – 1 zeigt nur einen Touch-Testscreen: Tippen zeichnet einen Kreis mit den Koordinaten.
 - `LEVI_RGB565_SWAP` – Byte-Reihenfolge der Display-Übertragung (Standard 1). Bei vertauschten Farben auf 0 setzen.
-- `LEVI_FLUSH_STATS` – 1 loggt alle 5 s die Wartezeiten auf die Display-Übertragung.
 - `LEVI_RECENTER_MS` – Zeit ohne Bedienung bis zur Rückkehr auf An/Aus (Standard 60000).
 - `LEVI_DISPLAY_SPI_MHZ`, `LEVI_DISPLAY_INVERT`, `LEVI_BACKLIGHT_ACTIVE_HIGH`, `LEVI_BRIGHTNESS_MAX`
 - `LEVI_CALIB_*`, `LEVI_CALIB_POINTS` – Standard-Kalibrierung. Eigene Kalibrierung über die Web-Oberfläche.

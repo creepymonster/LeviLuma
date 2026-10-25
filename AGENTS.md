@@ -11,7 +11,7 @@ LeviLuma steuert einen LED-Strip der ELK-/Lotus-Lantern-Familie über BLE (Servi
 - **LCD-UI** auf dem Display des Boards (LVGL, Touch).
 - **Web-UI** im WLAN, erreichbar unter `leviluma.local` (mDNS) oder über die IP.
 
-Gesteuert werden: Ein/Aus, Helligkeit (1–100 %), Farbe (Farbset aus `LEVI_PICKER_LIST` mit Namen, Standard 15 Farben, und freie RGB-Werte), Musikmodus (Mikrofon) und eine Kalibrierung der Farben über die Web-UI.
+Gesteuert werden: Ein/Aus, Helligkeit (1–100 %, Standard beim Einschalten 100 %), Farbe (Farbset aus `LEVI_PICKER_LIST` mit Namen, Standard 15 Farben, und freie RGB-Werte), Musikmodus (Mikrofon, derzeit ohne Bedienelement) und eine Kalibrierung der Farben über die Web-UI.
 
 ## Hardware
 
@@ -52,7 +52,7 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 | `include/Config.example.h` | Vorlage für die Nutzerkonfiguration |
 
 ### Zustand und Nebenläufigkeit
-- Es laufen mindestens drei Kontexte: die Arduino-Schleife (LVGL, Web-Server, WLAN), der BLE-Task (auf Core 0) und der LVGL-Flush über DMA.
+- Es laufen mindestens drei Kontexte: die Arduino-Schleife (LVGL, Web-Server, WLAN), der BLE-Task (auf Core 0) und der LVGL-Flush (synchron).
 - **Gemeinsamer Zustand** (`State`) wird nur über die Setter in `state.cpp` geändert, unter `stateLock`. Leser holen sich mit `snapshot()` eine Kopie.
 - **`selected`** (Index der aktiven Farbe) gehört dem Loop-Task. Der BLE-Task darf es nicht lesen oder schreiben.
 - **Kalibrierung** (`calModel`, `calCustom`) wird unter `calLock` gelesen und geschrieben. Schreiber rechnen auf einer Kopie und tauschen dann aus.
@@ -62,13 +62,14 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 ### LCD-UI
 - Drei Kacheln **untereinander**: oben An/Aus, Mitte Farbe, unten Helligkeit. Wischen geht nur vertikal (`lv_tileview`), damit der Helligkeitsslider nicht mit dem Seitenwechsel kollidiert.
 - Die Mitte-Pille „An/Aus“ wird 500 ms gehalten (Füllanimation).
-- Der Farbwähler nutzt das Farbset aus `LeviPalette` (`LEVI_PICKER_LIST`), nicht die Kalibrierziele. Die Punkte liegen auf einem Kreis; in der Mitte stehen Name und Hex-Wert. Die Kalibrierung wirkt beim Senden trotzdem (über `setRGB`).
+- Die Farben sind nach Farbton sortiert (Weiß oben, dann im Uhrzeigersinn Koralle bis Rot). Der Farbwähler nutzt das Farbset aus `LeviPalette` (`LEVI_PICKER_LIST`), nicht die Kalibrierziele. Musik hat im Farbrad keinen Punkt, Musik schaltet nur die Web-UI. Die Punkte liegen auf einem Kreis; in der Mitte stehen Name und Hex-Wert. Die Kalibrierung wirkt beim Senden trotzdem (über `setRGB`).
 - Auf der Farbseite schaltet ein Tipp zur nächsten Farbe, am Ende wieder vorne.
 - Nach `LEVI_RECENTER_MS` ohne Berührung springt die Ansicht ohne Animation zurück auf An/Aus. Nach 20 s wird das Display gedimmt.
 - Im Modus `LEVI_TOUCH_TEST 1` zeigt das Display nur einen Touch-Testscreen (Kreis und Koordinaten).
 - Überbrückung kurzer Touch-Aussetzer: `LEVI_TOUCH_BRIDGE_MS`.
 - Anzeige wird nur bei geänderten Werten aktualisiert (`updateUI` mit Teilbereichen).
-- Der Flush ist asynchron mit Doppelpuffer (DMA). `flushRelease()` gibt den Puffer frei.
+- Der Flush ist synchron: `flush()` schreibt den Bereich per `pushPixels` und meldet LVGL danach fertig. Der DMA-Flush ist derzeit nicht aktiv, er war in Tests die Ursache eines schwarzen Displays.
+- Layout: `buildLayout()` wählt die Variante, heute `layoutRound240()` (runde 240×240-Kacheln untereinander). Weitere Displays bekommen eine eigene Layout-Funktion.
 
 ### Farbklima der LCD-UI
 Die LCD-UI nutzt das Theme `lvgl_theme_shadcn` (Dark Mode, Palette `zinc_dark` unverändert). Es ersetzt die frühere eigene Farbtabelle. Quelle: https://github.com/AlixANNERAUD/lvgl_theme_shadcn, eingebunden als `alix-anneraud/lvgl_theme_shadcn@^0.3.1` in `platformio.ini`. Voraussetzung: LVGL ≥ 9.6.
@@ -91,6 +92,7 @@ Regeln: Keine Farben für Bedienelemente (Pille, Regler, Text, Hintergrund) übe
 
 ### Web-UI
 - Eine Seite, ausgeliefert aus `WebUi.h`. Drei Karten untereinander in derselben Reihenfolge wie am Display (An/Aus, Farbe, Helligkeit).
+- Der Musik-Schalter ist aus der Web-UI entfernt. Der Endpunkt `/api/music` bleibt für den späteren Musik-Screen.
 - Endpunkte (in `src/web.cpp`):
   - `GET /api/state` – Zustand als JSON (inkl. `revision` und `sentRevision`).
   - `POST /api/power?on=0|1`
@@ -116,7 +118,7 @@ Regeln: Keine Farben für Bedienelemente (Pille, Regler, Text, Hintergrund) übe
 
 ## Worauf man achten sollte
 - **Keine blockierenden Aufrufe in der Schleife.** Kein `delay()` über wenige ms, kein synchroner WLAN-Scan (der Scan ist asynchron).
-- **Keine SPI-Zugriffe außerhalb des Flush**, solange die DMA läuft. Der Bus bleibt in `setup()` für das Display belegt.
+- **SPI nur über die Display-Initialisierung und den Flush** ansprechen.
 - **LVGL-Zeit** kommt über `lv_tick_set_cb(levTickMs)` nach `lv_init()`. Kein `lv_tick_inc` verwenden.
 - **Touch-Drehung:** Die Koordinaten kommen bereits gedreht von LovyanGFX. `LEVI_TOUCH_OFFSET_ROTATION` (0–7) steuert das. Der richtige Wert für 270 Grad ist **noch nicht bestimmt**. Nicht stillschweigend ändern, sondern am Gerät testen lassen (`LEVI_TOUCH_TEST`).
 - **RGB565-Byte-Reihenfolge:** `LEVI_RGB565_SWAP` (Standard 1). Bei vertauschten Farben zuerst diesen Schalter prüfen.

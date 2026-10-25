@@ -40,7 +40,7 @@
 // #define LEVI_MIC_EQ_MODE 0
 
 // Farbset des Farbwaehlers (LCD und Web-UI), flache Liste R,G,B,R,G,B,... mit 1 bis 24 Farben.
-// Unabhaengig von der Kalibrierung. Standard: 17 Farben der Web-UI (Weiss bis Cyan, siehe Palette.h).
+// Unabhaengig von der Kalibrierung. Standard: 15 Farben, nach Farbton sortiert (siehe Palette.h).
 // Farbset des Farbwaehlers (LCD und Web-UI). Eintraege: LEVI_PICKER_ENTRY("Name", R, G, B),
 // 1 bis 24 Stueck, Name hoechstens 15 Zeichen. Unabhaengig von der Kalibrierung.
 // Standard: 15 benannte Farben (siehe Palette.h).
@@ -65,5 +65,3 @@
 // Farben vertauscht? Dann 0 setzen (RGB565-Byte-Reihenfolge der Display-Uebertragung). Standard 1.
 // #define LEVI_RGB565_SWAP 1
 
-// Wartezeiten auf die DMA-Uebertragung (Mittel und Maximum) alle 5 s ins Log. Standard 0.
-// #define LEVI_FLUSH_STATS 0
