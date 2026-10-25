@@ -9,6 +9,7 @@
 #include "Web.h"
 #include "Config.h"
 #include "Palette.h"
+#include "BulbIcon.h"
 #include "CalibCore.h"
 #include "AppState.h"
 #include "Ble.h"
@@ -38,6 +39,8 @@ static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;
+static lv_obj_t *statusPwr=nullptr,*bulbImg=nullptr;   // Einschalt-Status (weiss unbekannt, rot aus, gruen an) mit Gluehbirne
+static lv_image_dsc_t bulbDsc{};
 static lv_obj_t *dots[LeviPalette::N+1]{};
 static lv_obj_t *pickerName=nullptr,*pickerHex=nullptr;   // Name und Hex-Wert in der Mitte des Farbwaehlers
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
@@ -120,7 +123,7 @@ static void setEnabled(lv_obj_t *o,bool en,lv_opa_t opaOn=LV_OPA_COVER){
   lv_obj_set_style_opa(o,en?opaOn:LV_OPA_40,0);
 }
 // Anzeige nur dort aktualisieren, wo sich der Wert geaendert hat.
-struct UiView { bool on,ble,wifi,active; uint8_t r,g,b,brightness; int8_t selected; };
+struct UiView { bool on,ble,wifi,active; uint8_t r,g,b,brightness; int8_t selected; int8_t power; };
 static UiView uiLast{};
 static bool uiInit=false;
 static void updatePowerUI(const UiView &v){
@@ -142,6 +145,7 @@ static void updateConnectionUI(const UiView &v){
   // Statuspunkte: gruen verbunden, rot getrennt
   lv_obj_set_style_bg_color(statusWifi,v.wifi?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
   lv_obj_set_style_bg_color(statusBle,v.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
+  lv_obj_set_style_bg_color(statusPwr,v.power==1?lv_color_hex(0x79DA89):v.power==0?lv_color_hex(0xE5484D):lv_color_hex(0xFFFFFF),0);
 }
 static void updateBrightnessUI(const UiView &v){
   lv_obj_set_style_bg_color(bar,lv_color_hex(0xFFE66D),LV_PART_INDICATOR);
@@ -178,12 +182,12 @@ static void setColorDotsOnce(){
 }
 static void updateUI(){
   State s=snapshot();
-  UiView v{s.power==1,s.ble,WiFi.status()==WL_CONNECTED,false,s.r,s.g,s.b,s.brightness,selected};
+  UiView v{s.power==1,s.ble,WiFi.status()==WL_CONNECTED,false,s.r,s.g,s.b,s.brightness,selected,s.power};
   v.active=v.on&&v.ble;   // Helligkeit und Farben nur eingeschaltet und mit Band verbunden
   bool first=!uiInit;uiInit=true;
   const UiView &l=uiLast;
   bool powerChanged=first||v.on!=l.on||v.ble!=l.ble||v.r!=l.r||v.g!=l.g||v.b!=l.b;
-  bool connChanged=first||v.wifi!=l.wifi||v.ble!=l.ble;
+  bool connChanged=first||v.wifi!=l.wifi||v.ble!=l.ble||v.power!=l.power;
   bool brightChanged=first||v.brightness!=l.brightness||v.active!=l.active||v.r!=l.r||v.g!=l.g||v.b!=l.b;
   bool colorChanged=first||v.selected!=l.selected||v.active!=l.active||v.r!=l.r||v.g!=l.g||v.b!=l.b;
   if(!(powerChanged||connChanged||brightChanged||colorChanged))return;
@@ -277,9 +281,18 @@ static void makeUI(){
   pillLbl2=lv_label_create(center);lv_obj_set_style_text_color(pillLbl2,lv_color_hex(0x000000),0);lv_obj_align(pillLbl2,LV_ALIGN_CENTER,0,0);
   // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
   statusWifi=lv_obj_create(tilePower);lv_obj_set_size(statusWifi,10,10);lv_obj_set_style_radius(statusWifi,LV_RADIUS_CIRCLE,0);
-  lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-11,22);
+  lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-22,22);
   statusBle=lv_obj_create(tilePower);lv_obj_set_size(statusBle,10,10);lv_obj_set_style_radius(statusBle,LV_RADIUS_CIRCLE,0);
-  lv_obj_set_style_border_width(statusBle,0,0);lv_obj_align(statusBle,LV_ALIGN_TOP_MID,11,22);
+  lv_obj_set_style_border_width(statusBle,0,0);lv_obj_align(statusBle,LV_ALIGN_TOP_MID,22,22);
+  statusPwr=lv_obj_create(tilePower);lv_obj_set_size(statusPwr,10,10);lv_obj_set_style_radius(statusPwr,LV_RADIUS_CIRCLE,0);
+  lv_obj_set_style_border_width(statusPwr,0,0);lv_obj_align(statusPwr,LV_ALIGN_TOP_MID,0,22);
+  // Gluehbirne ueber dem Einschalt-Status (A8-Bitmap, Farbe wie die Buchstaben W und B)
+  bulbDsc.header.magic=LV_IMAGE_HEADER_MAGIC;bulbDsc.header.cf=LV_COLOR_FORMAT_A8;bulbDsc.header.flags=0;
+  bulbDsc.header.w=12;bulbDsc.header.h=12;bulbDsc.header.stride=12;bulbDsc.header.reserved_2=0;
+  bulbDsc.data_size=sizeof(kBulbA8);bulbDsc.data=kBulbA8;
+  bulbImg=lv_image_create(tilePower);lv_image_set_src(bulbImg,&bulbDsc);
+  lv_obj_set_style_image_recolor(bulbImg,lv_color_hex(0x888888),0);lv_obj_set_style_image_recolor_opa(bulbImg,LV_OPA_COVER,0);
+  lv_obj_align_to(bulbImg,statusPwr,LV_ALIGN_OUT_TOP_MID,0,-3);
   lblWifi=lv_label_create(tilePower);lv_label_set_text(lblWifi,"W");lv_obj_set_style_text_color(lblWifi,lv_color_hex(0x9AA3AE),0);
   lv_obj_align_to(lblWifi,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
   lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x9AA3AE),0);

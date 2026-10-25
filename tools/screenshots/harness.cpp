@@ -9,6 +9,7 @@
 #include <string>
 #include "CalibCore.h"
 #include "Palette.h"
+#include "BulbIcon.h"
 
 // --- Stubs fuer Arduino/ESP-Teile ---
 static uint32_t millis(){return 0;}
