@@ -21,7 +21,7 @@ static void ledcWrite(int,int){}
 enum wl_status_t{WL_IDLE_STATUS=0,WL_CONNECTED=3};
 static struct { wl_status_t status(){return WL_CONNECTED;} } WiFi;
 namespace lgfx{struct swap565_t{};}
-struct StubLcd{ void waitDMA(){} void pushImageDMA(int,int,int,int,const lgfx::swap565_t*){} };
+struct StubLcd{ void waitDMA(){} void pushImageDMA(int,int,int,int,const lgfx::swap565_t*){} void startWrite(){} void endWrite(){} void setAddrWindow(int,int,int,int){} void pushPixels(const uint16_t*,uint32_t,bool){} };
 static StubLcd lcd;
 
 struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1; uint8_t r=139,g=92,b=246,brightness=75; uint32_t revision=0; uint32_t colorRev=0; uint32_t sentRevision=0; };
@@ -29,7 +29,7 @@ static State gState;
 static State snapshot(){return gState;}
 static int8_t selected=-1;
 static constexpr int MUSIC_IDX=LeviPalette::N;
-static constexpr int LIST_COUNT=LeviCal::N+1;
+static constexpr int LIST_COUNT=LeviPalette::N+1;
 static void setPower(bool){}
 static void setBrightness(int){}
 static void setRGB(uint8_t,uint8_t,uint8_t){}
