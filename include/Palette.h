@@ -11,10 +11,9 @@
 #ifndef LEVI_PICKER_LIST
 #define LEVI_PICKER_LIST \
   LEVI_PICKER_ENTRY("Weiss", 255, 255, 255), \
-  LEVI_PICKER_ENTRY("Bernstein", 255, 176, 0), \
   LEVI_PICKER_ENTRY("Koralle", 255, 107, 107), \
-  LEVI_PICKER_ENTRY("Rot", 230, 40, 50), \
   LEVI_PICKER_ENTRY("Orange", 255, 120, 40), \
+  LEVI_PICKER_ENTRY("Bernstein", 255, 176, 0), \
   LEVI_PICKER_ENTRY("Gelb", 255, 230, 109), \
   LEVI_PICKER_ENTRY("Limette", 150, 230, 80), \
   LEVI_PICKER_ENTRY("Smaragd", 40, 200, 110), \
@@ -24,7 +23,8 @@
   LEVI_PICKER_ENTRY("Koenigsblau", 50, 90, 240), \
   LEVI_PICKER_ENTRY("Indigo", 110, 90, 240), \
   LEVI_PICKER_ENTRY("Flieder", 190, 140, 255), \
-  LEVI_PICKER_ENTRY("Magenta", 230, 70, 200)
+  LEVI_PICKER_ENTRY("Magenta", 230, 70, 200), \
+  LEVI_PICKER_ENTRY("Rot", 230, 40, 50)
 #endif
 
 namespace LeviPalette {

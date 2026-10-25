@@ -44,7 +44,7 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 | `include/Ble.h`, `include/Web.h` | Schnittstellen der Module |
 | `include/WebUi.h` | Die Web-Oberfläche als HTML/CSS/JS in einem String (`LEVI_HTML`) |
 | `include/CalibCore.h` | Farbkalibrierung (RBF-Modell, 17 Zielfarben) |
-| `include/Palette.h` | Farbset des Farbwaehlers (`LeviPalette`, Einträge mit Namen aus `LEVI_PICKER_LIST`). Getrennt von den Kalibrierzielen |
+| `include/Palette.h` | Farbset des Farbwaehlers (`LeviPalette`, Einträge mit Namen aus `LEVI_PICKER_LIST`), Standardliste nach Farbton sortiert (Weiß, dann Regenbogen). Getrennt von den Kalibrierzielen |
 | `include/ColorMath.h` | Farbmischung und Überblendung |
 | `include/LotusProtocol.h` | BLE-Pakete des Bands |
 | `include/LGFX_Board.h` | Display- und Touch-Konfiguration für LovyanGFX |
