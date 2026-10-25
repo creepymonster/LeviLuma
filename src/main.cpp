@@ -57,13 +57,6 @@ static void selectColor(int idx){int n=wrapIdx(idx);if(n==MUSIC_IDX){setMusic(tr
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
 static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
-// Heller Hintergrund -> dunkle Schrift, sonst weiss.
-static void applyContrast(uint8_t r,uint8_t g,uint8_t b){
-  bool light=(r*299+g*587+b*114)/1000>170;
-  lv_color_t fg=light?lv_color_hex(0x1A1A1A):lv_color_white();
-  lv_obj_set_style_text_color(pillLbl,fg,0);
-  lv_obj_set_style_text_color(pillLbl2,fg,0);
-}
 // RGB565-Bytes tauschen (LovyanGFX). Falls Farben vertauscht wirken: LEVI_RGB565_SWAP 0 setzen.
 #ifndef LEVI_RGB565_SWAP
 #define LEVI_RGB565_SWAP 1
@@ -131,12 +124,17 @@ struct UiView { bool on,ble,wifi,active; uint8_t r,g,b,brightness; int8_t select
 static UiView uiLast{};
 static bool uiInit=false;
 static void updatePowerUI(const UiView &v){
-  lv_color_t color=rgbColor(v.r,v.g,v.b);
-  applyContrast(v.r,v.g,v.b);
+  // Farbklima (AGENTS.md): An-Pille gelb gefuellt mit schwarzer Schrift, Aus-Pille dunkel mit gelbem Rahmen.
+  const lv_color_t yellow=lv_color_hex(0xFFE66D), surface=lv_color_hex(0x13141A), muted=lv_color_hex(0x9AA3AE);
+  if(v.on){
+    lv_obj_set_style_bg_color(center,yellow,0);lv_obj_set_style_border_width(center,0,0);
+  }else{
+    lv_obj_set_style_bg_color(center,surface,0);lv_obj_set_style_border_color(center,yellow,0);lv_obj_set_style_border_width(center,2,0);
+  }
+  lv_color_t fg=v.on?lv_color_hex(0x000000):muted;
+  lv_obj_set_style_text_color(pillLbl,fg,0);lv_obj_set_style_text_color(pillLbl2,fg,0);
   // Mitte: An/Aus ist auch ausgeschaltet bedienbar, sobald verbunden
-  lv_obj_set_style_bg_color(center,color,0);
-  lv_obj_set_style_shadow_color(center,color,0);
-  setEnabled(center,v.ble,v.on?LV_OPA_COVER:LV_OPA_60);
+  setEnabled(center,v.ble,LV_OPA_COVER);
   lv_label_set_text(pillLbl,v.on?"Ausschalten":"Einschalten");
   lv_label_set_text(pillLbl2,v.on?"Ausschalten":"Einschalten");
 }
@@ -146,7 +144,7 @@ static void updateConnectionUI(const UiView &v){
   lv_obj_set_style_bg_color(statusBle,v.ble?lv_color_hex(0x79DA89):lv_color_hex(0xE5484D),0);
 }
 static void updateBrightnessUI(const UiView &v){
-  lv_obj_set_style_bg_color(bar,rgbColor(v.r,v.g,v.b),LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(bar,lv_color_hex(0xFFE66D),LV_PART_INDICATOR);
   setEnabled(bar,v.active);
   setEnabled(barLbl,v.active);
   if(lv_slider_get_value(bar)!=v.brightness)lv_slider_set_value(bar,v.brightness,LV_ANIM_OFF);
@@ -256,7 +254,7 @@ static void makeUI(){
   // Helligkeit: vertikaler Balken, Prozent oben
   // Helligkeit: waagerechte Spur, darueber der Prozentwert mit etwas Abstand
   bar=lv_slider_create(tileBright);lv_slider_set_range(bar,1,100);lv_obj_set_size(bar,180,18);lv_obj_align(bar,LV_ALIGN_CENTER,0,22);
-  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(bar,lv_color_hex(0x2A2A2A),LV_PART_MAIN);lv_obj_set_style_border_width(bar,0,0);
+  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(bar,lv_color_hex(0x3A3C48),LV_PART_MAIN);lv_obj_set_style_border_width(bar,1,LV_PART_MAIN);lv_obj_set_style_border_color(bar,lv_color_hex(0x5A5D6B),LV_PART_MAIN);
   lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_INDICATOR);lv_obj_set_style_border_width(bar,0,LV_PART_INDICATOR);
   lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_bg_color(bar,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(bar,LV_OPA_COVER,LV_PART_KNOB);
   lv_obj_set_style_border_width(bar,0,LV_PART_KNOB);lv_obj_set_style_shadow_width(bar,0,LV_PART_KNOB);lv_obj_set_style_pad_all(bar,6,LV_PART_KNOB);
@@ -272,19 +270,19 @@ static void makeUI(){
   // Fuellung beim Halten (liegt unter der Beschriftung, von der Pille beschnitten)
   holdFill=lv_obj_create(center);lv_obj_set_size(holdFill,0,48);lv_obj_set_style_radius(holdFill,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(holdFill,0,0);lv_obj_set_style_pad_all(holdFill,0,0);lv_obj_set_style_shadow_width(holdFill,0,0);
-  lv_obj_set_style_bg_color(holdFill,lv_color_white(),0);lv_obj_set_style_bg_opa(holdFill,LV_OPA_30,0);
+  lv_obj_set_style_bg_color(holdFill,lv_color_white(),0);lv_obj_set_style_bg_opa(holdFill,LV_OPA_20,0);
   lv_obj_remove_flag(holdFill,LV_OBJ_FLAG_CLICKABLE);lv_obj_align(holdFill,LV_ALIGN_LEFT_MID,0,0);
   // Halbfett: die Beschriftung zweimal mit 1 px Versatz (LVGL hat keine fette Montserrat-Variante)
-  pillLbl=lv_label_create(center);lv_obj_set_style_text_color(pillLbl,lv_color_white(),0);lv_obj_align(pillLbl,LV_ALIGN_CENTER,-1,0);
-  pillLbl2=lv_label_create(center);lv_obj_set_style_text_color(pillLbl2,lv_color_white(),0);lv_obj_align(pillLbl2,LV_ALIGN_CENTER,0,0);
+  pillLbl=lv_label_create(center);lv_obj_set_style_text_color(pillLbl,lv_color_hex(0x000000),0);lv_obj_align(pillLbl,LV_ALIGN_CENTER,-1,0);
+  pillLbl2=lv_label_create(center);lv_obj_set_style_text_color(pillLbl2,lv_color_hex(0x000000),0);lv_obj_align(pillLbl2,LV_ALIGN_CENTER,0,0);
   // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
   statusWifi=lv_obj_create(tilePower);lv_obj_set_size(statusWifi,10,10);lv_obj_set_style_radius(statusWifi,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-11,22);
   statusBle=lv_obj_create(tilePower);lv_obj_set_size(statusBle,10,10);lv_obj_set_style_radius(statusBle,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusBle,0,0);lv_obj_align(statusBle,LV_ALIGN_TOP_MID,11,22);
-  lblWifi=lv_label_create(tilePower);lv_label_set_text(lblWifi,"W");lv_obj_set_style_text_color(lblWifi,lv_color_hex(0x888888),0);
+  lblWifi=lv_label_create(tilePower);lv_label_set_text(lblWifi,"W");lv_obj_set_style_text_color(lblWifi,lv_color_hex(0x9AA3AE),0);
   lv_obj_align_to(lblWifi,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
-  lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x888888),0);
+  lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x9AA3AE),0);
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
   // Farbpunkte auf einem Kreis (passt zum runden Display), oben beginnend, im Uhrzeigersinn. Letzter Punkt: Musik.

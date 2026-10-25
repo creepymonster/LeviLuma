@@ -74,7 +74,7 @@ int main(int argc,char **argv){
   LeviPalette::get(5,gState.r,gState.g,gState.b);selected=5;updateUI();
   lv_obj_set_tile_id(tv,0,1,LV_ANIM_OFF);shot(d,"03_farbe");
 
-  gState.brightness=40;updateUI();
+  gState.r=139;gState.g=92;gState.b=246;selected=-1;gState.brightness=40;updateUI();
   lv_obj_set_tile_id(tv,0,2,LV_ANIM_OFF);shot(d,"04_helligkeit");
   return 0;
 }
