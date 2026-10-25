@@ -33,7 +33,7 @@ static uint8_t bandBrightness(uint8_t pct){return LEVI_BRIGHTNESS_MAX==255?(uint
 #endif
 // Anzahl Zwischenschritte beim Farbwechsel (ein Schritt pro 200-ms-Slot).
 #ifndef LEVI_FADE_STEPS
-#define LEVI_FADE_STEPS 8
+#define LEVI_FADE_STEPS 1
 #endif
 static void bleTask(void*){
   NimBLEDevice::init("LeviLuma");NimBLEClient *client=nullptr;NimBLERemoteCharacteristic *writer=nullptr;

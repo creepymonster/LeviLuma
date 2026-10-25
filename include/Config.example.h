@@ -49,8 +49,8 @@
 //   LEVI_PICKER_ENTRY("Rot", 255, 64, 64), \
 //   LEVI_PICKER_ENTRY("Blau", 64, 64, 255)
 
-// Anzahl der Schritte bei der Farbueberblendung (Standard 8):
-// #define LEVI_FADE_STEPS 8
+// Anzahl der Schritte bei der Farbueberblendung (Standard 1 = springt direkt zur Farbe):
+// #define LEVI_FADE_STEPS 1
 
 // Touch-Drehung in LovyanGFX, 0..7 (Standard 0; am Geraet pruefen):
 // #define LEVI_TOUCH_OFFSET_ROTATION 0

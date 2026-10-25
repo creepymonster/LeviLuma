@@ -151,7 +151,6 @@ static void updatePickerLabels(const UiView &v){
 // Die festen Farben der Punkte werden nur einmal gesetzt.
 static void setColorDotsOnce(){
   for(int k=0;k<LeviPalette::N;k++){uint8_t r,g,b;LeviPalette::get(k,r,g,b);lv_obj_set_style_bg_color(dots[k],lv_color_make(r,g,b),0);}
-  lv_obj_set_style_bg_color(dots[MUSIC_IDX],lv_color_hex(0x333333),0);
 }
 static void updateUI(){
   State s=snapshot();
@@ -253,7 +252,7 @@ static void makeUI(){
   holdFill=lv_obj_create(center);lv_obj_set_size(holdFill,0,48);lv_obj_set_style_radius(holdFill,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(holdFill,0,0);lv_obj_set_style_pad_all(holdFill,0,0);lv_obj_set_style_shadow_width(holdFill,0,0);
   lv_obj_set_style_bg_color(holdFill,lv_color_white(),0);lv_obj_set_style_bg_opa(holdFill,LV_OPA_20,0);
-  lv_obj_remove_flag(holdFill,LV_OBJ_FLAG_CLICKABLE);lv_obj_align(holdFill,LV_ALIGN_LEFT_MID,0,0);
+  lv_obj_remove_flag(holdFill,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_flag(holdFill,LV_OBJ_FLAG_IGNORE_LAYOUT);lv_obj_align(holdFill,LV_ALIGN_LEFT_MID,0,0);
   // Halbfett: die Beschriftung zweimal mit 1 px Versatz (LVGL hat keine fette Montserrat-Variante)
   pillLbl=lv_label_create(center);lv_obj_set_style_text_font(pillLbl,&lv_font_montserrat_16,0);lv_obj_center(pillLbl);
   // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
@@ -286,7 +285,7 @@ static void makeUI(){
   lv_obj_align_to(btIcon,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
   // Farbpunkte auf einem Kreis (passt zum runden Display), oben beginnend, im Uhrzeigersinn. Letzter Punkt: Musik.
-  const int nDots=LeviPalette::N+1;
+  const int nDots=LeviPalette::N;   // ohne Musik-Punkt: Musik nur ueber die Web-UI
   const float ringR=90.0f;
   for(int k=0;k<nDots;k++){
     dots[k]=lv_obj_create(tileColor);lv_obj_set_size(dots[k],14,14);lv_obj_remove_flag(dots[k],LV_OBJ_FLAG_SCROLLABLE);
