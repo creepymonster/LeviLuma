@@ -2,8 +2,8 @@
 #include <Arduino.h>
 static const char LEVI_HTML[] PROGMEM=R"LEVIHTML(<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LeviLuma</title>
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#eaeaea;color:#171717;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;padding:18px}
-.shell{background:#f3f3f3;border-radius:24px;padding:20px 17px 13px;width:min(100%,1000px)}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#f3f3f3;color:#171717;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;padding:18px}
+.shell{background:transparent;padding:20px 0 13px;width:min(100%,1000px)}
 header{text-align:center;padding:5px 0 20px}h1{font-size:36px;letter-spacing:-1.3px;margin:0;font-weight:760;display:flex;align-items:center;justify-content:center;gap:8px}
 svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{display:flex;justify-content:center;gap:9px;margin-top:16px}.branddots i{width:15px;height:15px;border-radius:50%}
 .calib{margin:16px auto 0;max-width:600px;width:100%}
