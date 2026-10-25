@@ -134,7 +134,7 @@ static void updatePowerUI(const UiView &v){
   lv_color_t fg=v.on?lv_color_hex(0x000000):muted;
   lv_obj_set_style_text_color(pillLbl,fg,0);lv_obj_set_style_text_color(pillLbl2,fg,0);
   // Mitte: An/Aus ist auch ausgeschaltet bedienbar, sobald verbunden
-  if(v.ble)lv_obj_remove_state(center,LV_STATE_DISABLED);else lv_obj_add_state(center,LV_STATE_DISABLED);   // ohne Transparenz, nur nicht bedienbar
+  setEnabled(center,v.ble,v.on?LV_OPA_COVER:LV_OPA_60);   // ohne BLE: halbtransparent und nicht bedienbar
   lv_label_set_text(pillLbl,v.on?"Ausschalten":"Einschalten");
   lv_label_set_text(pillLbl2,v.on?"Ausschalten":"Einschalten");
 }

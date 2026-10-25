@@ -125,6 +125,12 @@ Noch nicht im Code umgesetzt. Nach der Umsetzung zeigen die Screenshots in `scre
 - **Bei Änderungen am Protokoll** (`LotusProtocol.h`) nur Pakete ändern, die am Gerät getestet wurden, oder klar als ungetestet kennzeichnen.
 - **Keine Schnellschüsse bei Refactorings.** Das Projekt ist gerade in Module aufgeteilt (`ble`, `web`, `state`). Dabei Abhängigkeiten über `AppState.h` führen.
 
+## Screenshots
+- `tools/screenshots/render.sh`: LCD-UI per Harness (LVGL 9.2.0, Framebuffer), Ausgabe `screenshots/<B>x<H>/`, Dateien `01_off_disconnected`, `02_on_center`, `03_color`, `04_brightness`.
+- `tools/screenshots/webui.py`: Web-UI per Playwright (Chromium) mit gemockter API, Ausgabe `screenshots/web/`: `desktop_1280x800.png`, `mobile_390x844.png`.
+- Beides läuft in `.github/workflows/screenshots.yml` bei Änderungen an `src`, `include` und `tools/screenshots`. Dateinamen sind englisch.
+- Die Harness-Szenen sind nicht das Gerät. Touch und Farben auf dem Display können abweichen.
+
 ## Git-Konventionen
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.
 - Commits, die ein KI-Agent erstellt, enden mit den Zeilen `Co-Authored-By` und `Claude-Session`, wie in der laufenden Sitzung vorgegeben.

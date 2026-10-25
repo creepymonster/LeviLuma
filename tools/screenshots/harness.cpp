@@ -66,15 +66,15 @@ int main(int argc,char **argv){
   makeUI();
 
   gState.power=0;gState.ble=false;updateUI();
-  lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);shot(d,"01_aus_getrennt");
+  lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);shot(d,"01_off_disconnected");
 
   gState.power=1;gState.ble=true;gState.r=139;gState.g=92;gState.b=246;selected=-1;updateUI();
-  lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);shot(d,"02_an_mitte");
+  lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);shot(d,"02_on_center");
 
   LeviPalette::get(5,gState.r,gState.g,gState.b);selected=5;updateUI();
-  lv_obj_set_tile_id(tv,0,1,LV_ANIM_OFF);shot(d,"03_farbe");
+  lv_obj_set_tile_id(tv,0,1,LV_ANIM_OFF);shot(d,"03_color");
 
   gState.r=139;gState.g=92;gState.b=246;selected=-1;gState.brightness=40;updateUI();
-  lv_obj_set_tile_id(tv,0,2,LV_ANIM_OFF);shot(d,"04_helligkeit");
+  lv_obj_set_tile_id(tv,0,2,LV_ANIM_OFF);shot(d,"04_brightness");
   return 0;
 }

@@ -30,11 +30,16 @@ jobs:
           ref: v9.2.0
           path: .lvgl
 
-      - name: Pillow installieren
-        run: pip install --quiet pillow
+      - name: Pillow und Playwright installieren
+        run: |
+          pip install --quiet pillow playwright
+          python -m playwright install --with-deps chromium
 
       - name: Screenshots rendern
         run: tools/screenshots/render.sh . .lvgl screenshots
+
+      - name: Web-UI-Screenshots rendern (Desktop und mobil)
+        run: python3 tools/screenshots/webui.py . screenshots
 
       - name: Screenshots ins Repo committen
         run: |
