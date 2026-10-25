@@ -11,7 +11,7 @@ svg{display:block}header p{margin:4px 0;color:#777;font-size:15px}.branddots{dis
 .tile{display:flex;flex-direction:column;justify-content:center;padding:20px 18px}
 .power-tile{display:flex;flex-direction:column;align-items:center;padding:20px 18px;gap:12px}
 .dots{display:flex;align-items:center;gap:6px}
-.dl{font-size:11px;font-weight:600;color:#888;line-height:1}.dots .wifi,.dots .bt{color:#9AA3AE;display:block}
+.dl{font-size:11px;font-weight:600;color:#888;line-height:1}.dots .wifi,.dots .bt{color:#9AA3AE;display:block;width:12px;height:12px}.dots .wifi{transform:translateY(-1px)}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#e5484d}.dot.ok{background:#79da89}.dot.unk{background:#fff;box-shadow:inset 0 0 0 1px #c9c9c9}.pcol{position:relative;display:inline-flex;align-items:center;color:#888}.pcol .bulb{position:absolute;left:50%;bottom:calc(100% + 3px);transform:translateX(-50%)}
 .statebar{display:flex;justify-content:center;margin-top:auto}
 .statebar .state{font-size:11px;font-weight:600;color:#888}
