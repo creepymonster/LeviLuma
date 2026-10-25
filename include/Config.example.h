@@ -7,6 +7,10 @@
 #define LEVI_WIFI_HOSTNAME "leviluma"
 #define LEVI_WIFI_TX_DBM 8.5f
 
+// Anzeigename in der Weboberflaeche (Kopf, Fuss, Seitentitel). Standard "LeviLuma".
+// Der Netzwerkname bleibt LEVI_WIFI_HOSTNAME.
+// #define LEVI_NAME "LeviLuma"
+
 #define LEVI_DISPLAY_SPI_MHZ 40
 #define LEVI_DISPLAY_INVERT true
 #define LEVI_BACKLIGHT_ACTIVE_HIGH true
@@ -32,10 +36,6 @@
 
 // ---- Optionale Einstellungen (auskommentiert = Standardwert im Code) ----
 // Pflicht ist nur WLAN (oben). Diese Datei enthaelt bewusst nur Platzhalter, keine echten Zugangsdaten.
-
-// Anzeigename in der Weboberflaeche (Kopf, Fuss, Seitentitel). Standard "LeviLuma".
-// Der Netzwerkname bleibt LEVI_WIFI_HOSTNAME.
-// #define LEVI_NAME "LeviLuma"
 
 // Sekunden ohne Bedienung bis zur Rueckkehr auf die Mittelseite (Standard 60000 ms):
 // #define LEVI_RECENTER_MS 60000
