@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string>
 #include "CalibCore.h"
+#include "Palette.h"
 
 // --- Stubs fuer Arduino/ESP-Teile ---
 static uint32_t millis(){return 0;}
@@ -70,7 +71,7 @@ int main(int argc,char **argv){
   gState.power=1;gState.ble=true;gState.r=139;gState.g=92;gState.b=246;selected=-1;updateUI();
   lv_obj_set_tile_id(tv,0,0,LV_ANIM_OFF);shot(d,"02_an_mitte");
 
-  gState.r=LeviCal::TARGET[5][0];gState.g=LeviCal::TARGET[5][1];gState.b=LeviCal::TARGET[5][2];selected=5;updateUI();
+  LeviPalette::get(5,gState.r,gState.g,gState.b);selected=5;updateUI();
   lv_obj_set_tile_id(tv,0,1,LV_ANIM_OFF);shot(d,"03_farbe");
 
   gState.brightness=40;updateUI();

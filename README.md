@@ -27,6 +27,7 @@ Optional, mit Standardwert (alle in `Config.example.h` dokumentiert):
 - `LEVI_DISPLAY_ROTATION` – 0, 90, 180 oder 270 Grad (andere Werte brechen den Build ab).
 - `LEVI_TOUCH_OFFSET_ROTATION` – Touch-Drehung in LovyanGFX (0–7). Muss für die Montage am Gerät geprüft werden.
 - `LEVI_TOUCH_BRIDGE_MS` – Überbrückung kurzer Touch-Aussetzer (Standard 40 ms).
+- `LEVI_PICKER_RGB` – Farbset des Farbwählers (LCD und Web), flache Liste R,G,B,… mit 1–24 Farben. Unabhängig von der Kalibrierung.
 - `LEVI_TOUCH_TEST` – 1 zeigt nur einen Touch-Testscreen: Tippen zeichnet einen Kreis mit den Koordinaten.
 - `LEVI_RGB565_SWAP` – Byte-Reihenfolge der Display-Übertragung (Standard 1). Bei vertauschten Farben auf 0 setzen.
 - `LEVI_FLUSH_STATS` – 1 loggt alle 5 s die Wartezeiten auf die Display-Übertragung.
@@ -47,6 +48,7 @@ Die API hat keine Authentifizierung. Nur in einem vertrauenswürdigen Netz betre
 | `POST /api/raw?r=&g=&b=` | Farbe ohne Kalibrierung |
 | `POST /api/music?on=0\|1` | Musikmodus |
 | `GET /api/calib` | Kalibrierung lesen |
+| `GET /api/palette` | Farbset des Farbwählers als JSON (`colors`, `music`) |
 | `POST /api/calib?p=…` | 51 Werte (17 Farben × RGB, je 0–255) speichern |
 | `POST /api/calib/reset` | Kalibrierung auf den Standard zurücksetzen |
 

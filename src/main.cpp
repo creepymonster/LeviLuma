@@ -38,9 +38,9 @@ static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *lblWifi=nullptr,*lblBle=nullptr;
-static lv_obj_t *dots[LeviCal::N+1]{};
+static lv_obj_t *dots[LeviPalette::N+1]{};
 static uint32_t lastTouchMs=0,lastWifiAttempt=0;
-// Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
+// Farbliste des Farbwaehlers (LeviPalette, Config LEVI_PICKER_RGB), danach der Musikmodus.
 static int wrapIdx(int i){return ((i%LIST_COUNT)+LIST_COUNT)%LIST_COUNT;}
 static bool touchDown=false;
 static uint16_t touchX=120,touchY=120;
@@ -52,7 +52,7 @@ static bool screenDim=false;
 #endif
 static uint8_t currentBacklight=255;
 
-static void selectColor(int idx){int n=wrapIdx(idx);if(n==MUSIC_IDX){setMusic(true);return;}setRGB(LeviCal::TARGET[n][0],LeviCal::TARGET[n][1],LeviCal::TARGET[n][2]);}
+static void selectColor(int idx){int n=wrapIdx(idx);if(n==MUSIC_IDX){setMusic(true);return;}uint8_t r,g,b;LeviPalette::get(n,r,g,b);setRGB(r,g,b);}
 static void backlight(uint8_t value){currentBacklight=value;ledcWrite(0,LEVI_BACKLIGHT_ACTIVE_HIGH?value:255-value);}
 static void wake(){lastTouchMs=millis();if(screenDim){screenDim=false;backlight(255);}}
 static lv_color_t rgbColor(uint8_t r,uint8_t g,uint8_t b){return lv_color_make(r,g,b);}
@@ -154,14 +154,14 @@ static void updateBrightnessUI(const UiView &v){
 }
 static void updateColorUI(const UiView &v){
   // Farbpunkte: aktive Farbe mit weissem Rahmen
-  for(int k=0;k<LeviCal::N;k++){
+  for(int k=0;k<LeviPalette::N;k++){
     lv_obj_set_style_border_width(dots[k],k==v.selected?2:0,0);
     setEnabled(dots[k],v.active);
   }
 }
 // Die festen Farben der Punkte werden nur einmal gesetzt.
 static void setColorDotsOnce(){
-  for(int k=0;k<LeviCal::N;k++)lv_obj_set_style_bg_color(dots[k],lv_color_make(LeviCal::TARGET[k][0],LeviCal::TARGET[k][1],LeviCal::TARGET[k][2]),0);
+  for(int k=0;k<LeviPalette::N;k++){uint8_t r,g,b;LeviPalette::get(k,r,g,b);lv_obj_set_style_bg_color(dots[k],lv_color_make(r,g,b),0);}
   lv_obj_set_style_bg_color(dots[MUSIC_IDX],lv_color_hex(0x333333),0);
 }
 static void updateUI(){
@@ -194,7 +194,7 @@ static void nextColorClicked(lv_event_t *e){
   (void)e;
   State s=snapshot();
   if(s.power!=1||!s.ble)return;
-  int n=selected<0?0:(selected+1)%LeviCal::N;
+  int n=selected<0?0:(selected+1)%LeviPalette::N;
   selectColor(n);
 }
 
@@ -273,12 +273,13 @@ static void makeUI(){
   lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x888888),0);
   lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
-  // Farbpunkte: 5 Spalten, 4 Zeilen (17 Kalibrierfarben plus Musik)
-  for(int k=0;k<=LeviCal::N;k++){
+  // Farbpunkte: 5 Spalten, Zeilen passend zur Anzahl (Farben plus Musik), vertikal zentriert
+  const int rows=(LeviPalette::N+1+4)/5, y0=-(rows-1)*17;
+  for(int k=0;k<=LeviPalette::N;k++){
     dots[k]=lv_obj_create(tileColor);lv_obj_set_size(dots[k],14,14);lv_obj_remove_flag(dots[k],LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(dots[k],LV_RADIUS_CIRCLE,0);lv_obj_set_style_pad_all(dots[k],0,0);
     lv_obj_set_style_border_color(dots[k],lv_color_white(),0);lv_obj_set_style_shadow_width(dots[k],0,0);
-    lv_obj_align(dots[k],LV_ALIGN_CENTER,(k%5-2)*34,(k/5)*34-51);
+    lv_obj_align(dots[k],LV_ALIGN_CENTER,(k%5-2)*34,(k/5)*34+y0);
   }
   lv_obj_add_flag(tileColor,LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(tileColor,nextColorClicked,LV_EVENT_CLICKED,nullptr);

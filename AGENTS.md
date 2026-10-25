@@ -11,7 +11,7 @@ LeviLuma steuert einen LED-Strip der ELK-/Lotus-Lantern-Familie über BLE (Servi
 - **LCD-UI** auf dem Display des Boards (LVGL, Touch).
 - **Web-UI** im WLAN, erreichbar unter `leviluma.local` (mDNS) oder über die IP.
 
-Gesteuert werden: Ein/Aus, Helligkeit (1–100 %), Farbe (17 Kalibrierfarben und freie RGB-Werte), Musikmodus (Mikrofon) und eine Kalibrierung der Farben über die Web-UI.
+Gesteuert werden: Ein/Aus, Helligkeit (1–100 %), Farbe (Farbset aus `LEVI_PICKER_RGB`, Standard 17 Farben, und freie RGB-Werte), Musikmodus (Mikrofon) und eine Kalibrierung der Farben über die Web-UI.
 
 ## Hardware
 
@@ -44,6 +44,7 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 | `include/Ble.h`, `include/Web.h` | Schnittstellen der Module |
 | `include/WebUi.h` | Die Web-Oberfläche als HTML/CSS/JS in einem String (`LEVI_HTML`) |
 | `include/CalibCore.h` | Farbkalibrierung (RBF-Modell, 17 Zielfarben) |
+| `include/Palette.h` | Farbset des Farbwaehlers (`LeviPalette`, Standard aus `LEVI_PICKER_RGB`). Getrennt von den Kalibrierzielen |
 | `include/ColorMath.h` | Farbmischung und Überblendung |
 | `include/LotusProtocol.h` | BLE-Pakete des Bands |
 | `include/LGFX_Board.h` | Display- und Touch-Konfiguration für LovyanGFX |
@@ -61,6 +62,7 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 ### LCD-UI
 - Drei Kacheln **untereinander**: oben An/Aus, Mitte Farbe, unten Helligkeit. Wischen geht nur vertikal (`lv_tileview`), damit der Helligkeitsslider nicht mit dem Seitenwechsel kollidiert.
 - Die Mitte-Pille „An/Aus“ wird 500 ms gehalten (Füllanimation).
+- Der Farbwähler nutzt das Farbset aus `LeviPalette` (`LEVI_PICKER_RGB`), nicht die Kalibrierziele. Die Kalibrierung wirkt beim Senden trotzdem (über `setRGB`).
 - Auf der Farbseite schaltet ein Tipp zur nächsten Farbe, am Ende wieder vorne.
 - Nach `LEVI_RECENTER_MS` ohne Berührung springt die Ansicht ohne Animation zurück auf An/Aus. Nach 20 s wird das Display gedimmt.
 - Im Modus `LEVI_TOUCH_TEST 1` zeigt das Display nur einen Touch-Testscreen (Kreis und Koordinaten).
@@ -95,6 +97,7 @@ Regeln: Keine zusätzliche Akzentfarbe neben der LED-Farbe und den beiden Status
   - `POST /api/raw?r=&g=&b=` – RGB ohne Kalibrierung.
   - `POST /api/color?r=&g=&b=` – RGB mit Kalibrierung.
   - `POST /api/music?on=0|1`
+  - `GET /api/palette` – Farbset des Farbwaehlers als JSON, z. B. `{"colors":["#ffffff",…],"music":true}`. Die Web-UI holt es beim Laden.
   - `GET /api/calib`, `POST /api/calib?p=<51 Werte, komma-getrennt 0..255>`, `POST /api/calib/reset`
 - Eingaben werden mit `integer()` geprüft (nur Ziffern, 1–3 Stellen, Grenzen).
 - **Keine Authentifizierung.** Die API ist nur für vertrauenswürdige Netze gedacht (steht in der README).

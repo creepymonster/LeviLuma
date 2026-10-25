@@ -7,6 +7,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include "CalibCore.h"
+#include "Palette.h"
 
 // Logging ueber stdout (UART0-Konsole), also in demselben Monitor wie die NimBLE-Meldungen.
 #define LEVI_LOG(fmt,...) printf("[%8lu] levi: " fmt "\n",(unsigned long)millis(),##__VA_ARGS__)
@@ -18,14 +19,14 @@ struct State { bool ble=false; bool music=false; bool raw=false; int8_t power=-1
 extern SemaphoreHandle_t stateLock;
 void stateInit();   // Mutexe anlegen und Kalibrierung laden (einmal in setup)
 
-// Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe.
+// Index in der Farbliste des Farbwaehlers (0..N-1 aus LeviPalette, MUSIC_IDX), -1 = freie Farbe.
 // Besitz: nur der Loop-Task (LVGL-UI, Web-Handler setRGB/setMusic). Der BLE-Task liest 'selected' nicht,
 // er arbeitet nur mit der Snapshot-Kopie von State. Deshalb ist kein Mutex noetig. Wenn BLE je darauf zugreift, unter stateLock verschieben.
 extern int8_t selected;
 
-// Farbliste: die 17 Kalibrierziele, danach der Musikmodus.
-static constexpr int MUSIC_IDX=LeviCal::N;
-static constexpr int LIST_COUNT=LeviCal::N+1;
+// Farbliste des Farbwaehlers (LeviPalette, Config LEVI_PICKER_RGB), danach der Musikmodus.
+static constexpr int MUSIC_IDX=LeviPalette::N;
+static constexpr int LIST_COUNT=LeviPalette::N+1;
 State snapshot();
 void stateSetBle(bool on);
 void stateMarkSent(uint32_t rev);

@@ -39,6 +39,10 @@
 // Mikrofon-EQ-Modus nach "Mikrofon an" (Standard 0):
 // #define LEVI_MIC_EQ_MODE 0
 
+// Farbset des Farbwaehlers (LCD und Web-UI), flache Liste R,G,B,R,G,B,... mit 1 bis 24 Farben.
+// Unabhaengig von der Kalibrierung. Standard: 17 Farben der Web-UI (Weiss bis Cyan, siehe Palette.h).
+// #define LEVI_PICKER_RGB 255,255,255, 255,64,64, 64,255,64, 64,64,255
+
 // Anzahl der Schritte bei der Farbueberblendung (Standard 8):
 // #define LEVI_FADE_STEPS 8
 

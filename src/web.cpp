@@ -13,6 +13,18 @@ static WebServer web(80);
 
 static bool integer(const String &v,int max){if(v.length()<1||v.length()>3)return false;for(char c:v)if(c<'0'||c>'9')return false;return v.toInt()<=max;}
 static void stateJson(){State s=snapshot();String j="{\"wifi\":";j+=(WiFi.status()==WL_CONNECTED?"true":"false");j+=",\"ble\":";j+=(s.ble?"true":"false");j+=",\"power\":\"";j+=(s.power<0?"unknown":s.power==1?"on":"off");j+="\",\"r\":"+String(s.r)+",\"g\":"+String(s.g)+",\"b\":"+String(s.b)+",\"brightness\":"+String(s.brightness)+",\"music\":"+String(s.music?"true":"false")+",\"revision\":"+String(s.revision)+",\"sentRevision\":"+String(s.sentRevision)+"}";web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",j);}
+// Farbset des Farbwaehlers (LEVI_PICKER_RGB) als JSON, z. B. {"colors":["#ffffff",...],"music":true}.
+static String paletteJson(){
+  String j="{\"colors\":[";
+  for(int i=0;i<LeviPalette::N;i++){
+    uint8_t r,g,b;LeviPalette::get(i,r,g,b);
+    char hex[10];snprintf(hex,sizeof(hex),"\"#%02x%02x%02x\"",r,g,b);
+    if(i)j+=',';j+=hex;
+  }
+  j+="],\"music\":true}";
+  return j;
+}
+
 void webStart(){
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LEVI_HTML);});web.on("/api/state",HTTP_GET,stateJson);
   web.on("/api/power",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setPower(v=="1");stateJson();});
@@ -34,7 +46,7 @@ void webStart(){
     LEVI_LOG("Kalibrierung gespeichert (17 Punkte)");
     web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",calibJson());});
   web.on("/api/calib/reset",HTTP_POST,[]{if(!calibReset()){web.send(500,"text/plain","NVS-Fehler");return;}LEVI_LOG("Kalibrierung zurueckgesetzt");web.send(200,"application/json",calibJson());});
-  web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.begin();
+  web.on("/api/music",HTTP_POST,[]{String v=web.arg("on");if(v!="0"&&v!="1"){web.send(400,"text/plain","on=0|1");return;}setMusic(v=="1");stateJson();});web.on("/api/color",HTTP_POST,[]{String r=web.arg("r"),g=web.arg("g"),b=web.arg("b");if(!integer(r,255)||!integer(g,255)||!integer(b,255)){web.send(400,"text/plain","r,g,b=0..255");return;}setRGB(r.toInt(),g.toInt(),b.toInt());stateJson();});web.on("/api/palette",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",paletteJson());});web.begin();
 }
 
 void webLoop(){ web.handleClient(); }

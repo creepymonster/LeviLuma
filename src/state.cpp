@@ -9,7 +9,7 @@
 
 SemaphoreHandle_t stateLock=nullptr;
 static State state;
-// Index in der Farbliste (0..16 Kalibrierfarben, MUSIC_IDX), -1 = freie Farbe.
+// Index in der Farbliste des Farbwaehlers (0..N-1 aus LeviPalette, MUSIC_IDX), -1 = freie Farbe.
 // Besitz: nur der Loop-Task (LVGL-UI, Web-Handler setRGB/setMusic). Der BLE-Task liest 'selected' nicht,
 // er arbeitet nur mit der Snapshot-Kopie von State. Deshalb ist kein Mutex noetig. Wenn BLE je darauf zugreift, unter stateLock verschieben.
 int8_t selected=-1;
@@ -104,7 +104,7 @@ void setPower(bool on){ xSemaphoreTake(stateLock,portMAX_DELAY); state.power=on?
 void setBrightness(int b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.brightness=constrain(b,1,100); ++state.revision; xSemaphoreGive(stateLock); }
 void setRaw(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=true; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock); }
 void setRGB(uint8_t r,uint8_t g,uint8_t b){ xSemaphoreTake(stateLock,portMAX_DELAY); state.raw=false; state.music=false; state.r=r;state.g=g;state.b=b; ++state.revision; ++state.colorRev; xSemaphoreGive(stateLock);
-  selected=-1;for(int i=0;i<LeviCal::N;i++)if(LeviCal::TARGET[i][0]==r&&LeviCal::TARGET[i][1]==g&&LeviCal::TARGET[i][2]==b){selected=(int8_t)i;break;} }
+  selected=-1;for(int i=0;i<LeviPalette::N;i++){uint8_t pr,pg,pb;LeviPalette::get(i,pr,pg,pb);if(pr==r&&pg==g&&pb==b){selected=(int8_t)i;break;}} }
 void setMusic(bool on){xSemaphoreTake(stateLock,portMAX_DELAY);state.music=on;++state.revision;xSemaphoreGive(stateLock);if(on)selected=MUSIC_IDX;}
 void stateInit(){
   stateLock=xSemaphoreCreateMutex();
