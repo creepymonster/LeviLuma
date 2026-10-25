@@ -71,23 +71,24 @@ Ein Waveshare ESP32-C6-Touch-LCD-2.8 soll später unterstützt werden. Dessen Pi
 - Der Flush ist asynchron mit Doppelpuffer (DMA). `flushRelease()` gibt den Puffer frei.
 
 ### Farbklima der LCD-UI
-Festgelegt. Schwarzer Hintergrund, zwei Akzente aus der Palette. Die LED-Farbe erscheint nicht als Bedienelement-Farbe, sondern nur als Farbpunkt-Auswahl im Farbwähler.
+Die LCD-UI nutzt das Theme `lvgl_theme_shadcn` (Dark Mode, Basis `zinc_dark`) und ersetzt die frühere eigene Farbtabelle. Quelle: https://github.com/AlixANNERAUD/lvgl_theme_shadcn, eingebunden als `alix-anneraud/lvgl_theme_shadcn@^0.3.1` in `platformio.ini`. Voraussetzung: LVGL ≥ 9.6.
 
-- Hintergrund: `#000000`
-- Fläche (Aus-Pille): `#13141A`
-- Trennlinie: `#262832`
-- Ungefüllter Regler-Bereich: `#3A3C48` mit 1 px Kante `#5A5D6B`
-- Überschriften und Statustexte (Bereichsnamen wie „Ausgeschaltet“): `#FF6B6B` (Koralle, 7,6:1 auf Schwarz)
-- Komponenten (An-Pille, Rahmen der Aus-Pille, gefüllter Regler): `#FFE66D` (Gelb, 16,8:1 auf Schwarz)
-- Schrift auf der gelben An-Pille: `#000000`
-- Text primär (Prozentwert, Werte): `#F4F6F8`
-- Text sekundär (Hinweise, „W“/„B“, Aus-Beschriftung): `#9AA3AE`
-- Halten-Füllung: weiß mit 18 % Deckkraft
-- Deaktiviert: Deckkraft 40 %, keine Farbänderung
+Initialisierung in `src/main.cpp` (`themeInit`):
+- Primärfarbe `#FFE66D` (Gelb), Primary-Foreground `#111111`, erzeugt per `lv_theme_shadcn_palette_from_primary`.
+- Fonts: Montserrat 16 (small/normal), 28 (large/h3), 32 (h2), 48 (h1).
 
-Regeln: Nur die beiden Akzente plus Neutraltöne. Keine Schatten oder Glows. Text mindestens 4,5:1 Kontrast zu seinem Untergrund (WCAG AA).
+Verwendung:
+- Hintergrund: Theme-Hintergrund (nahezu Schwarz).
+- An-Pille: Variante `DEFAULT` (gefüllt, Primärfarbe).
+- Aus-Pille: Variante `OUTLINE`.
+- Gefüllter Regler und Indikator: Theme-Primärfarbe. Ungefüllter Teil: Theme-Track.
+- Sekundärtext (z. B. Hex-Anzeige im Farbwähler): `LV_THEME_SHADCN_TEXT_MUTED`.
+- Primärtext: Theme-Textfarbe.
+- Deaktiviert (kein BLE): Deckkraft 60 % bei aus, 100 % bei an (`setEnabled`).
 
-Noch nicht im Code umgesetzt. Nach der Umsetzung zeigen die Screenshots in `screenshots/` den Stand im Code.
+Eigene Farben, die nicht vom Theme kommen: Statuspunkte (Grün an `#79DA89`, Rot aus `#E5484D`, Weiß unbekannt), Symbole WLAN/Bluetooth/Glühbirne (Grau `#9AA3AE` bzw. `#888888`), Farbpunkte des Farbwählers aus `LeviPalette`.
+
+Regeln: Keine eigenen Hintergrundfarben für Bedienelemente setzen, damit das Theme wirkt. Abweichungen nur mit Begründung in dieser Datei festhalten.
 
 ### Web-UI
 - Eine Seite, ausgeliefert aus `WebUi.h`. Drei Karten untereinander in derselben Reihenfolge wie am Display (An/Aus, Farbe, Helligkeit).
@@ -110,7 +111,7 @@ Noch nicht im Code umgesetzt. Nach der Umsetzung zeigen die Screenshots in `scre
 
 ## Build und Test
 - PlatformIO, Umgebung `waveshare_esp32s3`, Framework Arduino, Plattform `espressif32@6.10.0`.
-- Bibliotheken: LovyanGFX `^1.2.7`, LVGL `^9.2.0`, NimBLE-Arduino `^1.4.3`.
+- Bibliotheken: LovyanGFX `^1.2.7`, LVGL `^9.6.0`, `lvgl_theme_shadcn` `^0.3.1`, NimBLE-Arduino `^1.4.3`.
 - Der Entwickler baut und testet **lokal auf der Hardware**. Behauptungen über Build- oder Testergebnisse nur machen, wenn sie tatsächlich ausgeführt wurden. Im Zweifel sagen, dass es nicht geprüft wurde.
 - Logging: `LEVI_LOG(...)` schreibt auf die Konsole (`printf`), nicht auf `Serial`.
 
@@ -126,7 +127,7 @@ Noch nicht im Code umgesetzt. Nach der Umsetzung zeigen die Screenshots in `scre
 - **Keine Schnellschüsse bei Refactorings.** Das Projekt ist gerade in Module aufgeteilt (`ble`, `web`, `state`). Dabei Abhängigkeiten über `AppState.h` führen.
 
 ## Screenshots
-- `tools/screenshots/render.sh`: LCD-UI per Harness (LVGL 9.2.0, Framebuffer), Ausgabe `screenshots/<B>x<H>/`, Dateien `01_off_disconnected`, `02_on_center`, `03_color`, `04_brightness`.
+- `tools/screenshots/render.sh`: LCD-UI per Harness (LVGL 9.6.0 mit Theme, Framebuffer), Aufruf `render.sh <repo> <lvgl-src> <theme-src> <out-root>`, Ausgabe `<out-root>/<B>x<H>/`, Dateien `01_off_disconnected`, `02_on_center`, `03_color`, `04_brightness`.
 - `tools/screenshots/webui.py`: Web-UI per Playwright (Chromium) mit gemockter API, Ausgabe `screenshots/web/`: `desktop_1280x800.png`, `mobile_390x844.png`.
 - Beides läuft in `.github/workflows/screenshots.yml` bei Änderungen an `src`, `include` und `tools/screenshots`. Dateinamen sind englisch.
 - Die Harness-Szenen sind nicht das Gerät. Touch und Farben auf dem Display können abweichen.

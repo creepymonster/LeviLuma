@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <NimBLEDevice.h>
 #include <lvgl.h>
+#include "lv_theme_shadcn.h"
 #include "LGFX_Board.h"
 #include "LotusProtocol.h"
 #include "Web.h"
@@ -39,7 +40,7 @@ alignas(4) static uint8_t drawBuf2[240*24*2];  // zweiter Puffer: LVGL rendert, 
 static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
-static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
+static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
 static lv_obj_t *btIcon=nullptr,*wifiIcon=nullptr;
 static lv_image_dsc_t btDsc{};
 static lv_image_dsc_t wifiDsc{};
@@ -131,19 +132,11 @@ struct UiView { bool on,ble,wifi,active; uint8_t r,g,b,brightness; int8_t select
 static UiView uiLast{};
 static bool uiInit=false;
 static void updatePowerUI(const UiView &v){
-  // Farbklima (AGENTS.md): An-Pille gelb gefuellt mit schwarzer Schrift, Aus-Pille dunkel mit gelbem Rahmen.
-  const lv_color_t yellow=lv_color_hex(0xFFE66D), surface=lv_color_hex(0x13141A), muted=lv_color_hex(0x9AA3AE);
-  if(v.on){
-    lv_obj_set_style_bg_color(center,yellow,0);lv_obj_set_style_border_width(center,0,0);
-  }else{
-    lv_obj_set_style_bg_color(center,surface,0);lv_obj_set_style_border_color(center,yellow,0);lv_obj_set_style_border_width(center,2,0);
-  }
-  lv_color_t fg=v.on?lv_color_hex(0x000000):muted;
-  lv_obj_set_style_text_color(pillLbl,fg,0);lv_obj_set_style_text_color(pillLbl2,fg,0);
+  // Farben kommen vom Theme: An = Primaerfarbe (gefuellt), Aus = Outline
+  lv_theme_shadcn_set_variant(center,v.on?LV_THEME_SHADCN_VARIANT_DEFAULT:LV_THEME_SHADCN_VARIANT_OUTLINE);
   // Mitte: An/Aus ist auch ausgeschaltet bedienbar, sobald verbunden
   setEnabled(center,v.ble,v.on?LV_OPA_COVER:LV_OPA_60);   // ohne BLE: halbtransparent und nicht bedienbar
   lv_label_set_text(pillLbl,v.on?"Ausschalten":"Einschalten");
-  lv_label_set_text(pillLbl2,v.on?"Ausschalten":"Einschalten");
 }
 static void updateConnectionUI(const UiView &v){
   // Statuspunkte: gruen verbunden, rot getrennt
@@ -152,7 +145,6 @@ static void updateConnectionUI(const UiView &v){
   lv_obj_set_style_bg_color(statusPwr,v.power==1?lv_color_hex(0x79DA89):v.power==0?lv_color_hex(0xE5484D):lv_color_hex(0xFFFFFF),0);
 }
 static void updateBrightnessUI(const UiView &v){
-  lv_obj_set_style_bg_color(bar,lv_color_hex(0xFFE66D),LV_PART_INDICATOR);
   setEnabled(bar,v.active);
   setEnabled(barLbl,v.active);
   if(lv_slider_get_value(bar)!=v.brightness)lv_slider_set_value(bar,v.brightness,LV_ANIM_OFF);
@@ -243,13 +235,22 @@ static void centerClicked(lv_event_t *e){ // LONG_PRESSED
   setPower(snapshot().power!=1);
 }
 
+// Farbklima und Typografie: shadcn-Theme (lvgl_theme_shadcn), dunkel, Primaerfarbe Gelb.
+static lv_theme_shadcn_palette_t themePalette{};
+static void themeInit(lv_display_t *disp){
+  static const lv_theme_shadcn_fonts_t fonts={.small=&lv_font_montserrat_16,.normal=&lv_font_montserrat_16,.large=&lv_font_montserrat_28,
+                                              .h1=&lv_font_montserrat_48,.h2=&lv_font_montserrat_32,.h3=&lv_font_montserrat_28};
+  lv_theme_shadcn_palette_from_primary(&themePalette,lv_theme_shadcn_palette_zinc_dark(),lv_color_hex(0xFFE66D),lv_color_hex(0x111111));
+  lv_theme_shadcn_init(disp,&themePalette,&fonts,LV_THEME_SHADCN_FLAG_NONE);
+}
 static void makeUI(){
+  themeInit(lv_display_get_default());
   lv_obj_t *screen=lv_screen_active();
-  lv_obj_set_style_bg_color(screen,lv_color_hex(0x000000),0);lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
   // Drei Kacheln nebeneinander: links Helligkeit, Mitte An/Aus (Start), rechts Farben
   // LVGL-Tileview: drei Kacheln, Wischen links/rechts blaettert
   tv=lv_tileview_create(screen);lv_obj_set_size(tv,240,240);lv_obj_center(tv);
-  lv_obj_set_style_bg_color(tv,lv_color_hex(0x000000),0);lv_obj_set_style_bg_opa(tv,LV_OPA_COVER,0);
+  lv_obj_set_style_bg_opa(tv,LV_OPA_TRANSP,0);
   lv_obj_set_style_border_width(tv,0,0);lv_obj_set_style_pad_all(tv,0,0);lv_obj_set_scrollbar_mode(tv,LV_SCROLLBAR_MODE_OFF);
   // Untereinander: An/Aus oben, Farbe in der Mitte, Helligkeit unten (Wischen nur vertikal)
   tilePower=lv_tileview_add_tile(tv,0,0,(lv_dir_t)LV_DIR_BOTTOM);
@@ -262,15 +263,11 @@ static void makeUI(){
   // Helligkeit: vertikaler Balken, Prozent oben
   // Helligkeit: waagerechte Spur, darueber der Prozentwert mit etwas Abstand
   bar=lv_slider_create(tileBright);lv_slider_set_range(bar,1,100);lv_obj_set_size(bar,180,18);lv_obj_align(bar,LV_ALIGN_CENTER,0,22);
-  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(bar,lv_color_hex(0x3A3C48),LV_PART_MAIN);lv_obj_set_style_border_width(bar,1,LV_PART_MAIN);lv_obj_set_style_border_color(bar,lv_color_hex(0x5A5D6B),LV_PART_MAIN);
-  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_INDICATOR);lv_obj_set_style_border_width(bar,0,LV_PART_INDICATOR);
-  lv_obj_set_style_radius(bar,LV_RADIUS_CIRCLE,LV_PART_KNOB);lv_obj_set_style_bg_color(bar,lv_color_white(),LV_PART_KNOB);lv_obj_set_style_bg_opa(bar,LV_OPA_COVER,LV_PART_KNOB);
-  lv_obj_set_style_border_width(bar,0,LV_PART_KNOB);lv_obj_set_style_shadow_width(bar,0,LV_PART_KNOB);lv_obj_set_style_pad_all(bar,6,LV_PART_KNOB);
   lv_obj_add_event_cb(bar,barChanged,LV_EVENT_VALUE_CHANGED,nullptr);
-  barLbl=lv_label_create(tileBright);lv_obj_set_style_text_color(barLbl,lv_color_white(),0);lv_obj_set_style_text_font(barLbl,&lv_font_montserrat_28,0);lv_obj_align(barLbl,LV_ALIGN_CENTER,0,-14);
+  barLbl=lv_label_create(tileBright);lv_obj_set_style_text_font(barLbl,&lv_font_montserrat_28,0);lv_obj_align(barLbl,LV_ALIGN_CENTER,0,-14);
 
   // Mitte: An/Aus mit Halten
-  center=lv_obj_create(tilePower);lv_obj_set_size(center,150,48);lv_obj_center(center);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);
+  center=lv_button_create(tilePower);lv_obj_set_size(center,150,48);lv_obj_center(center);lv_obj_add_flag(center,LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(center,centerPressed,LV_EVENT_PRESSED,nullptr);lv_obj_add_event_cb(center,centerReleased,LV_EVENT_RELEASED,nullptr);
   lv_obj_add_event_cb(center,centerReleased,LV_EVENT_PRESS_LOST,nullptr);lv_obj_add_event_cb(center,centerClicked,LV_EVENT_LONG_PRESSED,nullptr);
   lv_obj_set_style_radius(center,LV_RADIUS_CIRCLE,0);lv_obj_set_style_clip_corner(center,true,0);lv_obj_set_style_border_width(center,0,0);lv_obj_set_style_pad_all(center,0,0);
@@ -281,8 +278,7 @@ static void makeUI(){
   lv_obj_set_style_bg_color(holdFill,lv_color_white(),0);lv_obj_set_style_bg_opa(holdFill,LV_OPA_20,0);
   lv_obj_remove_flag(holdFill,LV_OBJ_FLAG_CLICKABLE);lv_obj_align(holdFill,LV_ALIGN_LEFT_MID,0,0);
   // Halbfett: die Beschriftung zweimal mit 1 px Versatz (LVGL hat keine fette Montserrat-Variante)
-  pillLbl=lv_label_create(center);lv_obj_set_style_text_color(pillLbl,lv_color_hex(0x000000),0);lv_obj_align(pillLbl,LV_ALIGN_CENTER,-1,0);
-  pillLbl2=lv_label_create(center);lv_obj_set_style_text_color(pillLbl2,lv_color_hex(0x000000),0);lv_obj_align(pillLbl2,LV_ALIGN_CENTER,0,0);
+  pillLbl=lv_label_create(center);lv_obj_set_style_text_font(pillLbl,&lv_font_montserrat_16,0);lv_obj_center(pillLbl);
   // Statuspunkte oben: links WLAN (W), rechts Bluetooth (B)
   statusWifi=lv_obj_create(tilePower);lv_obj_set_size(statusWifi,10,10);lv_obj_set_style_radius(statusWifi,LV_RADIUS_CIRCLE,0);
   lv_obj_set_style_border_width(statusWifi,0,0);lv_obj_align(statusWifi,LV_ALIGN_TOP_MID,-22,22);
@@ -322,8 +318,8 @@ static void makeUI(){
     float a=-1.5707963f+6.2831853f*k/nDots;
     lv_obj_align(dots[k],LV_ALIGN_CENTER,(int)lroundf(cosf(a)*ringR),(int)lroundf(sinf(a)*ringR));
   }
-  pickerName=lv_label_create(tileColor);lv_obj_set_style_text_color(pickerName,lv_color_white(),0);lv_obj_set_style_text_font(pickerName,&lv_font_montserrat_16,0);lv_obj_align(pickerName,LV_ALIGN_CENTER,0,-10);
-  pickerHex=lv_label_create(tileColor);lv_obj_set_style_text_color(pickerHex,lv_color_hex(0x9AA3AE),0);lv_obj_set_style_text_font(pickerHex,&lv_font_montserrat_16,0);lv_obj_align(pickerHex,LV_ALIGN_CENTER,0,12);
+  pickerName=lv_label_create(tileColor);lv_obj_set_style_text_font(pickerName,&lv_font_montserrat_16,0);lv_obj_align(pickerName,LV_ALIGN_CENTER,0,-10);
+  pickerHex=lv_label_create(tileColor);lv_theme_shadcn_set_text_role(pickerHex,LV_THEME_SHADCN_TEXT_MUTED);lv_obj_set_style_text_font(pickerHex,&lv_font_montserrat_16,0);lv_obj_align(pickerHex,LV_ALIGN_CENTER,0,12);
   lv_obj_add_flag(tileColor,LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(tileColor,nextColorClicked,LV_EVENT_CLICKED,nullptr);
   updateUI();

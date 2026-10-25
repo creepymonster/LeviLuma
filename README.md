@@ -3,7 +3,7 @@
 Firmware für den Waveshare ESP32-S3-Touch-LCD-1.28 (rundes Display), die einen BLE-LED-Strip der ELK-/Lotus-Lantern-Familie steuert.
 Die Bedienung läuft am Display (Touch) und über eine Weboberfläche im WLAN.
 
-Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9, NimBLE-Arduino.
+Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9.6, lvgl_theme_shadcn (Dark Mode), NimBLE-Arduino.
 
 ## Start
 1. `include/Config.example.h` nach `include/Config.h` kopieren und WLAN-Zugangsdaten eintragen. `Config.h` nicht ins Repo committen.

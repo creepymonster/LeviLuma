@@ -2,6 +2,7 @@
 // Kompiliert die echte UI-Logik aus src/main.cpp (vom Skript render.sh extrahiert, als ui_part.inc)
 // gegen LVGL und rendert vier feste Zustaende in PPM-Dateien. Hardware (LovyanGFX, BLE, WLAN) ist gestubbt.
 #include "lvgl.h"
+#include "lv_theme_shadcn.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

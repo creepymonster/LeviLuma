@@ -23,12 +23,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: LVGL 9.2.0 holen
+      - name: LVGL 9.6.0 holen
         uses: actions/checkout@v5
         with:
           repository: lvgl/lvgl
-          ref: v9.2.0
+          ref: v9.6.0
           path: .lvgl
+
+      - name: shadcn-Theme holen
+        uses: actions/checkout@v5
+        with:
+          repository: AlixANNERAUD/lvgl_theme_shadcn
+          ref: v0.3.1
+          path: .theme
 
       - name: Pillow und Playwright installieren
         run: |
@@ -36,7 +43,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Screenshots rendern
-        run: tools/screenshots/render.sh . .lvgl screenshots
+        run: tools/screenshots/render.sh . .lvgl .theme screenshots
 
       - name: Web-UI-Screenshots rendern (Desktop und mobil)
         run: python3 tools/screenshots/webui.py . screenshots
