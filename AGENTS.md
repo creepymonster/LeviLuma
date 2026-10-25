@@ -87,7 +87,7 @@ Festgelegt. Schwarzer Hintergrund, zwei Akzente aus der Palette. Die LED-Farbe e
 
 Regeln: Nur die beiden Akzente plus Neutraltöne. Keine Schatten oder Glows. Text mindestens 4,5:1 Kontrast zu seinem Untergrund (WCAG AA).
 
-Noch nicht im Code umgesetzt. Dafür gilt die Vorlage in `tools/screenshots/` als Prüfung: Die Screenshots zeigen dann den Stand im Code.
+Noch nicht im Code umgesetzt. Nach der Umsetzung zeigen die Screenshots in `screenshots/` den Stand im Code.
 
 ### Web-UI
 - Eine Seite, ausgeliefert aus `WebUi.h`. Drei Karten untereinander in derselben Reihenfolge wie am Display (An/Aus, Farbe, Helligkeit).
