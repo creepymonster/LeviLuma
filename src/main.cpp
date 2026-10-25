@@ -414,14 +414,14 @@ void setup(){
   LEVI_LOG("LeviLuma startet");
   stateInit();
   ledcSetup(0,5000,8);ledcAttachPin(2,0);backlight(0);
-  lcd.init();
+  lcd.init();LEVI_LOG("DBG: lcd.init fertig");
 #ifndef LEVI_DISPLAY_ROTATION
 #define LEVI_DISPLAY_ROTATION 0
 #endif
   lcd.setRotation(LEVI_DISPLAY_ROTATION/90); // LovyanGFX: 0=0 Grad, 1=90, 2=180, 3=270
-  lcd.fillScreen(TFT_BLACK);
+  lcd.fillScreen(TFT_BLACK);LEVI_LOG("DBG: fillScreen fertig");
   lcd.startWrite();   // Bus fuer die DMA-Uebertragungen dauerhaft belegen (Display ist der einzige SPI-Teilnehmer)
-  lv_init();
+  lv_init();LEVI_LOG("DBG: lv_init fertig");
   lv_tick_set_cb(levTickMs); // LVGL-Zeitbasis: Animationen, Long-Press, Timer
   display=lv_display_create(W,H);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565);
   lv_display_set_buffers(display,drawBuf,drawBuf2,sizeof(drawBuf),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
@@ -429,7 +429,7 @@ void setup(){
 #if LEVI_TOUCH_TEST
   touchTestInit();
 #else
-  makeUI();
+  makeUI();LEVI_LOG("DBG: makeUI fertig");
 #endif
   lv_timer_handler();backlight(255);lastTouchMs=millis();wifiConnect();webStart();
   bleStart();
