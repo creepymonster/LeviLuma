@@ -11,6 +11,7 @@
 #include "Palette.h"
 #include "BulbIcon.h"
 #include "WifiIcon.h"
+#include "BluetoothIcon.h"
 
 // --- Stubs fuer Arduino/ESP-Teile ---
 static uint32_t millis(){return 0;}

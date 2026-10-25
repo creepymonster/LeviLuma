@@ -11,6 +11,7 @@
 #include "Palette.h"
 #include "BulbIcon.h"
 #include "WifiIcon.h"
+#include "BluetoothIcon.h"
 #include "CalibCore.h"
 #include "AppState.h"
 #include "Ble.h"
@@ -39,7 +40,8 @@ static lv_display_t *display=nullptr;
 static lv_indev_t *input=nullptr;
 static lv_obj_t *tv=nullptr,*tileBright=nullptr,*tilePower=nullptr,*tileColor=nullptr;
 static lv_obj_t *bar=nullptr,*barLbl=nullptr,*center=nullptr,*pillLbl=nullptr,*pillLbl2=nullptr,*holdFill=nullptr,*statusWifi=nullptr,*statusBle=nullptr;
-static lv_obj_t *lblBle=nullptr,*wifiIcon=nullptr;
+static lv_obj_t *btIcon=nullptr,*wifiIcon=nullptr;
+static lv_image_dsc_t btDsc{};
 static lv_image_dsc_t wifiDsc{};
 static lv_obj_t *statusPwr=nullptr,*bulbImg=nullptr;   // Einschalt-Status (weiss unbekannt, rot aus, gruen an) mit Gluehbirne
 static lv_image_dsc_t bulbDsc{};
@@ -302,8 +304,13 @@ static void makeUI(){
   wifiIcon=lv_image_create(tilePower);lv_image_set_src(wifiIcon,&wifiDsc);
   lv_obj_set_style_image_recolor(wifiIcon,lv_color_hex(0x9AA3AE),0);lv_obj_set_style_image_recolor_opa(wifiIcon,LV_OPA_COVER,0);
   lv_obj_align_to(wifiIcon,statusWifi,LV_ALIGN_OUT_LEFT_MID,-4,0);
-  lblBle=lv_label_create(tilePower);lv_label_set_text(lblBle,"B");lv_obj_set_style_text_color(lblBle,lv_color_hex(0x9AA3AE),0);
-  lv_obj_align_to(lblBle,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
+  // Bluetooth-Rune rechts vom BLE-Kreis (A8-Bitmap, gleiche Farbe wie das WLAN-Symbol)
+  btDsc.header.magic=LV_IMAGE_HEADER_MAGIC;btDsc.header.cf=LV_COLOR_FORMAT_A8;btDsc.header.flags=0;
+  btDsc.header.w=16;btDsc.header.h=16;btDsc.header.stride=16;btDsc.header.reserved_2=0;
+  btDsc.data_size=sizeof(kBtA8);btDsc.data=kBtA8;
+  btIcon=lv_image_create(tilePower);lv_image_set_src(btIcon,&btDsc);
+  lv_obj_set_style_image_recolor(btIcon,lv_color_hex(0x9AA3AE),0);lv_obj_set_style_image_recolor_opa(btIcon,LV_OPA_COVER,0);
+  lv_obj_align_to(btIcon,statusBle,LV_ALIGN_OUT_RIGHT_MID,4,0);
 
   // Farbpunkte auf einem Kreis (passt zum runden Display), oben beginnend, im Uhrzeigersinn. Letzter Punkt: Musik.
   const int nDots=LeviPalette::N+1;
