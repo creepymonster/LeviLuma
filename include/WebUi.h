@@ -58,7 +58,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(
   <p class="muted center" id="calInfo"></p>
 </div>
 </section>
-<footer><div class="footline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round"><path d="M2 8a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1" fill="#888"/></svg>LeviLuma · ESP32-S3 · Lokale Steuerung</div><p class="note" title="Der LED-Controller bestätigt seinen Zustand nicht.">AN/AUS zeigt den zuletzt gesetzten Zustand, keine Bestätigung durch die LED.</p></footer></div>
+<footer><div class="footline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round"><path d="M2 8a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1" fill="#888"/></svg>LeviLuma · ESP32-S3 · Lokale Steuerung</div></footer></div>
 <script>
 const $=id=>document.getElementById(id);let palette=[];let s={power:'unknown',r:139,g:92,b:246,brightness:75},editingUntil=0,sendTimer;
 const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),hex=()=>('#'+[s.r,s.g,s.b].map(v=>v.toString(16).padStart(2,'0')).join(''));
@@ -69,7 +69,7 @@ fetch('/api/palette',{cache:'no-store'}).then(r=>r.json()).then(j=>{palette=j.co
 function render(){let h=hex();let on=s.power==='on';document.querySelectorAll('.brightnessline,#brightness,#swatches').forEach(el=>el.classList.toggle('locked',!on));$('sample').style.background=h;$('hex').textContent=h.toUpperCase();$('color').value=h;
 $('value').textContent=s.brightness+'%';$('brightness').value=s.brightness;$('brightness').style.setProperty('--p',((s.brightness-1)/99*100)+'%');let pct=(s.brightness-1)/99*100;$('brightness').style.background='linear-gradient(to right,#191919 '+pct+'%,#e5e5e5 '+pct+'%)';
 {let pw=$('pwr');pw.className='dot'+(s.power==='on'?' ok':s.power==='off'?'':' unk');pw.title=s.power==='on'?'Eingeschaltet (grün)':s.power==='off'?'Ausgeschaltet (rot)':'Status unbekannt (weiß)';}$('power').textContent=s.power==='on'?'Ausschalten':'Einschalten';
-[...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&!!palette[i]&&palette[i].hex===h));let pi=palette.findIndex(c=>c.hex===h);$('pname').textContent=s.music?'Musik':(pi>=0?palette[pi].name:'Eigene Farbe');}
+[...$('swatches').children].forEach((b,i)=>b.classList.toggle('sel',!s.music&&!!palette[i]&&palette[i].hex===h));let pi=palette.findIndex(c=>c.hex===h);$('pname').textContent=s.music?'Musik':(pi>=0?palette[pi].name:'');}
 function refresh(){fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(d=>{let w=$('wifi');w.title=d.wifi?'WLAN verbunden':'WLAN getrennt';w.className='dot'+(d.wifi?' ok':'');let b=$('ble');b.title=d.ble?'BLE verbunden':'BLE getrennt';b.className='dot'+(d.ble?' ok':'');if(Date.now()>editingUntil){s=d;render();}}).catch(()=>{$('wifi').title='ESP offline';$('wifi').className='dot';$('ble').title='ESP offline';$('ble').className='dot';});}
 const togglePower=()=>{let on=s.power!=='on';s.power=on?'on':'off';render();post('/api/power?on='+(on?1:0))};
 $('power').onclick=togglePower;
