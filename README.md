@@ -5,6 +5,22 @@ Die Bedienung läuft am Display (Touch) und über eine Weboberfläche im WLAN.
 
 Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9.6, lvgl_theme_shadcn (Dark Mode), NimBLE-Arduino.
 
+## Screenshots
+
+Die Bilder werden bei jeder Änderung an Firmware oder UI automatisch neu erzeugt (GitHub Action `screenshots.yml`).
+
+**Display (240×240)**
+
+| Aus, ohne Verbindung | An | Farbauswahl | Helligkeit |
+|---|---|---|---|
+| ![Aus](screenshots/240x240/01_off_disconnected.png) | ![An](screenshots/240x240/02_on_center.png) | ![Farbe](screenshots/240x240/03_color.png) | ![Helligkeit](screenshots/240x240/04_brightness.png) |
+
+**Weboberfläche**
+
+| Desktop (1280×800) | Mobil (390×844) |
+|---|---|
+| ![Desktop](screenshots/web/desktop_1280x800.png) | ![Mobil](screenshots/web/mobile_390x844.png) |
+
 ## Start
 1. `include/Config.example.h` nach `include/Config.h` kopieren und WLAN-Zugangsdaten eintragen. `Config.h` nicht ins Repo committen.
 2. Projektordner in VS Code mit PlatformIO öffnen.
@@ -13,10 +29,10 @@ Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9.6, lvgl_them
 
 ## Bedienung
 **Display:** Drei Seiten untereinander: oben An/Aus, Mitte Farbe, unten Helligkeit. Hoch und runter wischen wechselt die Seite.
-- An/Aus: die Pille 500 ms halten.
+- An/Aus: die Pille etwa 100 ms halten.
 - Farbe: Tippen springt zur nächsten Farbe, am Ende wieder vorn.
 - Helligkeit: Balken wischen oder tippen.
-- Nach längerer Pause springt die Anzeige zurück auf An/Aus, und das Display wird gedimmt.
+- Nach längerer Pause springt die Anzeige zurück auf An/Aus; nach 20 Sekunden ohne Berührung schaltet sich die Hintergrundbeleuchtung aus. Eine Berührung schaltet sie wieder ein.
 
 **Web:** Dieselben drei Karten untereinander, dazu Kalibrierung der Farben.
 
@@ -28,9 +44,9 @@ Optional, mit Standardwert (alle in `Config.example.h` dokumentiert):
 - `LEVI_TOUCH_OFFSET_ROTATION` – Touch-Drehung in LovyanGFX (0–7). Muss für die Montage am Gerät geprüft werden.
 - `LEVI_TOUCH_BRIDGE_MS` – Überbrückung kurzer Touch-Aussetzer (Standard 40 ms).
 - `LEVI_PICKER_LIST` – Farbset des Farbwählers (LCD und Web) mit Namen: `LEVI_PICKER_ENTRY("Name", R, G, B)`, 1–24 Einträge, Name höchstens 15 Zeichen. Unabhängig von der Kalibrierung.
+- `LEVI_NAME` – Anzeigename in der Weboberfläche (Kopf, Fuß, Seitentitel), Standard `LeviLuma`. Der Netzwerkname bleibt `LEVI_WIFI_HOSTNAME`.
 - `LEVI_TOUCH_TEST` – 1 zeigt nur einen Touch-Testscreen: Tippen zeichnet einen Kreis mit den Koordinaten.
 - `LEVI_RGB565_SWAP` – Byte-Reihenfolge der Display-Übertragung (Standard 1). Bei vertauschten Farben auf 0 setzen.
-- `LEVI_FLUSH_STATS` – 1 loggt alle 5 s die Wartezeiten auf die Display-Übertragung.
 - `LEVI_RECENTER_MS` – Zeit ohne Bedienung bis zur Rückkehr auf An/Aus (Standard 60000).
 - `LEVI_DISPLAY_SPI_MHZ`, `LEVI_DISPLAY_INVERT`, `LEVI_BACKLIGHT_ACTIVE_HIGH`, `LEVI_BRIGHTNESS_MAX`
 - `LEVI_CALIB_*`, `LEVI_CALIB_POINTS` – Standard-Kalibrierung. Eigene Kalibrierung über die Web-Oberfläche.
@@ -49,7 +65,7 @@ Die API hat keine Authentifizierung. Nur in einem vertrauenswürdigen Netz betre
 | `POST /api/music?on=0\|1` | Musikmodus |
 | `GET /api/calib` | Kalibrierung lesen |
 | `GET /api/palette` | Farbset als JSON: `colors` mit `name` und `hex`, dazu `music` |
-| `POST /api/calib?p=…` | 51 Werte (17 Farben × RGB, je 0–255) speichern |
+| `POST /api/calib?p=…` | 30 Werte (10 Farben × RGB, je 0–255) speichern |
 | `POST /api/calib/reset` | Kalibrierung auf den Standard zurücksetzen |
 
 `sentRevision` zeigt, bis zu welcher Änderung alle Befehle an das Band gesendet wurden. Das ist eine Sendebestätigung, keine Bestätigung, dass das Band sie ausgeführt hat.
