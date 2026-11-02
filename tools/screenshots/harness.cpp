@@ -16,6 +16,7 @@
 
 // --- Stubs fuer Arduino/ESP-Teile ---
 static uint32_t millis(){return 0;}
+#define LEVI_LOG(...) ((void)0)   // Logging ist in der Harness stumm
 static void ledcWrite(int,int){}
 #define LEVI_BACKLIGHT_ACTIVE_HIGH true
 enum wl_status_t{WL_IDLE_STATUS=0,WL_CONNECTED=3};

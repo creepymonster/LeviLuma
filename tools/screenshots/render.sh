@@ -7,13 +7,15 @@ REPO="$(cd "$1" && pwd)"; LVGL="$(cd "$2" && pwd)"; THEME="$(cd "$3" && pwd)"; O
 BUILD="$(mktemp -d)"
 
 # Aufloesung aus main.cpp: Unterordner je Display, z. B. screenshots/240x240/
-res_w=$(grep -o 'static constexpr uint16_t W=[0-9]*' "$REPO/src/main.cpp" | grep -o '[0-9]*$')
-res_h=$(grep -o 'H=[0-9]*' "$REPO/src/main.cpp" | head -1 | grep -o '[0-9]*$')
+# Leerzeichen um '=' sind erlaubt (z. B. "W = 240, H = 240").
+dim_line=$(grep -E '^static constexpr uint16_t W *= *[0-9]+' "$REPO/src/main.cpp" | head -1)
+res_w=$(echo "$dim_line" | sed -E 's/.*W *= *([0-9]+).*/\1/')
+res_h=$(echo "$dim_line" | sed -E 's/.*H *= *([0-9]+).*/\1/')
 OUT="$OUT_ROOT/${res_w}x${res_h}"
 mkdir -p "$OUT"
 
 # UI-Abschnitt aus main.cpp: von den Zustandsvariablen bis vor wlStatusName (Flush, Touch, UI, Farben)
-start=$(grep -n '^static constexpr uint16_t W=240' "$REPO/src/main.cpp" | head -1 | cut -d: -f1)
+start=$(grep -nE '^static constexpr uint16_t W *= *[0-9]+' "$REPO/src/main.cpp" | head -1 | cut -d: -f1)
 end=$(grep -n '^static const char \*wlStatusName' "$REPO/src/main.cpp" | head -1 | cut -d: -f1)
 sed -n "${start},$((end-1))p" "$REPO/src/main.cpp" > "$BUILD/ui_part.inc"
 
