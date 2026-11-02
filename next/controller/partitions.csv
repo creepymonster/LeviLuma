@@ -1,0 +1,6 @@
+# LeviLuma Controller, 16 MB Flash
+# Name,   Type, SubType, Offset,  Size
+nvs,      data, nvs,     ,        0x20000
+phy_init, data, phy,     ,        0x1000
+factory,  app,  factory, ,        0x400000
+zb_fct,   data, fat,     ,        0x1000

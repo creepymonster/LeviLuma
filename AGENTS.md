@@ -1,10 +1,15 @@
 # AGENTS.md – Hinweise für KI-Agenten
 
-Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten. Kurz: Firmware für einen ESP32-S3 mit rundem Touch-Display, die einen BLE-LED-Strip steuert. Die README enthält Nutzerdokumentation, dieses Dokument enthält das, was man für sicheres Arbeiten im Code wissen muss.
+Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten. Das Repository enthält drei unabhängige Firmware-Projekte:
+
+- **Legacy** (`legacy/`): Firmware für einen ESP32-S3 mit rundem Touch-Display, die einen BLE-LED-Strip direkt steuert (PlatformIO, Arduino). Alle Abschnitte bis „LeviLuma Next“ beschreiben dieses Projekt; **Pfade dort sind relativ zu `legacy/`** (z. B. `src/main.cpp` = `legacy/src/main.cpp`).
+- **Next Controller** (`next/controller/`, ESP32-C5) und **Next Gateway** (`next/gateway/`, XIAO ESP32S3), beide natives ESP-IDF, siehe Abschnitt „LeviLuma Next“.
+
+Die READMEs (`README.md`, `legacy/README.md`, `next/README.md`) enthalten Nutzerdokumentation, dieses Dokument enthält das, was man für sicheres Arbeiten im Code wissen muss.
 
 Die Kommunikation mit dem Entwickler (Reimar) läuft auf Deutsch. Kommentare, Log-Meldungen und UI-Texte sind ebenfalls deutsch.
 
-## Was das Projekt macht
+## Was das Projekt macht (Legacy)
 
 LeviLuma steuert einen LED-Strip der ELK-/Lotus-Lantern-Familie über BLE (Service `0xFFF0`, Schreib-Characteristic `0xFFF3`, 9-Byte-Pakete mit Start `0x7E` und Ende `0xEF`). Die Steuerung läuft über zwei Oberflächen, die denselben Zustand verändern:
 
@@ -106,12 +111,12 @@ Regeln: Keine Farben für Bedienelemente (Pille, Regler, Text, Hintergrund) übe
 - **Keine Authentifizierung.** Die API ist nur für vertrauenswürdige Netze gedacht (steht in der README).
 
 ## Konfiguration
-- Die echte Konfiguration liegt in `include/Config.h`. Diese Datei ist per `.gitignore` ausgeschlossen und enthält WLAN-Zugangsdaten. **Niemals committen, nie echte Zugangsdaten in andere Dateien schreiben.**
+- Die echte Konfiguration liegt in `legacy/include/Config.h`. Diese Datei ist per `.gitignore` ausgeschlossen und enthält WLAN-Zugangsdaten. **Niemals committen, nie echte Zugangsdaten in andere Dateien schreiben.**
 - `include/Config.example.h` ist die Vorlage. Sie enthält nur Platzhalter und die optionalen Einstellungen als Kommentar. Neue Optionen dort dokumentieren, mit ihrem Standardwert.
 - Optionen werden im Code mit `#ifndef … #define … #endif` mit Standardwert versehen.
 
 ## Build und Test
-- PlatformIO, Umgebung `waveshare_esp32s3`, Framework Arduino, Plattform `espressif32@6.10.0`.
+- PlatformIO, Umgebung `waveshare_esp32s3`, Framework Arduino, Plattform `espressif32@6.10.0`. Bauen aus dem Repository-Wurzelordner: `pio run -d legacy`.
 - Bibliotheken: LovyanGFX `^1.2.7`, LVGL `^9.6.0`, `lvgl_theme_shadcn` `^0.3.1`, NimBLE-Arduino `^1.4.3`.
 - Der Entwickler baut und testet **lokal auf der Hardware**. Behauptungen über Build- oder Testergebnisse nur machen, wenn sie tatsächlich ausgeführt wurden. Im Zweifel sagen, dass es nicht geprüft wurde.
 - Logging: `LEVI_LOG(...)` schreibt auf die Konsole (`printf`), nicht auf `Serial`.
@@ -128,10 +133,26 @@ Regeln: Keine Farben für Bedienelemente (Pille, Regler, Text, Hintergrund) übe
 - **Keine Schnellschüsse bei Refactorings.** Das Projekt ist gerade in Module aufgeteilt (`ble`, `web`, `state`). Dabei Abhängigkeiten über `AppState.h` führen.
 
 ## Screenshots
-- `tools/screenshots/render.sh`: LCD-UI per Harness (LVGL 9.6.0 mit Theme, Framebuffer), Aufruf `render.sh <repo> <lvgl-src> <theme-src> <out-root>`, Ausgabe `<out-root>/<B>x<H>/`, Dateien `01_off_disconnected`, `02_on_center`, `03_color`, `04_brightness`.
-- `tools/screenshots/webui.py`: Web-UI per Playwright (Chromium) mit gemockter API, Ausgabe `screenshots/web/`: `desktop_1280x800.png`, `mobile_390x844.png`.
-- Beides läuft in `.github/workflows/screenshots.yml` bei Änderungen an `src`, `include` und `tools/screenshots`. Dateinamen sind englisch.
+- `legacy/tools/screenshots/render.sh`: LCD-UI per Harness (LVGL 9.6.0 mit Theme, Framebuffer), Aufruf `render.sh <repo> <lvgl-src> <theme-src> <out-root>`, Ausgabe `<out-root>/<B>x<H>/`, Dateien `01_off_disconnected`, `02_on_center`, `03_color`, `04_brightness`.
+- `legacy/tools/screenshots/webui.py`: Web-UI per Playwright (Chromium) mit gemockter API, Ausgabe `legacy/screenshots/web/`: `desktop_1280x800.png`, `mobile_390x844.png`.
+- Beides läuft in `.github/workflows/screenshots.yml` bei Änderungen an `legacy/src`, `legacy/include` und `legacy/tools/screenshots`. Dateinamen sind englisch.
 - Die Harness-Szenen sind nicht das Gerät. Touch und Farben auf dem Display können abweichen.
+
+## LeviLuma Next
+
+Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/shared/`. Nutzerdoku: `next/README.md`, `next/docs/`.
+
+- **Autoritativer Zustand:** Das Gateway (XIAO) hält den LightState und die Kalibrierung seiner Leiste. Der Controller zeigt nur bestätigte Zustände (STATE-Antworten/-Meldungen). Kein optimistisches Übernehmen von Befehlen; keine zweite Zustandsverwaltung (auch nicht in Zigbee).
+- **Protokoll:** nur in `next/shared/protocol/` ändern, beide Seiten nutzen dieselben Dateien. Version (`LVP_VERSION`) bei inkompatiblen Änderungen erhöhen und `next/docs/ESP_NOW_PROTOKOLL.md` nachziehen. Rahmen ≤ 250 Byte, Little Endian, byteweise Serialisierung.
+- **Hosttestbare Logik** liegt in `gateway/components/light_core/` und `controller/components/controller_core/` (ohne ESP-IDF-Abhängigkeit, NVS über `KvStore`). Neue Logik dorthin, Plattformcode in `main/`. Tests: `next/tests/run_tests.sh` (muss grün sein).
+- **Kopien aus Legacy:** `CalibCore.h`, `ColorMath.h` (Gateway) und `Palette.h` (Controller) sind byte-gleiche Kopien; `LotusProtocol.h` nur ohne `<Arduino.h>`. Änderungen an der Kalibrierung in beiden Projekten konsistent halten.
+- **Nebenläufigkeit Gateway:** `gwLock` für Modell/Kalibrierung/Kopplungen/Handler; BLE-Task nur mit Kopien; ESP-NOW-Callback kopiert nur in eine Queue.
+- **Nebenläufigkeit Controller:** `appLock` (rekursiv) für Register und Link; LVGL nur im LVGL-Task; Zigbee-Lock und App-Lock nie gleichzeitig halten.
+- **Zigbee:** nur mit `CONFIG_LEVILUMA_ZIGBEE_ENABLED` (Standard aus). Ohne Flag kein Zigbee-Code im Build (`main/CMakeLists.txt` über die Build-Eigenschaft `LEVI_WITH_ZIGBEE`). Endpoint-IDs sind stabil und persistent (`ZbMap`); nie umnummerieren.
+- **Sicherheit:** nur ESP-NOW-Bordmittel (PMK/LMK, CCMP). Keine eigene Kryptografie, Schlüssel nie übertragen.
+- **Abhängigkeiten des Controllers** (LVGL 9.6.0, lvgl_theme_shadcn 0.3.1, esp-zigbee-lib) werden per Git nach `next/controller/third_party/` geholt (`cmake/third_party.cmake`), nicht committen.
+- **Hardwaredaten** (Pins, Treiber) nur mit Quelle ändern; Quellen stehen in `next/README.md`. Next ist **nicht am Gerät getestet**; keine Hardwaretests behaupten.
+- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml`.
 
 ## Git-Konventionen
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.

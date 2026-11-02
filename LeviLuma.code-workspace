@@ -1,0 +1,22 @@
+{
+  "folders": [
+    {
+      "name": "Legacy – Waveshare S3",
+      "path": "legacy"
+    },
+    {
+      "name": "Next – RockBase C5",
+      "path": "next/controller"
+    },
+    {
+      "name": "Next – XIAO S3",
+      "path": "next/gateway"
+    }
+  ],
+  "extensions": {
+    "recommendations": [
+      "platformio.platformio-ide",
+      "espressif.esp-idf-extension"
+    ]
+  }
+}

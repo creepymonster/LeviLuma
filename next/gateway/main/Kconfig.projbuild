@@ -1,0 +1,92 @@
+menu "LeviLuma Gateway"
+
+    config LEVILUMA_GW_NAME
+        string "Anzeigename (leer = LeviLuma-XXXX aus der MAC)"
+        default ""
+        help
+            Name, den das Gateway in der Erkennung meldet. Hoechstens 24 Zeichen.
+            Der Controller kann zusaetzlich einen eigenen Anzeigenamen vergeben.
+            Ueber die serielle Konsole (Befehl "name") aenderbar, wird dann im NVS gespeichert.
+
+    config LEVILUMA_GW_KEY
+        string "Individueller Schluessel (32 Hex-Zeichen, leer = ohne Schluessel)"
+        default ""
+        help
+            Optionaler ESP-NOW-LMK (16 Byte) fuer dieses Gateway. Derselbe Schluessel wird beim
+            Koppeln am Controller eingegeben. Er wird nie per Funk uebertragen.
+            Ein im NVS gespeicherter Schluessel (Konsole: "key <hex>") hat Vorrang.
+            Ohne Schluessel: unverschluesselt, Kopplung nur im Kopplungsfenster.
+
+    config LEVILUMA_PAIRING_WINDOW_S
+        int "Kopplungsfenster ohne Schluessel (Sekunden)"
+        range 0 3600
+        default 300
+        help
+            Ohne Schluessel nimmt das Gateway neue Controller nur in diesem Zeitraum nach dem Start
+            oder nach Druck auf die Kopplungstaste an. 0 = nur nach Tastendruck (dann 300 s).
+
+    config LEVILUMA_PAIR_BUTTON_GPIO
+        int "GPIO der Kopplungstaste (-1 = keine)"
+        range -1 48
+        default 0
+        help
+            XIAO ESP32S3: BOOT-Taste an GPIO0 (laut Seeed-Pinbelegung). Low-aktiv mit Pull-up.
+
+    config LEVILUMA_STATUS_LED_GPIO
+        int "GPIO der Status-LED (-1 = keine)"
+        range -1 48
+        default 21
+        help
+            XIAO ESP32S3: User-LED an GPIO21 (laut Seeed-Pinbelegung). Blinkt bei offenem
+            Kopplungsfenster, leuchtet bei BLE-Verbindung. Polaritaet am Geraet pruefen.
+
+    config LEVILUMA_STATUS_LED_ACTIVE_LOW
+        bool "Status-LED leuchtet bei Low"
+        default y
+
+    config LEVILUMA_BRIGHTNESS_MAX
+        int "Helligkeitsbereich des Bandes (100 oder 255)"
+        default 100
+        help
+            Wie Legacy LEVI_BRIGHTNESS_MAX: 100 = Werte 0..100, 255 = Prozent auf 0..255 umgerechnet.
+
+    config LEVILUMA_MIC_EQ_MODE
+        int "Mikrofon-EQ-Modus nach Musik an (0..3)"
+        range 0 3
+        default 0
+        help
+            Wie Legacy LEVI_MIC_EQ_MODE: 0 normal, 1 weich, 2 dynamisch, 3 disko. Am Band ungetestet.
+
+    config LEVILUMA_FADE_STEPS
+        int "Schritte der Farbueberblendung"
+        range 1 50
+        default 1
+        help
+            Wie Legacy LEVI_FADE_STEPS (ein Schritt pro 200-ms-Fenster). 1 = Farbe springt direkt.
+
+    config LEVILUMA_CALIB_GAIN_R
+        int "Standard-Kalibrierung: Gain Rot (Promille)"
+        range 0 2000
+        default 1000
+
+    config LEVILUMA_CALIB_GAIN_G
+        int "Standard-Kalibrierung: Gain Gruen (Promille)"
+        range 0 2000
+        default 690
+
+    config LEVILUMA_CALIB_GAIN_B
+        int "Standard-Kalibrierung: Gain Blau (Promille)"
+        range 0 2000
+        default 940
+        help
+            Standard nach "Kalibrierung zuruecksetzen": lineare Kanal-Gains wie Legacy
+            LEVI_CALIB_GR/GG/GB (1.000/0.690/0.940 = FastLED TypicalSMD5050).
+
+    config LEVILUMA_CALIB_POINTS
+        string "Standard-Kalibrierung: 30 Werte (leer = Gains verwenden)"
+        default ""
+        help
+            Wie Legacy LEVI_CALIB_POINTS: 30 Zahlen 0..255, durch Komma getrennt
+            (10 Zielfarben x R,G,B in der Reihenfolge von CalibCore.h).
+
+endmenu

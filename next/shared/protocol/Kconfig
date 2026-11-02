@@ -1,0 +1,43 @@
+# Gemeinsame Funkeinstellungen. Controller und Gateway muessen hier dieselben Werte haben.
+menu "LeviLuma ESP-NOW"
+
+    config LEVILUMA_ESPNOW_CHANNEL
+        int "WLAN-Kanal fuer ESP-NOW (2,4 GHz)"
+        range 1 13
+        default 1
+        help
+            Controller und Gateways senden und empfangen nur auf diesem Kanal.
+            Muss auf allen Geraeten gleich sein. Der Controller verbindet sich mit keinem WLAN.
+
+    config LEVILUMA_ESPNOW_PMK
+        string "ESP-NOW Primary Master Key (genau 16 Zeichen)"
+        default "LeviLuma-PMK-v01"
+        help
+            Der PMK verschluesselt die individuellen Gateway-Schluessel (LMK) im ESP-NOW-Stack.
+            Muss auf allen Geraeten gleich und genau 16 Zeichen lang sein.
+            Ohne individuellen Gateway-Schluessel ist die Verbindung unverschluesselt.
+
+    config LEVILUMA_BEACON_MS
+        int "Abstand der Gateway-Beacons (ms)"
+        range 500 10000
+        default 2000
+        help
+            Gateways melden sich in diesem Abstand per Broadcast (ANNOUNCE).
+            Der Controller wertet ein Gateway nach drei verpassten Beacons als offline.
+
+    config LEVILUMA_REQUEST_TIMEOUT_MS
+        int "Wartezeit auf eine Antwort (ms)"
+        range 50 2000
+        default 250
+        help
+            Erste Wartezeit auf die Antwort eines Gateways. Jede Wiederholung wartet laenger
+            (lineare Steigerung: 1x, 2x, 3x ...).
+
+    config LEVILUMA_REQUEST_TRIES
+        int "Sendungen pro Anfrage"
+        range 1 10
+        default 4
+        help
+            Anzahl der Sendungen einer Anfrage, bevor sie als gescheitert gilt.
+
+endmenu

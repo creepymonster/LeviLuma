@@ -1,88 +1,69 @@
-# LeviLuma – LED-Steuerung mit Waveshare ESP32-S3 Touch LCD 1.28
+# LeviLuma
 
-Firmware für den Waveshare ESP32-S3-Touch-LCD-1.28 (rundes Display), die einen BLE-LED-Strip der ELK-/Lotus-Lantern-Familie steuert.
-Die Bedienung läuft am Display (Touch) und über eine Weboberfläche im WLAN.
+Steuerung von BLE-LED-Leisten der ELK-/Lotus-Lantern-Familie (`ELK-BLEDDM` u. a.) mit eigenem Touch-Display.
+Das Repository enthält drei unabhängige Firmware-Projekte:
 
-Technik: PlatformIO, Arduino, LovyanGFX (Display und Touch), LVGL 9.6, lvgl_theme_shadcn (Dark Mode), NimBLE-Arduino.
+| Projekt | Ordner | Hardware | Framework | Rolle |
+|---|---|---|---|---|
+| **Legacy** | [`legacy/`](legacy/) | Waveshare ESP32-S3-Touch-LCD-1.28 (rund) | PlatformIO, Arduino | Bisheriges Gerät: Display + Web-UI, steuert eine Leiste direkt per BLE |
+| **Next Controller** | [`next/controller/`](next/controller/) | RockBase NM-CYD-C5 (ESP32-C5, 2,8″) | ESP-IDF 5.5 (nativ) | Zentrale mit LVGL-Oberfläche, steuert Gateways per ESP-NOW, optional Zigbee (FRITZ!Box) |
+| **Next Gateway** | [`next/gateway/`](next/gateway/) | Seeed XIAO ESP32S3 | ESP-IDF 5.5 (nativ) | Je Leiste ein Gateway: BLE zur Leiste, ESP-NOW zum Controller, autoritativer LightState und Kalibrierung |
 
-## Screenshots
+Gemeinsamer Code von Next: [`next/shared/`](next/shared/) (ESP-NOW-Protokoll, Speicher-Hilfen).
+Dokumentation zu Next: [`next/README.md`](next/README.md) und [`next/docs/`](next/docs/).
 
-Die Bilder werden bei jeder Änderung an Firmware oder UI automatisch neu erzeugt (GitHub Action `screenshots.yml`).
+```
+LeviLuma/
+├── LeviLuma.code-workspace   VS-Code-Workspace (alle drei Projekte)
+├── legacy/                   Waveshare-Projekt (PlatformIO), unverändert verschoben
+├── next/
+│   ├── controller/           RockBase NM-CYD-C5 (ESP-IDF, LVGL, optional Zigbee)
+│   ├── gateway/              XIAO ESP32S3 (ESP-IDF, NimBLE, ESP-NOW)
+│   ├── shared/protocol/      gemeinsames ESP-NOW-Protokoll
+│   ├── shared/common/        NVS-Speicher, Schlüsselformat
+│   ├── tests/                Host-Tests (Protokoll, Gateway, Controller)
+│   ├── tools/                Abhängigkeiten holen, UI-Vorschau
+│   └── docs/                 Protokoll, Kopplung, Kalibrierung, Zigbee, Build/Flash
+└── .github/workflows/        CI (Legacy-Build, Legacy-Screenshots, Next)
+```
 
-**Display (240×240)**
+## Schnellstart
 
-| Aus, ohne Verbindung | An | Farbauswahl | Helligkeit |
-|---|---|---|---|
-| ![Aus](screenshots/240x240/01_off_disconnected.png) | ![An](screenshots/240x240/02_on_center.png) | ![Farbe](screenshots/240x240/03_color.png) | ![Helligkeit](screenshots/240x240/04_brightness.png) |
+**VS Code:** `LeviLuma.code-workspace` öffnen. Empfohlen werden die Erweiterungen *PlatformIO IDE* (für Legacy) und *ESP-IDF* (für Next). Jeder Workspace-Ordner ist ein eigenständiges Projekt.
 
-**Weboberfläche**
+**Legacy (PlatformIO):**
+```sh
+cp legacy/include/Config.example.h legacy/include/Config.h   # WLAN-Daten eintragen
+pio run -d legacy                 # bauen
+pio run -d legacy -t upload       # flashen
+```
 
-| Desktop (1280×800) | Mobil (390×844) |
-|---|---|
-| ![Desktop](screenshots/web/desktop_1280x800.png) | ![Mobil](screenshots/web/mobile_390x844.png) |
+**Next (ESP-IDF 5.5):**
+```sh
+. $IDF_PATH/export.sh
+cd next/gateway    && idf.py set-target esp32s3 build flash monitor
+cd next/controller && idf.py set-target esp32c5 build flash monitor
+# Controller mit Zigbee:
+cd next/controller && idf.py -B build-zigbee -D SDKCONFIG=build-zigbee/sdkconfig \
+    -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.zigbee" set-target esp32c5 build
+# Host-Tests (ohne Hardware):
+next/tests/run_tests.sh
+```
 
-## Start
-1. `include/Config.example.h` nach `include/Config.h` kopieren und WLAN-Zugangsdaten eintragen. `Config.h` nicht ins Repo committen.
-2. Projektordner in VS Code mit PlatformIO öffnen.
-3. Build, Upload und Serial Monitor (115200 Baud).
-4. Weboberfläche: `http://leviluma.local/` oder die IP des ESP32.
+Details: [`next/docs/BUILD_FLASH.md`](next/docs/BUILD_FLASH.md).
 
-## Bedienung
-**Display:** Drei Seiten untereinander: oben An/Aus, Mitte Farbe, unten Helligkeit. Hoch und runter wischen wechselt die Seite.
-- An/Aus: die Pille etwa 100 ms halten.
-- Farbe: Tippen springt zur nächsten Farbe, am Ende wieder vorn.
-- Helligkeit: Balken wischen oder tippen.
-- Nach längerer Pause springt die Anzeige zurück auf An/Aus; nach 20 Sekunden ohne Berührung schaltet sich die Hintergrundbeleuchtung aus. Eine Berührung schaltet sie wieder ein.
+## Legacy-Migration
 
-**Web:** Dieselben drei Karten untereinander, dazu Kalibrierung der Farben.
+Das Waveshare-Projekt wurde vollständig per `git mv` nach `legacy/` verschoben (`platformio.ini`, `src/`, `include/`, `tools/screenshots/`, `screenshots/`, `README.md`). Die interne Struktur ist unverändert, am Code wurde nichts geändert.
+Nötige Pfadanpassungen außerhalb von `legacy/`:
 
-## Konfiguration (`include/Config.h`)
-Pflicht: `LEVI_WIFI_SSID`, `LEVI_WIFI_PASSWORD`, `LEVI_WIFI_HOSTNAME`, `LEVI_WIFI_TX_DBM`.
+- `.gitignore`: `include/Config.h` → `legacy/include/Config.h` (die echte Konfiguration mit WLAN-Daten bleibt ausgeschlossen).
+- `.github/workflows/build.yml`: Pfadfilter auf `legacy/…`, Build mit `pio run -d legacy`, Config-Vorlage aus `legacy/include/`.
+- `.github/workflows/screenshots.yml`: Pfadfilter und Aufrufe auf `legacy/…`, Ausgabe nach `legacy/screenshots/`.
 
-Optional, mit Standardwert (alle in `Config.example.h` dokumentiert):
-- `LEVI_DISPLAY_ROTATION` – 0, 90, 180 oder 270 Grad (andere Werte brechen den Build ab).
-- `LEVI_TOUCH_OFFSET_ROTATION` – Touch-Drehung in LovyanGFX (0–7). Muss für die Montage am Gerät geprüft werden.
-- `LEVI_TOUCH_BRIDGE_MS` – Überbrückung kurzer Touch-Aussetzer (Standard 40 ms).
-- `LEVI_PICKER_LIST` – Farbset des Farbwählers (LCD und Web) mit Namen: `LEVI_PICKER_ENTRY("Name", R, G, B)`, 1–24 Einträge, Name höchstens 15 Zeichen. Unabhängig von der Kalibrierung.
-- `LEVI_NAME` – Anzeigename in der Weboberfläche (Kopf, Fuß, Seitentitel), Standard `LeviLuma`. Der Netzwerkname bleibt `LEVI_WIFI_HOSTNAME`.
-- `LEVI_TOUCH_TEST` – 1 zeigt nur einen Touch-Testscreen: Tippen zeichnet einen Kreis mit den Koordinaten.
-- `LEVI_RGB565_SWAP` – Byte-Reihenfolge der Display-Übertragung (Standard 1). Bei vertauschten Farben auf 0 setzen.
-- `LEVI_RECENTER_MS` – Zeit ohne Bedienung bis zur Rückkehr auf An/Aus (Standard 60000).
-- `LEVI_DISPLAY_SPI_MHZ`, `LEVI_DISPLAY_INVERT`, `LEVI_BACKLIGHT_ACTIVE_HIGH`, `LEVI_BRIGHTNESS_MAX`
-- `LEVI_CALIB_*`, `LEVI_CALIB_POINTS` – Standard-Kalibrierung. Eigene Kalibrierung über die Web-Oberfläche.
-- `LEVI_MIC_EQ_MODE`, `LEVI_FADE_STEPS`
+Die `platformio.ini` selbst ist unverändert (`-I include` ist relativ zum Projektordner).
 
-## Weboberfläche und API
-Die API hat keine Authentifizierung. Nur in einem vertrauenswürdigen Netz betreiben.
+## Hinweise
 
-| Endpunkt | Zweck |
-|---|---|
-| `GET /api/state` | Zustand als JSON, inklusive `revision` und `sentRevision` |
-| `POST /api/power?on=0\|1` | Ein/Aus |
-| `POST /api/brightness?value=0..100` | Helligkeit |
-| `POST /api/color?r=&g=&b=` | Farbe mit Kalibrierung |
-| `POST /api/raw?r=&g=&b=` | Farbe ohne Kalibrierung |
-| `POST /api/music?on=0\|1` | Musikmodus |
-| `GET /api/calib` | Kalibrierung lesen |
-| `GET /api/palette` | Farbset als JSON: `colors` mit `name` und `hex`, dazu `music` |
-| `POST /api/calib?p=…` | 30 Werte (10 Farben × RGB, je 0–255) speichern |
-| `POST /api/calib/reset` | Kalibrierung auf den Standard zurücksetzen |
-
-`sentRevision` zeigt, bis zu welcher Änderung alle Befehle an das Band gesendet wurden. Das ist eine Sendebestätigung, keine Bestätigung, dass das Band sie ausgeführt hat.
-
-## Hardware
-- Waveshare ESP32-S3-Touch-LCD-1.28, **16 MB Flash** (per `esptool flash_id` geprüft).
-- Display GC9A01, 240×240, SPI: SCLK 10, MOSI 11, CS 9, DC 8, RESET 14. Hintergrundbeleuchtung PWM auf GPIO 2.
-- Touch CST816S, I2C: SDA 6, SCL 7, RESET 13. Der Touch-Interrupt wird nicht genutzt, die Abfrage läuft zyklisch.
-- LED-Strip: BLE, Gerätenamen beginnen mit `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK` oder `LEDBLE`. Service `FFF0`, Schreib-Characteristic `FFF3`.
-
-## Getestet am Gerät
-- Ein/Aus, RGB und Helligkeit (natives Paket).
-- Touch, Seitenwechsel, Farbpunkte, Helligkeitsbalken.
-- Musikmodus und Mikrofon-EQ sind nicht als getestet markiert.
-
-## Bekannte Grenzen
-- Der LED-Status ist optimistisch: Das Band bestätigt Befehle nicht zuverlässig.
-- Die Touch-Drehung für die Montage am Gerät ist per `LEVI_TOUCH_OFFSET_ROTATION` einzustellen und bei Bedarf zu prüfen.
-- Das Waveshare ESP32-C6-Touch-LCD-2.8 wird noch nicht unterstützt.
-- Die Farbauswahl als Blasen-Wabe (Apple-Watch-Stil) ist geplant, aber nicht umgesetzt.
+- Die Legacy-Web-API hat keine Authentifizierung (nur vertrauenswürdige Netze). Next hat keine Weboberfläche.
+- Was am Gerät getestet ist und was nicht, steht in `legacy/README.md` und `next/README.md` (Abschnitt „Teststand“).

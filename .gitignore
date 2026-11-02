@@ -61,4 +61,17 @@ tmbootpicker.efi
 # Custom
 .pio/
 .vscode/
-include/Config.h
+# Legacy: echte Konfiguration mit WLAN-Zugangsdaten (nach der Verschiebung unter legacy/)
+legacy/include/Config.h
+
+# Next (ESP-IDF): Build-Ausgaben, erzeugte sdkconfig, heruntergeladene Komponenten
+next/**/build/
+next/**/build-*/
+next/**/sdkconfig
+next/**/sdkconfig.old
+next/**/managed_components/
+next/**/dependencies.lock
+next/shared/protocol/test/build/
+
+# Controller: per Git geholte externe Komponenten (LVGL, Theme, Zigbee-Bibliothek)
+next/controller/third_party/

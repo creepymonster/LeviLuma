@@ -1,0 +1,135 @@
+menu "LeviLuma Controller"
+
+    config LEVILUMA_CTRL_NAME
+        string "Name des Controllers (fuer die Gateways)"
+        default "LeviLuma Zentrale"
+        help
+            Wird beim Koppeln an das Gateway gemeldet. Hoechstens 24 Zeichen.
+
+    config LEVILUMA_ZIGBEE_ENABLED
+        bool "Zigbee aktivieren (FRITZ!Box-Anbindung)"
+        depends on SOC_IEEE802154_SUPPORTED
+        default n
+        help
+            Aktiviert den Zigbee-Stack, je Gateway einen Zigbee-Light-Endpoint (On/Off, Level, Color)
+            und die Zigbee-Einstellungen in der Oberflaeche. Erfordert zusaetzlich CONFIG_ZB_ENABLED
+            (siehe sdkconfig.defaults.zigbee). Standard: aus.
+
+    menu "Zigbee"
+        depends on LEVILUMA_ZIGBEE_ENABLED
+
+        config LEVILUMA_ZB_CHANNEL_MASK
+            hex "Erlaubte Zigbee-Kanaele (Bitmaske, Kanal 11..26)"
+            default 0x07FFF800
+            help
+                Standard: alle Kanaele 11..26. Die FRITZ!Box waehlt den Kanal selbst.
+
+        config LEVILUMA_ZB_MANUFACTURER
+            string "Hersteller (Basic Cluster)"
+            default "LeviLuma"
+
+        config LEVILUMA_ZB_MODEL
+            string "Modell (Basic Cluster)"
+            default "LeviLuma-C5"
+
+        config LEVILUMA_ZB_ED_KEEPALIVE_MS
+            int "Keep-Alive des Endgeraets (ms)"
+            default 3000
+    endmenu
+
+    menu "Display (ST7789, SPI)"
+        config LEVILUMA_LCD_SPI_MHZ
+            int "SPI-Takt Display (MHz)"
+            range 1 80
+            default 20
+            help
+                RockBase-Beispiele nutzen 20 MHz. Hoehere Werte am Geraet pruefen.
+        config LEVILUMA_LCD_PIN_SCLK
+            int "SCLK"
+            default 6
+        config LEVILUMA_LCD_PIN_MOSI
+            int "MOSI"
+            default 7
+        config LEVILUMA_LCD_PIN_MISO
+            int "MISO (gemeinsam mit Touch und SD)"
+            default 2
+        config LEVILUMA_LCD_PIN_CS
+            int "CS"
+            default 23
+        config LEVILUMA_LCD_PIN_DC
+            int "DC (im Schaltplan TFT_RS)"
+            default 24
+        config LEVILUMA_LCD_PIN_RST
+            int "RESET (-1 = am Chip-Reset, laut Schaltplan)"
+            default -1
+        config LEVILUMA_LCD_PIN_BL
+            int "Hintergrundbeleuchtung"
+            default 25
+        config LEVILUMA_LCD_BL_ACTIVE_HIGH
+            bool "Hintergrundbeleuchtung High-aktiv"
+            default y
+        config LEVILUMA_LCD_INVERT
+            bool "Farben invertieren"
+            default n
+            help
+                RockBase-Setup fuer TFT_eSPI: TFT_INVERSION_OFF.
+        config LEVILUMA_LCD_BGR
+            bool "BGR-Reihenfolge"
+            default n
+        choice LEVILUMA_LCD_ROTATION
+            prompt "Ausrichtung (Querformat 320x240)"
+            default LEVILUMA_LCD_ROT_90
+            config LEVILUMA_LCD_ROT_90
+                bool "90 Grad"
+            config LEVILUMA_LCD_ROT_270
+                bool "270 Grad"
+        endchoice
+    endmenu
+
+    menu "Touch (XPT2046, resistiv, SPI)"
+        config LEVILUMA_TOUCH_PIN_CS
+            int "CS"
+            default 1
+        config LEVILUMA_TOUCH_SPI_MHZ_X10
+            int "SPI-Takt Touch (MHz x 10)"
+            default 20
+            help
+                20 = 2,0 MHz (RockBase/TFT_eSPI: 2,5 MHz).
+        config LEVILUMA_TOUCH_Z_THRESHOLD
+            int "Mindestdruck (Z)"
+            default 300
+        config LEVILUMA_TOUCH_RAW_X_MIN
+            int "Rohwert X min (ohne Kalibrierung)"
+            default 300
+        config LEVILUMA_TOUCH_RAW_X_MAX
+            int "Rohwert X max"
+            default 3800
+        config LEVILUMA_TOUCH_RAW_Y_MIN
+            int "Rohwert Y min"
+            default 300
+        config LEVILUMA_TOUCH_RAW_Y_MAX
+            int "Rohwert Y max"
+            default 3800
+        config LEVILUMA_TOUCH_SWAP_XY
+            bool "Rohachsen tauschen (ohne Kalibrierung)"
+            default y
+        config LEVILUMA_TOUCH_CAL_ON_FIRST_BOOT
+            bool "Touch-Kalibrierung beim ersten Start"
+            default y
+            help
+                Ohne gespeicherte Kalibrierung startet die Drei-Punkt-Kalibrierung automatisch.
+    endmenu
+
+    config LEVILUMA_DIM_MS
+        int "Hintergrundbeleuchtung aus nach (ms ohne Beruehrung)"
+        default 20000
+        help
+            Wie Legacy: nach 20 s aus, eine Beruehrung schaltet sie wieder ein (und wird verworfen).
+
+    config LEVILUMA_HOME_MS
+        int "Zurueck zur Uebersicht nach (ms ohne Beruehrung)"
+        default 60000
+        help
+            Wie Legacy LEVI_RECENTER_MS.
+
+endmenu
