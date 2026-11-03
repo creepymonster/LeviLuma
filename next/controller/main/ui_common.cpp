@@ -9,6 +9,18 @@
 bool uiHoldScreen = false; // Touch-Kalibrierung und Kalibrierassistent nicht unterbrechen
 
 static UiRefreshFn refreshFn = nullptr;
+
+// Einheitliche Raender: Kaesten (Karten, Listen-Buttons, Eingabefelder, Tastatur) nutzen die volle
+// Inhaltsbreite (6 px Rand), ihr Inhalt ist um UI_INSET eingerueckt. Texte, Buttons und Zeilen direkt
+// im Inhaltsbereich oder in einer Liste werden ebenfalls um UI_INSET eingerueckt. So beginnt jeder
+// Text und jeder freie Button auf derselben Linie (6 + 8 = 14 px vom Bildschirmrand).
+static constexpr int UI_EDGE = 6;
+static constexpr int UI_INSET = 8;
+static const int kFlowTag = 0; // Markierung (user_data) fuer Inhaltsbereich und Listen
+
+static bool flowContainer(lv_obj_t *parent) {
+  return parent && lv_obj_get_user_data(parent) == (void *)&kFlowTag;
+}
 static lv_obj_t *header = nullptr, *headerTitle = nullptr;
 static uint32_t lastVersion = 0, lastFull = 0;
 static lv_theme_shadcn_palette_t themePalette{};
@@ -48,7 +60,8 @@ lv_obj_t *uiScreen(const char *title, UiBackFn back, UiRefreshFn refresh) {
   lv_obj_set_scrollable(header, false);
   lv_obj_set_style_radius(header, 0, 0);
   lv_obj_set_style_border_width(header, 0, 0);
-  lv_obj_set_style_pad_hor(header, 6, 0);
+  lv_obj_set_style_pad_left(header, back ? UI_EDGE : UI_EDGE + UI_INSET, 0); // Titel ohne Zurueck-Knopf auf der Textlinie
+  lv_obj_set_style_pad_right(header, UI_EDGE, 0);
   lv_obj_set_style_pad_ver(header, 0, 0);
   lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(header, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -80,7 +93,8 @@ lv_obj_t *uiScreen(const char *title, UiBackFn back, UiRefreshFn refresh) {
   lv_obj_set_style_radius(content, 0, 0);
   lv_obj_set_style_border_width(content, 0, 0);
   lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_pad_all(content, 6, 0);
+  lv_obj_set_style_pad_all(content, UI_EDGE, 0);
+  lv_obj_set_user_data(content, (void *)&kFlowTag);
   lv_obj_set_style_pad_row(content, 6, 0);
   lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_AUTO);
@@ -110,7 +124,7 @@ lv_obj_t *uiCard(lv_obj_t *parent) {
   lv_theme_shadcn_set_surface(c, LV_THEME_SHADCN_SURFACE_CARD);
   lv_obj_set_width(c, LV_PCT(100));
   lv_obj_set_height(c, LV_SIZE_CONTENT);
-  lv_obj_set_style_pad_all(c, 8, 0);
+  lv_obj_set_style_pad_all(c, UI_INSET, 0);
   lv_obj_set_style_pad_row(c, 4, 0);
   lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_scrollable(c, false);
@@ -128,6 +142,9 @@ lv_obj_t *uiRow(lv_obj_t *parent) {
   lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_scrollable(r, false);
+  if (flowContainer(parent)) {
+    lv_obj_set_style_pad_hor(r, UI_INSET, 0);
+  }
   return r;
 }
 
@@ -142,6 +159,9 @@ lv_obj_t *uiLabel(lv_obj_t *parent, const char *text, bool muted) {
     lv_obj_set_width(l, LV_PCT(100));
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
   }
+  if (flowContainer(parent)) {
+    lv_obj_set_style_pad_hor(l, UI_INSET, 0);
+  }
   return l;
 }
 
@@ -155,6 +175,9 @@ lv_obj_t *uiButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb, void *u
   lv_obj_set_style_pad_hor(b, 14, 0);
   lv_obj_set_style_margin_top(b, 6, 0);
   lv_obj_set_style_margin_bottom(b, 4, 0);
+  if (flowContainer(parent)) {
+    lv_obj_set_style_margin_left(b, UI_INSET, 0);
+  }
   lv_obj_t *l = lv_label_create(b);
   lv_label_set_text(l, text);
   lv_obj_center(l);
@@ -184,6 +207,7 @@ lv_obj_t *uiList(lv_obj_t *parent) {
   lv_obj_set_style_pad_row(l, 4, 0);
   lv_obj_set_flex_flow(l, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_scrollable(l, false);
+  lv_obj_set_user_data(l, (void *)&kFlowTag);
   return l;
 }
 
@@ -199,6 +223,7 @@ lv_obj_t *uiListButton(lv_obj_t *list, const char *icon, const char *text, lv_ev
   lv_obj_set_width(b, LV_PCT(100));
   lv_obj_set_height(b, LV_SIZE_CONTENT);
   lv_obj_set_style_pad_ver(b, 6, 0);
+  lv_obj_set_style_pad_hor(b, UI_INSET, 0); // Text im Kasten auf derselben Linie wie in Karten
   lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_column(b, 8, 0);
