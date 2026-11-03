@@ -56,3 +56,4 @@ void tests_link(void);
 void tests_gateway(void);
 void tests_controller(void);
 void tests_round(void);
+void tests_debug(void);

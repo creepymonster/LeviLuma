@@ -69,6 +69,7 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 | Gateway koppeln | [docs/PAIRING.md](docs/PAIRING.md) |
 | Kalibrierung | [docs/KALIBRIERUNG.md](docs/KALIBRIERUNG.md) |
 | Zigbee / FRITZ!Box | [docs/ZIGBEE.md](docs/ZIGBEE.md) |
+| ESP-NOW mitlesen (Diagnose) | [debug/README.md](debug/README.md) |
 
 ## Aufbau
 
@@ -83,7 +84,8 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 | `controller/cmake/third_party.cmake` | LVGL 9.6.0, lvgl_theme_shadcn 0.3.1 und esp-zigbee-lib (nur mit Zigbee) per Git auf feste Versionen |
 | `controller-round/` | Temporärer runder Controller (eigenes Projekt, nutzt `shared/` und `controller_core`) |
 | `tests/` | Host-Tests (gcc, ASan/UBSan) |
-| `tools/` | `fetch_deps.sh`, `ui_preview/`, `check_round_build.py` |
+| `debug/` | Eigenständiges, passives ESP-NOW-Diagnosegerät für den XIAO ESP32-S3 (seriell, Promiscuous-Empfang), siehe [debug/README.md](debug/README.md); nutzt `shared/protocol` |
+| `tools/` | `fetch_deps.sh`, `ui_preview/`, `check_round_build.py`, `check_debug_build.py` |
 
 **Oberfläche:** Ein/Aus liegt auf der Übersicht (Schalter je Gateway); die Detailansicht zeigt nur Farbe, Helligkeit und Status. Statussymbole: Gateway per ESP-NOW erreichbar und Licht an/aus. Ob das Gateway mit der Leiste verbunden ist, steht als Text („Band nicht verbunden“). Der **Musikmodus hat kein Bedienelement**, solange er am Band nicht ausreichend getestet ist; die ESP-NOW-Befehle bleiben im Protokoll.
 
