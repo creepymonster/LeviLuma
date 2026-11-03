@@ -13,7 +13,7 @@ Round Controller <--ESP-NOW (STATE)-- Gateway        (Gateway bleibt autoritativ
 
 ![Ein/Aus](../screenshots/controller-round_240x240/05_power_on.png) ![Helligkeit](../screenshots/controller-round_240x240/06_brightness.png) ![Farbe](../screenshots/controller-round_240x240/07_color.png) ![Gateway](../screenshots/controller-round_240x240/08_gateway.png)
 
-Die Bilder stammen aus der Host-Vorschau (`tools/preview/render.sh`: echtes `main/ui.cpp` gegen LVGL 9.6 mit nachgebildeten Daten, außerhalb des Kreises abgedunkelt). Sie sind nicht vom Gerät. Alle Bilder: `next/screenshots/controller-round_240x240/` und Abschnitt „Screenshots“ in [../README.md](../README.md).
+Die Bilder stammen aus der Host-Vorschau (`tools/preview/render.sh`: echtes `main/ui.cpp` gegen LVGL 9.6 mit nachgebildeten Daten, außerhalb des Kreises transparent). Sie sind nicht vom Gerät. Alle Bilder: `next/screenshots/controller-round_240x240/` und Abschnitt „Screenshots“ in [../README.md](../README.md).
 
 ## Hardware
 

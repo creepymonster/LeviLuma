@@ -1,5 +1,6 @@
 // Host-Vorschau der runden Oberflaeche: kompiliert main/ui.cpp gegen LVGL mit nachgebildetem
-// Controller-Dienst und schreibt PPM-Bilder (ausserhalb des Kreises abgedunkelt wie am Geraet).
+// Controller-Dienst und schreibt PPM-Bilder. render.sh macht beim Umwandeln in PNG alles ausserhalb
+// des runden Panels transparent.
 // Nicht das Geraet: Touch, Farben und Timing koennen abweichen.
 #include <stdio.h>
 #include <string.h>
@@ -54,12 +55,7 @@ static void shot(const char *name) {
   lv_refr_now(nullptr);
   FILE *f = fopen((out + "/" + name + ".ppm").c_str(), "wb");
   fprintf(f, "P6\n240 240\n255\n");
-  for (int y = 0; y < 240; y++) for (int x = 0; x < 240; x++) {
-    int i = (y * 240 + x) * 3; float dx = x - 119.5f, dy = y - 119.5f;
-    bool in = dx * dx + dy * dy <= 120.f * 120.f; // rundes Panel
-    unsigned char p[3] = {(unsigned char)(in ? fb[i] : 40), (unsigned char)(in ? fb[i + 1] : 40), (unsigned char)(in ? fb[i + 2] : 40)};
-    fwrite(p, 1, 3, f);
-  }
+  fwrite(fb, 1, 240 * 240 * 3, f);
   fclose(f);
 }
 

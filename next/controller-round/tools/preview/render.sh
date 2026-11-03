@@ -17,10 +17,17 @@ g++ -std=c++20 -O0 -g -DLV_CONF_INCLUDE_SIMPLE -DCONFIG_LEVILUMA_HOME_MS=60000 -
   "$B"/*.o -o "$B/preview" -lm
 "$B/preview" "$B" || { cp "$B/preview" /tmp/claude-0/-home-user-LeviLuma/2feb8cca-184f-5821-b8a2-0071a502b4b0/scratchpad/preview_bin 2>/dev/null; exit 1; }
 python3 - "$B" "$OUT" <<'PY'
+# PNG mit Alphakanal: ausserhalb des runden Panels (Durchmesser 240) transparent, Rand geglaettet
 import glob, os, sys
-from PIL import Image
+from PIL import Image, ImageDraw
+S = 8  # Ueberabtastung fuer einen weichen Rand
+mask = Image.new("L", (240 * S, 240 * S), 0)
+ImageDraw.Draw(mask).ellipse([0, 0, 240 * S - 1, 240 * S - 1], fill=255)
+mask = mask.resize((240, 240), Image.LANCZOS)
 for f in sorted(glob.glob(os.path.join(sys.argv[1], "*.ppm"))):
     n = os.path.splitext(os.path.basename(f))[0]
-    Image.open(f).convert("RGB").save(os.path.join(sys.argv[2], n + ".png")); print("geschrieben:", n + ".png")
+    img = Image.open(f).convert("RGBA")
+    img.putalpha(mask)
+    img.save(os.path.join(sys.argv[2], n + ".png")); print("geschrieben:", n + ".png")
 PY
 rm -rf "$B"

@@ -42,7 +42,7 @@ Erzeugt mit `tools/ui_preview/render.sh`, Ordner `screenshots/controller_320x240
 
 ### Round Controller (240×240, rund, temporär)
 
-Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises abgedunkelt), Ordner `screenshots/controller-round_240x240/`.
+Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises transparent), Ordner `screenshots/controller-round_240x240/`.
 
 | Ohne Gateway | Gateway-Seite ohne Kopplung | Gateway wählen |
 |---|---|---|
