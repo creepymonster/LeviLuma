@@ -2,9 +2,8 @@
 
 Unveränderte STEP-Dateien der drei im Projekt verwendeten Board-Modelle.
 Die Dateiendung `.stp` des Waveshare-Originals wurde lediglich zu `.step`
-vereinheitlicht. Die PNGs werden direkt aus den jeweiligen STEP-Geometrien
-erzeugt und zeigen zwei gegenüberliegende Schrägansichten (+Z/−Z, beim XIAO
-entsprechend dessen Modellachsen +Y/−Y).
+vereinheitlicht. Die PNGs wurden aus den jeweiligen STEP-Geometrien
+erzeugt und zeigen zwei gegenüberliegende Schrägansichten.
 
 | Board | Verwendung | STEP | Rendering |
 |---|---|---|---|
@@ -35,38 +34,22 @@ der [Projektübersicht](../../README.md) und [Next-Dokumentation](../../next/REA
   Das veröffentlichte Modell enthält die bestückte Platine **ohne LCD-Modul**.
   Der Platzbedarf des Displays lässt sich damit allein nicht bestimmen.
 
-[sources.json](sources.json) enthält Download-URLs, Archivpfade und SHA-256-Werte.
-Die STEP-Dateien sind bytegleich mit den aus den Archiven entnommenen Originalen.
-Prüfung im Verzeichnis `hardware/boards/`:
+Die STEP-Dateien sind bytegleich mit den aus den Archiven entnommenen Originalen
+(SHA-256, Prüfung mit `sha256sum <datei>`):
 
-```sh
-sha256sum -c SHA256SUMS
-```
+| Datei | SHA-256 |
+|---|---|
+| `waveshare-esp32-s3-touch-lcd-1.28.step` | `4a2a3a950d1c7bac0749a60d4804bb508580d51a89cd72b4953a6c51451d0e58` |
+| `seeed-xiao-esp32s3.step` | `870ad45c7af5d92324cec4c6ae65fbf86e3b049d5a97ab9ffd9039ebd73455dd` |
+| `rockbase-nm-cyd-c5.step` | `12348eee80ee7a9d248f80c20072b22a02bc9782169a676e4c54345e99de94cc` |
+
+Die Modelle wurden nicht gegen die tatsächlich vorhandenen Platinenrevisionen
+vermessen; für passgenaue Gehäuse insbesondere Steckverbinder, Display und
+Montagepunkte am eigenen Board prüfen.
 
 Die Modelle stammen von den jeweiligen Anbietern; deren Rechte bleiben bestehen.
 In den drei heruntergeladenen Archiven war keine separate Lizenzdatei enthalten.
 Eine darüber hinausgehende Nutzungslizenz wird hier nicht behauptet.
-
-## Renderings erneut erzeugen
-
-```sh
-python -m pip install cadquery==2.7.0 numpy Pillow
-python hardware/boards/render.py
-```
-
-`render.py` importiert die Baugruppen mit Open CASCADE über CadQuery, übernimmt
-vorhandene Bauteilfarben und rastert die triangulierte Geometrie mit einem
-Tiefenpuffer. Es benötigt keinen Grafikserver. Nicht vorhandene Farben erhalten
-einen neutralen Grauton; Transparenz wird für die technische Ansicht opak gezeigt.
-Die Baugruppen werden für das Rendering abgeflacht; gleiche Bauteilnamen
-sind dabei erlaubt. Die STEP-Dateien bleiben unverändert.
-
-[geometry-check.json](geometry-check.json) dokumentiert den erfolgreichen Import,
-die Anzahl der Volumenkörper und Dreiecke sowie die Gesamt-Abmessungen entlang
-der Modellachsen in Millimetern. Dies ist keine Maßprüfung am physischen Board.
-Die Modelle wurden nicht gegen die tatsächlich vorhandenen Platinenrevisionen
-vermessen; für passgenaue Gehäuse insbesondere Steckverbinder, Display und
-Montagepunkte am eigenen Board prüfen.
 
 ## Vorschau
 
