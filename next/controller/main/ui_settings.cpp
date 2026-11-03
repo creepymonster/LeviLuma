@@ -97,9 +97,8 @@ static uint32_t listSignature() {
 static void buildGwList() {
   lv_obj_clean(gwList);
   GatewayView v;
-  int paired = 0, unknown = 0;
-  uiListText(gwList, "Gekoppelt");
-
+  int unknown = 0;
+  // Gekoppelte Gateways stehen ohne Ueberschrift oben in der Liste
   for (int i = 0; i < appGatewayCount(); i++) {
     if (!appView(i, v) || !v.paired) {
       continue;
@@ -108,10 +107,6 @@ static void buildGwList() {
     uiGatewayStatusText(v, st, sizeof(st));
     snprintf(line, sizeof(line), "%s\n%s%s", v.name, st, v.hasKey ? "  (Schluessel)" : "");
     uiListButton(gwList, v.online ? LV_SYMBOL_OK : LV_SYMBOL_WARNING, line, pairedClicked, (void *)(intptr_t)i);
-    paired++;
-  }
-  if (!paired) {
-    uiListText(gwList, "  keine");
   }
   uiListText(gwList, "Gefunden, nicht gekoppelt");
 
