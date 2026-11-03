@@ -11,9 +11,9 @@ Round Controller <--ESP-NOW (STATE)-- Gateway        (Gateway bleibt autoritativ
 - **Kein BLE, keine WLAN-Verbindung, kein WLAN-Scan, kein Access Point, kein TCP/IP-Dienst, kein HTTP/MQTT, kein Zigbee.** Der WLAN-Treiber läuft nur im STA-Modus als Funkteil für ESP-NOW; `esp_netif` wird nicht initialisiert. Geprüft mit `next/tools/check_round_build.py` (auch in der CI).
 - Keine eigene Kalibrierung: Farben werden als kalibrierte Farbe (`SET_STATE` mit `COLOR`) gesendet, die Kalibrierung wendet das Gateway an.
 
-![Hauptansicht](screenshots/240x240/05_main_on.png) ![Farbe](screenshots/240x240/06_color.png) ![Gateway](screenshots/240x240/07_gateway.png) ![Aus](screenshots/240x240/08_main_off.png)
+![Hauptansicht](../screenshots/controller-round_240x240/05_main_on.png) ![Farbe](../screenshots/controller-round_240x240/06_color.png) ![Gateway](../screenshots/controller-round_240x240/07_gateway.png) ![Aus](../screenshots/controller-round_240x240/08_main_off.png)
 
-Die Bilder stammen aus der Host-Vorschau (`tools/preview/render.sh`: echtes `main/ui.cpp` gegen LVGL 9.6 mit nachgebildeten Daten, außerhalb des Kreises abgedunkelt). Sie sind nicht vom Gerät. Weitere in `screenshots/240x240/`.
+Die Bilder stammen aus der Host-Vorschau (`tools/preview/render.sh`: echtes `main/ui.cpp` gegen LVGL 9.6 mit nachgebildeten Daten, außerhalb des Kreises abgedunkelt). Sie sind nicht vom Gerät. Alle Bilder: `next/screenshots/controller-round_240x240/` und Abschnitt „Screenshots“ in [../README.md](../README.md).
 
 ## Hardware
 

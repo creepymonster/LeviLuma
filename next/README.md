@@ -16,9 +16,45 @@ Zigbee:      FRITZ!Box --Zigbee--> C5 --ESP-NOW--> XIAO --BLE--> Leiste
              XIAO --ESP-NOW--> C5 --> LVGL und Zigbee-Attribute
 ```
 
-![Übersicht](screenshots/controller_320x240/01_home.png) ![Detail](screenshots/controller_320x240/02_detail.png) ![Gateways](screenshots/controller_320x240/04_gateways.png)
+## Screenshots
 
-Die Bilder stammen aus der Host-Vorschau (`tools/ui_preview/render.sh`, echte `ui_*.cpp` gegen LVGL 9.6 mit nachgebildeten Daten), nicht vom Gerät. Weitere: `screenshots/controller_320x240/`.
+Alle Bilder stammen aus Host-Vorschauen: die echten Oberflächen-Quelltexte, gebaut gegen LVGL 9.6 mit nachgebildeten Daten. Sie sind **nicht vom Gerät**; Touch, Farben und Timing können abweichen.
+
+### RockBase-Controller (320×240)
+
+Erzeugt mit `tools/ui_preview/render.sh`, Ordner `screenshots/controller_320x240/`.
+
+| Übersicht | Detail: Farbe und Helligkeit | Einstellungen |
+|---|---|---|
+| ![Übersicht](screenshots/controller_320x240/01_home.png) | ![Detail: Farbe und Helligkeit](screenshots/controller_320x240/02_detail.png) | ![Einstellungen](screenshots/controller_320x240/03_settings.png) |
+
+| Gateway-Verwaltung | Kopplung mit Schlüssel | Kopplung ohne Schlüssel |
+|---|---|---|
+| ![Gateway-Verwaltung](screenshots/controller_320x240/04_gateways.png) | ![Kopplung mit Schlüssel](screenshots/controller_320x240/05_pair_key.png) | ![Kopplung ohne Schlüssel](screenshots/controller_320x240/06_pair_open.png) |
+
+| Gateway-Details | Kalibrierung | Info |
+|---|---|---|
+| ![Gateway-Details](screenshots/controller_320x240/07_gateway_settings.png) | ![Kalibrierung](screenshots/controller_320x240/08_calibration.png) | ![Info](screenshots/controller_320x240/09_info.png) |
+
+| Übersicht ohne Gateway | Touch-Kalibrierung |  |
+|---|---|---|
+| ![Übersicht ohne Gateway](screenshots/controller_320x240/10_home_empty.png) | ![Touch-Kalibrierung](screenshots/controller_320x240/11_touch_cal.png) |  |
+
+### Round Controller (240×240, rund, temporär)
+
+Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises abgedunkelt), Ordner `screenshots/controller-round_240x240/`.
+
+| Ohne Gateway | Gateway-Seite ohne Kopplung | Gateway wählen |
+|---|---|---|
+| ![Ohne Gateway](screenshots/controller-round_240x240/01_unpaired.png) | ![Gateway-Seite ohne Kopplung](screenshots/controller-round_240x240/02_gateway_unpaired.png) | ![Gateway wählen](screenshots/controller-round_240x240/03_search.png) |
+
+| Schlüsseleingabe | Hauptansicht, an | Farbrad und Palette |
+|---|---|---|
+| ![Schlüsseleingabe](screenshots/controller-round_240x240/04_key.png) | ![Hauptansicht, an](screenshots/controller-round_240x240/05_main_on.png) | ![Farbrad und Palette](screenshots/controller-round_240x240/06_color.png) |
+
+| Gateway-Seite | Hauptansicht, aus | Gateway offline |
+|---|---|---|
+| ![Gateway-Seite](screenshots/controller-round_240x240/07_gateway.png) | ![Hauptansicht, aus](screenshots/controller-round_240x240/08_main_off.png) | ![Gateway offline](screenshots/controller-round_240x240/09_main_offline.png) |
 
 ## Dokumentation
 
