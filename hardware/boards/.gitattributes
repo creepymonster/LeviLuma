@@ -1,0 +1,2 @@
+# Herstellerdateien bytegleich erhalten und große CAD-Textdiffs vermeiden.
+*.step -text -diff
