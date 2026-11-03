@@ -145,7 +145,7 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 
 - **Autoritativer Zustand:** Das Gateway (XIAO) hält den LightState und die Kalibrierung seiner Leiste. Der Controller zeigt nur bestätigte Zustände (STATE-Antworten/-Meldungen). Kein optimistisches Übernehmen von Befehlen; keine zweite Zustandsverwaltung (auch nicht in Zigbee).
 - **Protokoll:** nur in `next/shared/protocol/` ändern, beide Seiten nutzen dieselben Dateien. Version (`LVP_VERSION`) bei inkompatiblen Änderungen erhöhen und `next/docs/ESP_NOW_PROTOKOLL.md` nachziehen. Rahmen ≤ 250 Byte, Little Endian, byteweise Serialisierung.
-- **Hosttestbare Logik** liegt in `gateway/components/light_core/` und `controller/components/controller_core/` (ohne ESP-IDF-Abhängigkeit, NVS über `KvStore`). Neue Logik dorthin, Plattformcode in `main/`. Tests: `next/tests/run_tests.sh` (muss grün sein).
+- **Hosttestbare Logik** liegt in `gateway/components/light_core/` und `controller/components/controller_core/` (ohne ESP-IDF-Abhängigkeit, NVS über `KvStore`). Neue Logik dorthin, Plattformcode in `main/`. Tests: `next/tests/run_tests.sh` (muss grün sein); Auswertung siehe „Testauswertung“ unten.
 - **Kopien aus Legacy:** `CalibCore.h`, `ColorMath.h` (Gateway) und `Palette.h` (Controller) sind byte-gleiche Kopien; `LotusProtocol.h` nur ohne `<Arduino.h>`. Änderungen an der Kalibrierung in beiden Projekten konsistent halten.
 - **Nebenläufigkeit Gateway:** `gwLock` für Modell/Kalibrierung/Kopplungen/Handler; BLE-Task nur mit Kopien; ESP-NOW-Callback kopiert nur in eine Queue.
 - **Nebenläufigkeit Controller:** `appLock` (rekursiv) für Register und Link; LVGL nur im LVGL-Task; Zigbee-Lock und App-Lock nie gleichzeitig halten.
@@ -156,6 +156,16 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 - **Oberfläche (beide Controller):** Musikmodus ohne Bedienelement, bis er am Band getestet ist (Protokollbefehle bleiben). Statussymbole nur ESP-NOW-Verbindung (Gateway-Symbol) und Licht an/aus (Glühbirne). RockBase: Ein/Aus nur auf der Übersicht.
 - **Round Controller** (`next/controller-round/`): nur ESP-NOW. Kein BLE, keine WLAN-Verbindung/-Suche/AP, kein `esp_netif`, kein Zigbee/HTTP/MQTT; `set(COMPONENTS main)` hält ungenutzte Komponenten aus dem Build, `next/tools/check_round_build.py` prüft das. Display/Touch über LovyanGFX mit der Legacy-`LGFX_Board`-Konfiguration; Werte nur aus Legacy übernehmen. Genau ein Gateway (`Round::mayPair`). Nutzt `controller_core` aus `next/controller/` – Änderungen dort wirken auf beide Controller.
 - Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml` (Firmware-Builds inkl. Round und Funkprüfung), `.github/workflows/tests.yml` (Host-Tests, Legacy-Kopien).
+
+### Testauswertung (`next/tests/README.md`)
+Die Datei wird **automatisch** von `next/tests/tools/gen_report.py` aus den maschinenlesbaren Ergebnissen des Testprogramms erzeugt (`LEVI_TEST_RESULTS`, JSON Lines). Abschlusszeitpunkt ist der CI-Lauf nach dem Merge auf `main` (`.github/workflows/tests.yml`, Job `report`): Er legt die Datei per Bot-Commit (`[skip ci]`, nur diese Datei, kein Force-Push) ab und nennt darin den getesteten Commit. Jeder CI-Lauf erzeugt zusätzlich eine Vorschau als Artefakt.
+
+- **Nicht von Hand ändern** und nicht während der Entwicklung oder nach lokalen Läufen aktualisieren; sie entsteht erst zum Abschluss aus realen Ergebnissen.
+- Neue Tests müssen über die gemeinsame Testregistrierung (`RUN`, `RUN_D` mit Kurzbeschreibung, `SKIP` mit Grund aus `tests/test_util.h`) laufen, damit sie automatisch in der Auswertung erscheinen. Keine zweite Liste der Tests pflegen.
+- Neue Testgruppen (`levi_group` in `tests/test_main.cpp`) oder Prüfverfahren (z. B. weitere Sanitizer, neue CI-Schritte) müssen in `gen_report.py` und den Workflow integriert werden.
+- Änderungen an Testsuite oder Testausgabe (JSON-Ereignisse `meta`/`group`/`begin`/`test`/`summary`) müssen mit dem Generator kompatibel bleiben; Generator und Testprogramm gemeinsam ändern und beide Fehlerpfade prüfen.
+- Fehlende Ergebnisse, übersprungene Tests und nicht ausgeführte Prüfungen müssen ausdrücklich sichtbar bleiben. Host-Tests, Firmware-Builds und Hardwaretests bleiben getrennt; Hardwaretests gelten nie als bestanden, solange sie nicht am Gerät gelaufen sind.
+- Erfolge dürfen niemals ohne tatsächliche Ausführung behauptet werden. Der CI-Status kommt von den Testschritten; die Berichtserstellung darf ihn nicht verdecken.
 
 ## Git-Konventionen
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.

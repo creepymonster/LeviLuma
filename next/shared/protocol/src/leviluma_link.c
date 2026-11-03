@@ -110,6 +110,15 @@ int lvl_txq_count(const lvl_txq_t *q) {
   return n;
 }
 
+const lvl_pending_t *lvl_txq_find_peer(const lvl_txq_t *q, const uint8_t peer[LVP_ID_LEN]) {
+  for (int i = 0; i < LVL_MAX_PENDING; i++) {
+    if (q->slot[i].used && lvp_id_equal(q->slot[i].peer, peer)) {
+      return &q->slot[i];
+    }
+  }
+  return NULL;
+}
+
 void lvl_dedup_init(lvl_dedup_t *d) {
   memset(d, 0, sizeof(*d));
 }

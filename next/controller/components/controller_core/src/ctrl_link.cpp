@@ -1,28 +1,6 @@
 #include "ctrl_link.h"
 #include <string.h>
 
-lvp_set_state_t ctrl_merge_set(const lvp_set_state_t &a, const lvp_set_state_t &b) {
-  lvp_set_state_t r = a;
-
-  if (b.mask & (LVP_SET_COLOR | LVP_SET_RAW)) {
-    r.mask &= (uint8_t)~(LVP_SET_COLOR | LVP_SET_RAW);
-    r.r = b.r;
-    r.g = b.g;
-    r.b = b.b;
-  }
-  if (b.mask & LVP_SET_POWER) {
-    r.power = b.power;
-  }
-  if (b.mask & LVP_SET_BRIGHTNESS) {
-    r.brightness = b.brightness;
-  }
-  if (b.mask & LVP_SET_MUSIC) {
-    r.music = b.music;
-  }
-  r.mask |= b.mask;
-  return r;
-}
-
 CtrlLink::CtrlLink(GatewayRegistry &reg, Radio &radio, const Config &cfg) : reg_(reg), radio_(radio), cfg_(cfg) {
   lvl_txq_init(&txq_, cfg.timeoutMs, cfg.tries);
 }
@@ -38,14 +16,19 @@ bool CtrlLink::online(int idx, uint32_t nowMs) const {
   return reg_.online(idx, nowMs, offlineTimeoutMs());
 }
 
+const lvl_pending_t *CtrlLink::inFlight(int idx) const {
+  return lvl_txq_find_peer(&txq_, reg_.at(idx).id);
+}
+
 bool CtrlLink::commandPending(int idx) const {
-  return lvl_txq_has(&txq_, reg_.at(idx).id, LVP_MSG_SET_STATE) || nextSetValid_[idx];
+  const lvl_pending_t *p = inFlight(idx);
+  return (p && p->type == LVP_MSG_SET_STATE) || wait_[idx].kind == WaitKind::Light;
 }
 
 bool CtrlLink::calibPending(int idx) const {
-  const uint8_t *id = reg_.at(idx).id;
-  return lvl_txq_has(&txq_, id, LVP_MSG_GET_CALIB) || lvl_txq_has(&txq_, id, LVP_MSG_SET_CALIB) ||
-         lvl_txq_has(&txq_, id, LVP_MSG_RESET_CALIB);
+  const lvl_pending_t *p = inFlight(idx);
+  bool open = p && (p->type == LVP_MSG_GET_CALIB || p->type == LVP_MSG_SET_CALIB || p->type == LVP_MSG_RESET_CALIB);
+  return open || wait_[idx].kind == WaitKind::SetCalib || wait_[idx].kind == WaitKind::ResetCalib || needCalib_[idx];
 }
 
 void CtrlLink::start(uint32_t nowMs) {
@@ -161,7 +144,8 @@ bool CtrlLink::unpair(int idx, uint32_t nowMs) {
     stats_.sent++;
   }
   lvl_txq_cancel_peer(&txq_, g.id);
-  nextSetValid_[idx] = false;
+  wait_[idx] = Waiting();
+  needState_[idx] = needCalib_[idx] = false;
   radio_.delPeer(g.id);
   bool ok = reg_.unpair(idx);
   changed(idx);
@@ -180,9 +164,12 @@ lvp_err_t CtrlLink::setState(int idx, const lvp_set_state_t &cmd, uint32_t nowMs
   if (e != LVP_OK) {
     return e;
   }
-  if (lvl_txq_has(&txq_, g.id, LVP_MSG_SET_STATE)) {
-    nextSet_[idx] = nextSetValid_[idx] ? ctrl_merge_set(nextSet_[idx], cmd) : cmd;
-    nextSetValid_[idx] = true;
+  if (wait_[idx].kind == WaitKind::SetCalib || wait_[idx].kind == WaitKind::ResetCalib) {
+    return LVP_ERR_BUSY; // wartende Kalibrierung nicht stillschweigend verdraengen
+  }
+  if (inFlight(idx)) {
+    wait_[idx].kind = WaitKind::Light; // ersetzt einen wartenden Lichtbefehl vollstaendig
+    wait_[idx].light = cmd;
     version_++;
     return LVP_OK;
   }
@@ -198,54 +185,99 @@ lvp_err_t CtrlLink::setState(int idx, const lvp_set_state_t &cmd, uint32_t nowMs
   return LVP_OK;
 }
 
-void CtrlLink::sendQueuedSet(int idx, uint32_t nowMs) {
-  if (!nextSetValid_[idx]) {
+void CtrlLink::pump(int idx, uint32_t nowMs) {
+  GatewayEntry &g = reg_.at(idx);
+
+  if (!g.used || !g.paired || inFlight(idx)) {
     return;
   }
-  nextSetValid_[idx] = false;
+  Waiting &w = wait_[idx];
   lvp_msg_t m;
-  lvp_init(&m, LVP_MSG_SET_STATE);
-  m.u.set_state = nextSet_[idx];
-  request(idx, m, nowMs);
+
+  if (w.kind != WaitKind::None) {
+    switch (w.kind) {
+    case WaitKind::Light:
+      lvp_init(&m, LVP_MSG_SET_STATE);
+      m.u.set_state = w.light;
+      break;
+    case WaitKind::SetCalib:
+      lvp_init(&m, LVP_MSG_SET_CALIB);
+      memcpy(m.u.set_calib.points, w.points, LVP_CAL_BYTES);
+      break;
+    default:
+      lvp_init(&m, LVP_MSG_RESET_CALIB);
+      break;
+    }
+    if (request(idx, m, nowMs)) { // bei voller Warteschlange bleibt der Befehl stehen (naechster Tick)
+      w = Waiting(); // lastTimeout bleibt bis zur naechsten Antwort stehen (Timeout des Vorgaengers nicht verschleiern)
+      version_++;
+    }
+    return;
+  }
+  if (needState_[idx]) {
+    lvp_init(&m, LVP_MSG_GET_STATE);
+    needState_[idx] = !request(idx, m, nowMs);
+    return;
+  }
+  if (needCalib_[idx]) {
+    lvp_init(&m, LVP_MSG_GET_CALIB);
+    needCalib_[idx] = !request(idx, m, nowMs);
+  }
 }
 
 bool CtrlLink::requestState(int idx, uint32_t nowMs) {
   GatewayEntry &g = reg_.at(idx);
-  if (!g.used || !g.paired || lvl_txq_has(&txq_, g.id, LVP_MSG_GET_STATE)) {
+  const lvl_pending_t *p = g.used && g.paired ? inFlight(idx) : nullptr;
+
+  if (!g.used || !g.paired || (p && p->type == LVP_MSG_GET_STATE)) {
     return false;
   }
-  lvp_msg_t m;
-  lvp_init(&m, LVP_MSG_GET_STATE);
-  return request(idx, m, nowMs);
+  needState_[idx] = true; // Bedarf vormerken; gesendet wird nur, wenn nichts offen ist und kein Befehl wartet
+  pump(idx, nowMs);
+  return true;
 }
 
 bool CtrlLink::requestCalib(int idx, uint32_t nowMs) {
   GatewayEntry &g = reg_.at(idx);
-  if (!g.used || !g.paired || lvl_txq_has(&txq_, g.id, LVP_MSG_GET_CALIB)) {
+  const lvl_pending_t *p = g.used && g.paired ? inFlight(idx) : nullptr;
+
+  if (!g.used || !g.paired || (p && p->type == LVP_MSG_GET_CALIB)) {
     return false;
   }
-  lvp_msg_t m;
-  lvp_init(&m, LVP_MSG_GET_CALIB);
-  return request(idx, m, nowMs);
+  needCalib_[idx] = true;
+  pump(idx, nowMs);
+  return true;
 }
 
 bool CtrlLink::resetCalib(int idx, uint32_t nowMs) {
-  if (!reg_.at(idx).paired) {
+  GatewayEntry &g = reg_.at(idx);
+
+  if (!g.used || !g.paired || wait_[idx].kind == WaitKind::SetCalib || wait_[idx].kind == WaitKind::ResetCalib) {
     return false;
   }
-  lvp_msg_t m;
-  lvp_init(&m, LVP_MSG_RESET_CALIB);
-  return request(idx, m, nowMs);
+  wait_[idx] = Waiting();
+  wait_[idx].kind = WaitKind::ResetCalib;
+  g.lastError = 0;
+  g.lastTimeout = false;
+  pump(idx, nowMs);
+  version_++;
+  return true;
 }
 
 bool CtrlLink::sendCalib(int idx, const uint8_t points[LVP_CAL_BYTES], uint32_t nowMs) {
-  if (!reg_.at(idx).paired) {
+  GatewayEntry &g = reg_.at(idx);
+
+  if (!g.used || !g.paired || wait_[idx].kind == WaitKind::SetCalib || wait_[idx].kind == WaitKind::ResetCalib) {
     return false;
   }
-  lvp_msg_t m;
-  lvp_init(&m, LVP_MSG_SET_CALIB);
-  memcpy(m.u.set_calib.points, points, LVP_CAL_BYTES);
-  return request(idx, m, nowMs);
+  wait_[idx] = Waiting();
+  wait_[idx].kind = WaitKind::SetCalib;
+  memcpy(wait_[idx].points, points, LVP_CAL_BYTES);
+  g.lastError = 0;
+  g.lastTimeout = false;
+  pump(idx, nowMs);
+  version_++;
+  return true;
 }
 
 void CtrlLink::applyState(int idx, const lvp_state_t &s, uint32_t gwSession) {
@@ -267,6 +299,7 @@ void CtrlLink::applyState(int idx, const lvp_state_t &s, uint32_t gwSession) {
   g.stateValid = true;
   g.announcedRevision = s.revision;
   g.syncPending = false;
+  needState_[idx] = false; // bestaetigter Zustand liegt vor
   changed(idx);
 }
 
@@ -286,8 +319,7 @@ void CtrlLink::handleResponse(int idx, const lvp_msg_t &m, const lvl_pending_t *
         g.pairPhase = PairPhase::None;
         memcpy(g.announcedName, m.u.pair_rsp.name, sizeof(g.announcedName));
         g.syncPending = true;
-        requestState(idx, nowMs);
-        requestCalib(idx, nowMs);
+        needState_[idx] = needCalib_[idx] = true; // nacheinander gesendet (pump)
       } else {
         g.pairPhase = PairPhase::Failed;
         g.lastError = (uint8_t)e;
@@ -310,8 +342,9 @@ void CtrlLink::handleResponse(int idx, const lvp_msg_t &m, const lvl_pending_t *
         listener_->onPairResult(idx, false);
       }
     } else if (reqType == LVP_MSG_SET_STATE) {
-      requestState(idx, nowMs); // Befehl abgelehnt: Anzeige auf den bestaetigten Zustand zuruecksetzen
-      sendQueuedSet(idx, nowMs);
+      needState_[idx] = true; // Befehl abgelehnt: Anzeige auf den bestaetigten Zustand zuruecksetzen
+    } else if (reqType == LVP_MSG_SET_CALIB || reqType == LVP_MSG_RESET_CALIB) {
+      needCalib_[idx] = true; // abgelehnt: gespeicherte Kalibrierung neu lesen
     }
     changed(idx);
     break;
@@ -321,11 +354,8 @@ void CtrlLink::handleResponse(int idx, const lvp_msg_t &m, const lvl_pending_t *
       g.lastTimeout = false;
       applyState(idx, m.u.state, m.hdr.session);
       if (!g.calibValid || g.calib.calib_revision != m.u.state.calib_revision) {
-        requestCalib(idx, nowMs);
+        needCalib_[idx] = true;
       }
-    }
-    if (reqType == LVP_MSG_SET_STATE) {
-      sendQueuedSet(idx, nowMs);
     }
     break;
   case LVP_MSG_CALIB:
@@ -333,6 +363,8 @@ void CtrlLink::handleResponse(int idx, const lvp_msg_t &m, const lvl_pending_t *
       g.calib = m.u.calib;
       g.calibValid = true;
       g.lastError = 0;
+      g.lastTimeout = false;
+      needCalib_[idx] = false;
       changed(idx);
     }
     break;
@@ -403,13 +435,15 @@ void CtrlLink::onFrame(const uint8_t src[LVP_ID_LEN], bool broadcast, const uint
       return; // verspaetete Antwort auf eine bereits abgeschlossene Anfrage
     }
     handleResponse(idx, m, matched ? &req : nullptr, nowMs);
+    pump(idx, nowMs);
     return;
   }
   if ((m.hdr.flags & LVP_FLAG_NOTIFY) && m.hdr.type == LVP_MSG_STATE && g.paired) {
     applyState(idx, m.u.state, m.hdr.session);
     if (!g.calibValid || g.calib.calib_revision != m.u.state.calib_revision) {
-      requestCalib(idx, nowMs);
+      needCalib_[idx] = true;
     }
+    pump(idx, nowMs);
   }
 }
 
@@ -437,13 +471,18 @@ void CtrlLink::onTimeout(const lvl_pending_t &p, uint32_t nowMs) {
     break;
   case LVP_MSG_SET_STATE:
     g.syncPending = true; // unklar, ob ausgefuehrt: Zustand beim naechsten Kontakt abgleichen
-    sendQueuedSet(idx, nowMs);
+    break;
+  case LVP_MSG_SET_CALIB:
+  case LVP_MSG_RESET_CALIB:
+    g.syncPending = g.paired;
+    needCalib_[idx] = g.paired; // unklar, ob gespeichert: gespeicherte Kalibrierung abfragen
     break;
   default:
     g.syncPending = g.paired;
     break;
   }
   changed(idx);
+  pump(idx, nowMs); // wartenden Befehl (ausschliesslich den letzten) senden; der alte wird nicht erneut eingereiht
 }
 
 void CtrlLink::tick(uint32_t nowMs) {
@@ -480,9 +519,10 @@ void CtrlLink::tick(uint32_t nowMs) {
       }
       changed(i);
     }
-    if (g.paired && on && g.syncPending && !commandPending(i)) {
-      requestState(i, nowMs);
+    if (g.paired && on && g.syncPending) {
+      requestState(i, nowMs); // Bedarf vormerken; ueberholt keine offene Anfrage
     }
+    pump(i, nowMs);
   }
   if (started_ && (uint32_t)(nowMs - lastDiscover_) >= cfg_.discoverEveryMs) {
     discover(nowMs);

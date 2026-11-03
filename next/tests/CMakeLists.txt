@@ -6,8 +6,10 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 
 set(NEXT ${CMAKE_CURRENT_LIST_DIR}/..)
-add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=address,undefined -fno-omit-frame-pointer)
-add_link_options(-fsanitize=address,undefined)
+# Pruefverfahren: ASan + UBSan; UBSan-Funde brechen den Lauf ab (kein stilles Weiterlaufen). Der Wert landet im Ergebnis/Bericht.
+set(LEVI_SANITIZERS "AddressSanitizer,UndefinedBehaviorSanitizer (no-recover)")
+add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+add_link_options(-fsanitize=address,undefined -fno-sanitize-recover=all)
 
 add_executable(levi_tests
   test_main.cpp test_protocol.cpp test_gateway.cpp test_controller.cpp test_round.cpp
@@ -32,4 +34,5 @@ target_include_directories(levi_tests PRIVATE
   ${NEXT}/gateway/components/light_core/include
   ${NEXT}/controller/components/controller_core/include
   ${NEXT}/controller-round/components/round_core/include)
+target_compile_definitions(levi_tests PRIVATE LEVI_SANITIZERS="${LEVI_SANITIZERS}")
 target_link_libraries(levi_tests m)

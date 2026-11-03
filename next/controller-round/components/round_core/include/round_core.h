@@ -15,7 +15,7 @@ bool mayPair(const GatewayRegistry &reg);
 
 // ---- Sendedrossel ----
 // Waehrend einer Touch-Bewegung hoechstens alle intervalMs einen Befehl; der letzte Wert wird beim
-// Loslassen immer gesendet. Der ESP-NOW-Link fasst zusaetzlich zusammen (ein Befehl unterwegs).
+// Loslassen immer gesendet. Der ESP-NOW-Link haelt zusaetzlich hoechstens einen Befehl wartend (der neueste ersetzt ihn).
 class Throttle {
 public:
   explicit Throttle(uint32_t intervalMs) : interval_(intervalMs) {}

@@ -82,6 +82,20 @@ struct SimNet : Radio {
   };
   std::vector<Peer> peers; // Peers des Controllers
   int dropNext = 0;        // die naechsten n Unicast-Rahmen gehen verloren
+  struct Sent {
+    uint8_t dst0; // letztes Adressbyte des Ziels
+    uint8_t type;
+    uint16_t seq;
+    lvp_set_state_t cmd; // nur bei SET_STATE belegt
+  };
+  std::vector<Sent> sentLog; // alle Unicast-Sendungen des Controllers (inkl. Wiederholungen)
+  int countSent(uint8_t type, int last = -1, int seq = -1) const {
+    int n = 0;
+    for (auto &e : sentLog) {
+      n += e.type == type && (last < 0 || e.dst0 == last) && (seq < 0 || e.seq == seq);
+    }
+    return n;
+  }
   int delivered = 0;
 
   Peer *peer(const uint8_t *mac) {
@@ -96,6 +110,14 @@ struct SimNet : Radio {
     Peer *p = peer(mac);
     if (!p) {
       return false; // ESP-NOW: Unicast nur an eingetragene Peers
+    }
+    lvp_msg_t dm;
+    if (lvp_decode(d, n, &dm) == LVP_OK) {
+      Sent e = {mac[5], dm.hdr.type, dm.hdr.seq, {}};
+      if (dm.hdr.type == LVP_MSG_SET_STATE) {
+        e.cmd = dm.u.set_state;
+      }
+      sentLog.push_back(e);
     }
     Frame f;
     memcpy(f.src, CTRL_ID, 6);
@@ -520,23 +542,384 @@ static void test_e2e_coalescing_latest_wins() {
   Rig r;
   SimGateway g(0x05, nullptr);
   int idx = pairOpen(r, g);
+  uint32_t rev0 = g.light.snapshot().revision;
   // Schnelle Reglerbewegung: viele Befehle, waehrend einer unterwegs ist
   for (int b = 10; b <= 100; b += 10) {
     lvp_set_state_t c = {LVP_SET_BRIGHTNESS, 0, (uint8_t)b, 0, 0, 0, 0};
     r.link->setState(idx, c, r.now);
   }
-  lvp_set_state_t on = {LVP_SET_POWER, 1, 0, 0, 0, 0, 0};
-  r.link->setState(idx, on, r.now);
   r.settle();
+  // Nur der erste (unterwegs) und der letzte (wartend) Befehl erreichen das Gateway
   CHECK_EQ(g.light.snapshot().brightness, 100);
-  CHECK_EQ(g.light.snapshot().power, 1);
-  CHECK(g.light.snapshot().revision <= 3); // zusammengefasst statt 11 Einzelbefehle
+  CHECK_EQ(g.light.snapshot().revision - rev0, 2u);
   CHECK_EQ(r.reg.at(idx).state.brightness, 100);
+  CHECK(!r.link->commandPending(idx));
+}
 
-  lvp_set_state_t a = {LVP_SET_RAW, 0, 0, 1, 2, 3, 0}, b = {LVP_SET_COLOR, 0, 0, 4, 5, 6, 0};
-  lvp_set_state_t m = ctrl_merge_set(a, b);
-  CHECK_EQ(m.mask, LVP_SET_COLOR);
-  CHECK_EQ(m.r, 4);
+// Ein neuer Befehl ersetzt den wartenden vollstaendig: aeltere Felder anderer Befehlstypen werden nicht uebernommen
+static void test_e2e_waiting_command_replaced_not_merged() {
+  Rig r;
+  SimGateway g(0x15, nullptr);
+  int idx = pairOpen(r, g);
+  uint32_t rev0 = g.light.snapshot().revision;
+  lvp_set_state_t a = {LVP_SET_BRIGHTNESS, 0, 10, 0, 0, 0, 0};      // A: unterwegs
+  lvp_set_state_t b = {LVP_SET_BRIGHTNESS, 0, 20, 0, 0, 0, 0};      // B
+  lvp_set_state_t c = {LVP_SET_POWER, 1, 0, 0, 0, 0, 0};            // C
+  lvp_set_state_t d = {LVP_SET_COLOR, 0, 0, 200, 100, 50, 0};       // D: letzter
+  CHECK_EQ(r.link->setState(idx, a, r.now), LVP_OK);
+  CHECK_EQ(r.link->setState(idx, b, r.now), LVP_OK);
+  CHECK_EQ(r.link->setState(idx, c, r.now), LVP_OK);
+  CHECK_EQ(r.link->setState(idx, d, r.now), LVP_OK);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x15), 1); // nur A wurde gesendet
+  r.settle();
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x15), 2); // A, dann ausschliesslich D
+  LightSnapshot s = g.light.snapshot();
+  CHECK_EQ(s.revision - rev0, 2u);
+  CHECK_EQ(s.brightness, 10);           // B nicht uebernommen
+  CHECK(s.power != 1);                  // C nicht uebernommen (kein Zusammenfuehren in D)
+  CHECK_EQ(s.r, 200);                   // D
+  CHECK_EQ(s.g, 100);
+  CHECK_EQ(s.b, 50);
+}
+
+// Bekannter Fehlerfall: SET_STATE geht verloren, danach wird eine neuere Abfrage verlangt.
+// Die Abfrage darf die Wiederholung nicht ueberholen (sonst verwirft das Gateway sie als veraltet).
+static void test_e2e_loss_then_query_does_not_overtake() {
+  Rig r;
+  SimGateway g(0x16, nullptr);
+  int idx = pairOpen(r, g);
+  r.net.sentLog.clear();
+  uint32_t rev0 = g.light.snapshot().revision;
+  r.net.dropNext = 1; // erste Sendung des SET_STATE geht verloren
+  lvp_set_state_t c = {LVP_SET_POWER | LVP_SET_BRIGHTNESS, 1, 42, 0, 0, 0, 0};
+  CHECK_EQ(r.link->setState(idx, c, r.now), LVP_OK);
+  CHECK(r.link->requestCalib(idx, r.now));   // vorgemerkt, nicht gesendet
+  CHECK(r.link->requestState(idx, r.now));   // vorgemerkt, nicht gesendet
+  CHECK_EQ(r.net.sentLog.size(), 1u);
+  r.settle(100);
+  // Wiederholung mit derselben Sequenznummer, dann erst die Abfragen
+  CHECK(r.net.sentLog.size() >= 3);
+  uint16_t seq = r.net.sentLog[0].seq;
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x16), 2);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x16, seq), 2);
+  CHECK(r.net.sentLog[1].type == LVP_MSG_SET_STATE && r.net.sentLog[1].seq == seq);
+  CHECK(r.net.sentLog[2].type != LVP_MSG_SET_STATE);
+  CHECK_EQ(g.light.snapshot().revision - rev0, 1u); // genau einmal ausgefuehrt, nicht als veraltet verworfen
+  CHECK_EQ(g.light.snapshot().brightness, 42);
+  CHECK_EQ(r.reg.at(idx).state.brightness, 42);
+  CHECK_EQ(r.net.countSent(LVP_MSG_GET_CALIB, 0x16), 1); // Bedarf zusammengefasst
+  CHECK_EQ(r.net.countSent(LVP_MSG_GET_STATE, 0x16), 0); // die STATE-Antwort des Befehls deckt den Bedarf ab
+}
+
+// Abfragebedarf staut sich nicht: viele Anforderungen waehrend einer offenen Anfrage -> je Art eine Abfrage
+static void test_e2e_query_demand_coalesced() {
+  Rig r;
+  SimGateway g(0x17, nullptr);
+  int idx = pairOpen(r, g);
+  r.net.sentLog.clear();
+  lvp_set_state_t c = {LVP_SET_POWER, 1, 0, 0, 0, 0, 0};
+  r.link->setState(idx, c, r.now);
+  for (int i = 0; i < 20; i++) {
+    r.link->requestState(idx, r.now);
+    r.link->requestCalib(idx, r.now);
+  }
+  r.settle(100);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x17), 1);
+  CHECK(r.net.countSent(LVP_MSG_GET_STATE, 0x17) <= 1); // STATE der Antwort deckt den Bedarf bereits ab
+  CHECK_EQ(r.net.countSent(LVP_MSG_GET_CALIB, 0x17), 1);
+}
+
+// Endgueltiger Timeout: danach folgt ausschliesslich der letzte wartende Befehl; der alte kehrt nie zurueck
+static void test_e2e_final_timeout_then_last_waiting() {
+  Rig r;
+  SimGateway g(0x18, nullptr);
+  int idx = pairOpen(r, g);
+  r.net.sentLog.clear();
+  uint32_t rev0 = g.light.snapshot().revision;
+  g.online = false; // Gateway antwortet nicht
+  lvp_set_state_t a = {LVP_SET_BRIGHTNESS, 0, 11, 0, 0, 0, 0}, b = {LVP_SET_BRIGHTNESS, 0, 22, 0, 0, 0, 0},
+                  c = {LVP_SET_COLOR, 0, 0, 9, 8, 7, 0};
+  r.link->setState(idx, a, r.now);
+  uint16_t seqA = r.net.sentLog[0].seq;
+  r.link->setState(idx, b, r.now);
+  r.link->setState(idx, c, r.now);
+  // bis zum endgueltigen Timeout von A (250+500+750+1000 ms)
+  for (int i = 0; i < 400 && r.net.countSent(LVP_MSG_SET_STATE, 0x18) < 5; i++) {
+    r.step(10);
+  }
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x18, seqA), 4); // begrenzt: 4 Sendungen mit gleicher Sequenz
+  CHECK(r.reg.at(idx).lastTimeout);
+  CHECK(r.link->commandPending(idx)); // C ist jetzt unterwegs
+  g.online = true;
+  r.settle(500);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x18, seqA), 4); // A wird nie wieder gesendet
+  LightSnapshot s = g.light.snapshot();
+  CHECK_EQ(s.revision - rev0, 1u); // nur C
+  CHECK(s.brightness != 11 && s.brightness != 22);
+  CHECK_EQ(s.r, 9);
+  CHECK(!r.link->commandPending(idx));
+}
+
+// Gateways werden unabhaengig behandelt: ein haengendes Gateway blockiert das andere nicht
+static void test_e2e_gateways_independent_queues() {
+  Rig r;
+  SimGateway a(0x1A, nullptr), b(0x1B, nullptr);
+  a.pairing.openWindow(0, 0xFFFFFFF);
+  b.pairing.openWindow(0, 0xFFFFFFF);
+  r.net.gws.push_back(&a);
+  r.net.gws.push_back(&b);
+  r.link->start(r.now);
+  r.settle();
+  int ia = r.reg.find(a.id()), ib = r.reg.find(b.id());
+  r.link->pair(ia, nullptr, r.now);
+  r.link->pair(ib, nullptr, r.now);
+  r.settle();
+  CHECK(r.reg.at(ia).paired && r.reg.at(ib).paired);
+  r.net.sentLog.clear();
+  uint32_t revB = b.light.snapshot().revision;
+  a.online = false;
+  lvp_set_state_t a1 = {LVP_SET_BRIGHTNESS, 0, 10, 0, 0, 0, 0}, a2 = {LVP_SET_BRIGHTNESS, 0, 20, 0, 0, 0, 0},
+                  b1 = {LVP_SET_BRIGHTNESS, 0, 30, 0, 0, 0, 0}, b2 = {LVP_SET_BRIGHTNESS, 0, 40, 0, 0, 0, 0};
+  r.link->setState(ia, a1, r.now);
+  r.link->setState(ib, b1, r.now); // sofort unterwegs, obwohl A offen ist
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x1A), 1);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x1B), 1);
+  r.link->setState(ia, a2, r.now); // wartet bei A
+  r.link->setState(ib, b2, r.now); // wartet bei B
+  r.settle(20);
+  CHECK_EQ(b.light.snapshot().brightness, 40);
+  CHECK_EQ(b.light.snapshot().revision - revB, 2u);
+  CHECK(r.link->commandPending(ia)); // A haengt weiter, B ist fertig
+  CHECK(!r.link->commandPending(ib));
+  a.online = true;
+  r.settle(500);
+  CHECK_EQ(a.light.snapshot().brightness, 20);
+  CHECK_EQ(r.reg.at(ia).state.brightness, 20);
+}
+
+// Kalibrierung speichern darf nicht durch Lichtbefehle (Farbwiederherstellung) verdraengt werden
+static void test_e2e_calib_save_then_restore_color() {
+  Rig r;
+  SimGateway g(0x19, nullptr);
+  int idx = pairOpen(r, g);
+  uint8_t pts[30];
+  for (int i = 0; i < 30; i++) {
+    pts[i] = (uint8_t)(50 + i);
+  }
+  // Vorschau (roh) ist unterwegs, Speichern wartet, Farbwiederherstellung wird abgewiesen -> Speichern bleibt erhalten
+  lvp_set_state_t preview = {LVP_SET_RAW, 0, 0, 10, 20, 30, 0}, restore = {LVP_SET_COLOR, 0, 0, 255, 0, 0, 0};
+  CHECK_EQ(r.link->setState(idx, preview, r.now), LVP_OK);
+  CHECK(r.link->sendCalib(idx, pts, r.now));
+  CHECK(r.link->calibPending(idx));
+  CHECK_EQ(r.link->setState(idx, restore, r.now), LVP_ERR_BUSY);
+  CHECK(!r.link->sendCalib(idx, pts, r.now));  // zweiter Vorgang ersetzt den ersten nicht stillschweigend
+  CHECK(!r.link->resetCalib(idx, r.now));
+  r.settle();
+  CHECK(g.cal.custom());
+  uint8_t got[30];
+  g.cal.points(got);
+  CHECK_EQ(got[29], 79);
+  CHECK(!r.link->calibPending(idx));
+  CHECK_EQ(r.link->setState(idx, restore, r.now), LVP_OK); // danach moeglich
+  r.settle();
+  CHECK_EQ(g.light.snapshot().r, 255);
+  CHECK_EQ(r.reg.at(idx).calib.custom, 1);
+
+  // Speichern ist unterwegs: die Wiederherstellung wartet und wird danach ausgefuehrt
+  uint8_t pts2[30];
+  for (int i = 0; i < 30; i++) {
+    pts2[i] = (uint8_t)(90 + i);
+  }
+  CHECK(r.link->sendCalib(idx, pts2, r.now));
+  lvp_set_state_t restore2 = {LVP_SET_COLOR, 0, 0, 1, 2, 3, 0};
+  CHECK_EQ(r.link->setState(idx, restore2, r.now), LVP_OK);
+  r.settle();
+  g.cal.points(got);
+  CHECK_EQ(got[0], 90);
+  CHECK_EQ(g.light.snapshot().b, 3);
+}
+
+// Die n-te gesendete SET_STATE-Sendung an dieses Gateway (0-basiert)
+static const SimNet::Sent *nthSet(const SimNet &n, uint8_t last, int k) {
+  for (auto &e : n.sentLog) {
+    if (e.type == LVP_MSG_SET_STATE && e.dst0 == last && k-- == 0) {
+      return &e;
+    }
+  }
+  return nullptr;
+}
+
+static void settleSets(Rig &r, SimGateway &g, int idx) {
+  lvp_set_state_t on = {LVP_SET_MUSIC, 0, 0, 0, 0, 0, 1};
+  CHECK_EQ(r.link->setState(idx, on, r.now), LVP_OK);
+  r.settle();
+  CHECK(g.light.snapshot().music);
+}
+
+// Musik an wartet, danach kalibrierte Farbe: nur die Farbe wartet weiter, ohne uebernommenes MUSIC-Feld.
+static void test_e2e_waiting_music_then_color_music_stays_off() {
+  Rig r;
+  SimGateway g(0x20, nullptr);
+  int idx = pairOpen(r, g);
+  settleSets(r, g, idx); // Gateway: Musik laeuft
+  r.net.sentLog.clear();
+  lvp_set_state_t a = {LVP_SET_BRIGHTNESS, 0, 55, 0, 0, 0, 0}, music = {LVP_SET_MUSIC, 0, 0, 0, 0, 0, 1},
+                  color = {LVP_SET_COLOR, 0, 0, 10, 20, 30, 0};
+  r.link->setState(idx, a, r.now);     // unterwegs
+  r.link->setState(idx, music, r.now); // wartet
+  r.link->setState(idx, color, r.now); // ersetzt "Musik an" vollstaendig
+  r.settle();
+  const SimNet::Sent *second = nthSet(r.net, 0x20, 1);
+  CHECK(second != nullptr);
+  if (second) {
+    CHECK_EQ(second->cmd.mask, LVP_SET_COLOR); // kein MUSIC-Feld uebernommen
+    CHECK_EQ(second->cmd.music, 0);
+  }
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x20), 2);
+  CHECK(!g.light.snapshot().music); // kalibrierte Farbe beendet den Musikmodus
+  CHECK(!(r.reg.at(idx).state.flags & LVP_STATE_MUSIC)); // Anzeige = bestaetigter Zustand
+  CHECK_EQ(g.light.snapshot().r, 10);
+}
+
+// Farbe wartet, danach Helligkeit: nur die Helligkeit bleibt erhalten
+static void test_e2e_waiting_color_then_brightness_only_brightness() {
+  Rig r;
+  SimGateway g(0x21, nullptr);
+  int idx = pairOpen(r, g);
+  r.net.sentLog.clear();
+  uint32_t colorRev0 = g.light.snapshot().colorRev;
+  lvp_set_state_t a = {LVP_SET_POWER, 1, 0, 0, 0, 0, 0}, color = {LVP_SET_COLOR, 0, 0, 1, 2, 3, 0},
+                  br = {LVP_SET_BRIGHTNESS, 0, 33, 0, 0, 0, 0};
+  r.link->setState(idx, a, r.now);
+  r.link->setState(idx, color, r.now);
+  r.link->setState(idx, br, r.now);
+  r.settle();
+  const SimNet::Sent *second = nthSet(r.net, 0x21, 1);
+  CHECK(second != nullptr);
+  if (second) {
+    CHECK_EQ(second->cmd.mask, LVP_SET_BRIGHTNESS);
+  }
+  CHECK_EQ(g.light.snapshot().colorRev, colorRev0); // Farbe wurde nie gesendet
+  CHECK_EQ(g.light.snapshot().brightness, 33);
+}
+
+// Roh <-> kalibriert: der letzte wartende Befehl bleibt unveraendert; Musik bleibt bei RAW, endet bei COLOR
+static void test_e2e_waiting_raw_calibrated_switch_last_wins() {
+  Rig r;
+  SimGateway g(0x22, nullptr);
+  int idx = pairOpen(r, g);
+  settleSets(r, g, idx);
+  r.net.sentLog.clear();
+  lvp_set_state_t a = {LVP_SET_POWER, 1, 0, 0, 0, 0, 0}, raw = {LVP_SET_RAW, 0, 0, 5, 6, 7, 0},
+                  cal = {LVP_SET_COLOR, 0, 0, 8, 9, 10, 0}, raw2 = {LVP_SET_RAW, 0, 0, 11, 12, 13, 0};
+  r.link->setState(idx, a, r.now);
+  r.link->setState(idx, raw, r.now);
+  r.link->setState(idx, cal, r.now);
+  r.link->setState(idx, raw2, r.now); // letzter: roh, darf weder COLOR noch Werte des Vorgaengers enthalten
+  r.settle();
+  const SimNet::Sent *second = nthSet(r.net, 0x22, 1);
+  CHECK(second != nullptr);
+  if (second) {
+    CHECK_EQ(second->cmd.mask, LVP_SET_RAW);
+    CHECK_EQ(second->cmd.r, 11);
+  }
+  CHECK(g.light.snapshot().raw);
+  CHECK(g.light.snapshot().music); // RAW beendet Musik nicht; COLOR (ersetzt) wurde nie gesendet
+  CHECK_EQ(g.light.snapshot().r, 11);
+
+  // Umgekehrt: roh wartet, dann kalibriert -> Musik aus, nicht roh
+  r.net.sentLog.clear();
+  r.link->setState(idx, a, r.now);
+  r.link->setState(idx, raw, r.now);
+  r.link->setState(idx, cal, r.now);
+  r.settle();
+  second = nthSet(r.net, 0x22, 1);
+  CHECK(second != nullptr);
+  if (second) {
+    CHECK_EQ(second->cmd.mask, LVP_SET_COLOR);
+  }
+  CHECK(!g.light.snapshot().raw);
+  CHECK(!g.light.snapshot().music);
+}
+
+// Paketverlust und Wiederholungen aendern weder Inhalt noch Bedeutung des letzten wartenden Befehls
+static void test_e2e_loss_keeps_waiting_command_identical() {
+  Rig r;
+  SimGateway g(0x23, nullptr);
+  int idx = pairOpen(r, g);
+  settleSets(r, g, idx);
+  r.net.sentLog.clear();
+  uint32_t rev0 = g.light.snapshot().revision;
+  lvp_set_state_t a = {LVP_SET_BRIGHTNESS, 0, 60, 0, 0, 0, 0}, music = {LVP_SET_MUSIC, 0, 0, 0, 0, 0, 1},
+                  color = {LVP_SET_COLOR, 0, 0, 40, 50, 60, 0};
+  r.net.dropNext = 5; // A: alle 4 Sendungen verloren (endgueltiger Timeout), erste Sendung des wartenden Befehls ebenfalls
+  r.link->setState(idx, a, r.now);
+  r.link->setState(idx, music, r.now);
+  r.link->setState(idx, color, r.now);
+  r.settle(450);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_STATE, 0x23), 6); // 4x A, 2x der letzte Befehl
+  const SimNet::Sent *w1 = nthSet(r.net, 0x23, 4), *w2 = nthSet(r.net, 0x23, 5);
+  CHECK(w1 && w2);
+  if (w1 && w2) {
+    CHECK_EQ(w1->seq, w2->seq); // Wiederholung: gleiche Sequenznummer
+    CHECK_EQ(w1->cmd.mask, LVP_SET_COLOR);
+    CHECK_EQ(w2->cmd.mask, LVP_SET_COLOR);
+    CHECK(w1->seq != nthSet(r.net, 0x23, 0)->seq);
+    CHECK(w2->cmd.r == 40 && w2->cmd.g == 50 && w2->cmd.b == 60 && w2->cmd.music == 0);
+  }
+  CHECK_EQ(g.light.snapshot().revision - rev0, 1u); // nur der Farbbefehl, genau einmal
+  CHECK(!g.light.snapshot().music);
+  CHECK_EQ(g.light.snapshot().brightness, 100); // A nie angekommen und nicht erneut eingereiht
+}
+
+// Ein bewusst zusammengesetzter einzelner SET_STATE behaelt seine Semantik (Farbe, Musik aus, dann Musikfeld)
+static void test_e2e_single_composite_set_state_semantics() {
+  Rig r;
+  SimGateway g(0x24, nullptr);
+  int idx = pairOpen(r, g);
+  r.net.sentLog.clear();
+  // direkt gesendet (nichts unterwegs)
+  lvp_set_state_t both = {LVP_SET_COLOR | LVP_SET_MUSIC, 0, 0, 1, 2, 3, 1};
+  CHECK_EQ(r.link->setState(idx, both, r.now), LVP_OK);
+  r.settle();
+  CHECK(g.light.snapshot().music); // ausdrueckliches Musikfeld wirkt nach der Farbe
+  CHECK_EQ(g.light.snapshot().r, 1);
+
+  // als wartender Befehl: unveraendert uebernommen
+  lvp_set_state_t a = {LVP_SET_POWER, 1, 0, 0, 0, 0, 0}, off = {LVP_SET_COLOR | LVP_SET_MUSIC, 0, 0, 4, 5, 6, 0};
+  r.link->setState(idx, a, r.now);
+  r.link->setState(idx, both, r.now);
+  r.link->setState(idx, off, r.now); // ersetzt "both" vollstaendig
+  r.settle();
+  const SimNet::Sent *last = nthSet(r.net, 0x24, 2);
+  CHECK(last != nullptr);
+  if (last) {
+    CHECK_EQ(last->cmd.mask, LVP_SET_COLOR | LVP_SET_MUSIC);
+    CHECK_EQ(last->cmd.music, 0);
+  }
+  CHECK(!g.light.snapshot().music);
+  CHECK_EQ(g.light.snapshot().r, 4);
+}
+
+// Verlorene Kalibrierung speichern: endgueltiger Timeout wird gemeldet (nicht als Erfolg), nichts wird spaeter erneut gesendet
+static void test_e2e_calib_save_timeout_reported() {
+  Rig r;
+  SimGateway g(0x1C, nullptr);
+  int idx = pairOpen(r, g);
+  r.net.sentLog.clear();
+  uint8_t pts[30] = {0};
+  g.online = false;
+  CHECK(r.link->sendCalib(idx, pts, r.now));
+  for (int i = 0; i < 400 && r.link->calibPending(idx) && r.net.countSent(LVP_MSG_SET_CALIB, 0x1C) <= 4; i++) {
+    r.step(10);
+  }
+  CHECK(r.reg.at(idx).lastTimeout); // UI: "Keine Antwort" statt "Gespeichert"
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_CALIB, 0x1C), 4);
+  g.online = true;
+  r.settle(400);
+  CHECK_EQ(r.net.countSent(LVP_MSG_SET_CALIB, 0x1C), 4); // nicht erneut eingereiht
+  CHECK(!g.cal.custom());
+  CHECK_EQ(r.reg.at(idx).calib.custom, 0); // gespeicherte Kalibrierung neu gelesen
 }
 
 static void test_e2e_offline_and_resync() {
@@ -673,7 +1056,19 @@ void tests_controller(void) {
   RUN(test_e2e_key_required);
   RUN(test_e2e_pairing_window_closed);
   RUN(test_e2e_retry_on_loss);
-  RUN(test_e2e_coalescing_latest_wins);
+  RUN_D(test_e2e_coalescing_latest_wins, "Viele Befehle waehrend einer offenen Anfrage: nur erster (unterwegs) und letzter (wartend) erreichen das Gateway");
+  RUN_D(test_e2e_waiting_command_replaced_not_merged, "A unterwegs, B/C/D folgen: ausschliesslich D; keine Felder aelterer Befehle uebernommen");
+  RUN_D(test_e2e_loss_then_query_does_not_overtake, "SET_STATE geht verloren, GET_CALIB/GET_STATE ueberholen die Wiederholung nicht (kein STALE)");
+  RUN_D(test_e2e_query_demand_coalesced, "Abfragebedarf wird zusammengefasst, kein Rueckstau");
+  RUN_D(test_e2e_final_timeout_then_last_waiting, "Endgueltiger Timeout: danach nur der letzte wartende Befehl, der alte kehrt nie zurueck");
+  RUN_D(test_e2e_gateways_independent_queues, "Zwei Gateways werden unabhaengig behandelt");
+  RUN_D(test_e2e_calib_save_then_restore_color, "Kalibrierung speichern wird von der Farbwiederherstellung nicht verdraengt");
+  RUN_D(test_e2e_calib_save_timeout_reported, "Timeout beim Speichern der Kalibrierung wird gemeldet, nicht als Erfolg");
+  RUN_D(test_e2e_waiting_music_then_color_music_stays_off, "Wartendes 'Musik an' + kalibrierte Farbe: Musik bleibt aus");
+  RUN_D(test_e2e_waiting_color_then_brightness_only_brightness, "Wartende Farbe + Helligkeit: nur Helligkeit");
+  RUN_D(test_e2e_waiting_raw_calibrated_switch_last_wins, "Wechsel roh/kalibriert: letzter wartender Befehl unveraendert");
+  RUN_D(test_e2e_loss_keeps_waiting_command_identical, "Verlust/Wiederholung aendert Inhalt des wartenden Befehls nicht");
+  RUN_D(test_e2e_single_composite_set_state_semantics, "Einzelner SET_STATE mit mehreren Feldern behaelt seine Semantik");
   RUN(test_e2e_offline_and_resync);
   RUN(test_e2e_notify_from_gateway);
   RUN(test_e2e_calibration);
