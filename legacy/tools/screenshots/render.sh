@@ -33,12 +33,24 @@ mkdir -p "$BUILD/ppm"
 "$BUILD/shot" "$BUILD/ppm"
 
 python3 - "$BUILD/ppm" "$OUT" <<'PY'
+# PNG mit Alphakanal: ausserhalb des runden Displays transparent, Rand geglaettet
 import glob, os, sys
-from PIL import Image
+from PIL import Image, ImageDraw
 src, out = sys.argv[1], sys.argv[2]
+S = 8  # Ueberabtastung fuer einen weichen Rand
+masks = {}
+def mask_for(size):
+    if size not in masks:
+        w, h = size
+        m = Image.new("L", (w * S, h * S), 0)
+        ImageDraw.Draw(m).ellipse([0, 0, w * S - 1, h * S - 1], fill=255)
+        masks[size] = m.resize(size, Image.LANCZOS)
+    return masks[size]
 for f in sorted(glob.glob(os.path.join(src, "*.ppm"))):
     name = os.path.splitext(os.path.basename(f))[0]
-    Image.open(f).convert("RGB").save(os.path.join(out, name + ".png"))
+    img = Image.open(f).convert("RGBA")
+    img.putalpha(mask_for(img.size))
+    img.save(os.path.join(out, name + ".png"))
     print("geschrieben:", name + ".png")
 PY
 rm -rf "$BUILD"
