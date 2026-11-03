@@ -119,6 +119,8 @@ Die Flashgröße ist hier nicht belegt; die Firmware nutzt deshalb ein 4-MB-Layo
 
 ## Teststand
 
+Die geprüfte, automatisch erzeugte Auswertung (Ergebnisse je Test, getesteter Commit, Prüfverfahren) steht in [`tests/README.md`](tests/README.md); sie entsteht im CI-Lauf nach dem Merge auf `main`. Die Tabelle unten ist eine händisch gepflegte Übersicht.
+
 | Art | Stand |
 |---|---|
 | **Builds** | Gateway (ESP-IDF 5.5.6, esp32s3), Controller ohne Zigbee und mit Zigbee (esp32c5) in dieser Umgebung gebaut, ohne Warnungen im eigenen Code. Legacy mit PlatformIO gebaut. |

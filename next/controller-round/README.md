@@ -86,7 +86,7 @@ Nebenläufigkeit wie beim RockBase-Controller: Der ESP-NOW-Callback kopiert nur 
 ## LightState-Synchronisierung
 
 - Angezeigt wird der vom Gateway bestätigte Zustand (`STATE`). Nur während der Finger auf dem Helligkeitsregler liegt oder ein Befehl unterwegs ist, zeigt die Oberfläche den Eingabewert; danach gilt wieder der bestätigte Wert.
-- Wiederholung, Zusammenfassen (immer höchstens ein Befehl unterwegs, neuester Wert gewinnt), Zeitüberschreitung, Duplikaterkennung und Abgleich nach Neustart oder Offline-Phase übernimmt `CtrlLink` (wie beim RockBase-Controller). Veraltete Antworten (kleinere Revision derselben Sitzung) werden verworfen.
+- Wiederholung, Senderegel (je Gateway höchstens eine Anfrage unterwegs und ein Steuerbefehl wartend; ein neuer Lichtbefehl ersetzt den wartenden vollständig, Abfragen überholen nichts, siehe `docs/ESP_NOW_PROTOKOLL.md`), Zeitüberschreitung, Duplikaterkennung und Abgleich nach Neustart oder Offline-Phase übernimmt `CtrlLink` (wie beim RockBase-Controller). Veraltete Antworten (kleinere Revision derselben Sitzung) werden verworfen.
 - Zusätzlich sendet die Oberfläche beim Ziehen des Helligkeitsreglers höchstens alle 120 ms einen Befehl; der letzte Wert geht beim Loslassen immer raus.
 - Offline: nach drei verpassten Beacons. Der ESP-NOW-Punkt wird rot und die Bedienelemente werden gesperrt (keine Statustexte). Befehle werden nicht gesammelt. Ist das Gateway wieder da, wird der vollständige Zustand abgefragt.
 

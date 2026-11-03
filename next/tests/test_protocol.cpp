@@ -331,7 +331,11 @@ static void test_txq_complete_and_cancel() {
   CHECK(lvl_txq_complete(&q, ID_B, 1, &out));  // Peer und Sequenz muessen passen
   CHECK_EQ(out.tag, 2);
   CHECK(!lvl_txq_complete(&q, ID_B, 1, &out)); // nur einmal
+  const lvl_pending_t *open = lvl_txq_find_peer(&q, ID_A);
+  CHECK(open != nullptr && open->type == LVP_MSG_GET_STATE);
+  CHECK(lvl_txq_find_peer(&q, ID_B) == nullptr);
   CHECK_EQ(lvl_txq_cancel_peer(&q, ID_A), 2);
+  CHECK(lvl_txq_find_peer(&q, ID_A) == nullptr);
   CHECK_EQ(lvl_txq_count(&q), 0);
   // volle Warteschlange
   for (int i = 0; i < LVL_MAX_PENDING; i++) {

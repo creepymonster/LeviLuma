@@ -2,10 +2,20 @@ name: Tests
 
 # Host-Tests von LeviLuma Next (ohne Hardware, ohne ESP-IDF) und Pruefung der aus Legacy
 # kopierten Dateien. Laeuft auf jedem Branch, damit Fehler vor dem Merge auffallen.
+#
+# Testauswertung (next/tests/README.md):
+#  - Jeder Lauf erzeugt den Bericht aus den tatsaechlichen Ergebnissen und legt ihn als Artefakt ab
+#    (auch bei Test- oder Buildfehlern). Das ist nur eine Vorschau.
+#  - Abschlusszeitpunkt: der Lauf nach dem Merge auf main (push). Nur dort uebernimmt der Job "report"
+#    die Auswertung per Bot-Commit ("[skip ci]") in next/tests/README.md. Der Bericht nennt den getesteten Commit.
+#  - Der CI-Status kommt ausschliesslich von den Test-Schritten; der Berichtsjob kann einen Fehlschlag nicht verdecken.
+#  - Schleifen: der Bot-Commit aendert nur next/tests/README.md (per paths ausgenommen, "[skip ci]", Push mit
+#    GITHUB_TOKEN loest keine Workflows aus).
 on:
   push:
     paths:
       - "next/**"
+      - "!next/tests/README.md"
       - "legacy/include/CalibCore.h"
       - "legacy/include/ColorMath.h"
       - "legacy/include/Palette.h"
@@ -13,11 +23,15 @@ on:
   pull_request:
     paths:
       - "next/**"
+      - "!next/tests/README.md"
       - "legacy/include/CalibCore.h"
       - "legacy/include/ColorMath.h"
       - "legacy/include/Palette.h"
       - ".github/workflows/tests.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   host-tests:
@@ -29,13 +43,133 @@ jobs:
       - name: Werkzeuge installieren
         run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build g++
 
-      - name: Tests bauen und ausfuehren (ASan/UBSan)
-        run: next/tests/run_tests.sh
+      - name: Tests bauen (ASan/UBSan)
+        id: build
+        run: next/tests/run_tests.sh build
+
+      - name: Tests ausfuehren
+        id: run
+        if: steps.build.outcome == 'success'
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          set -o pipefail
+          LEVI_TEST_RESULTS="$RUNNER_TEMP/report/results.jsonl" next/tests/run_tests.sh run 2>&1 | tee "$RUNNER_TEMP/report/console.log"
 
       # CalibCore.h, ColorMath.h und Palette.h sind byte-gleiche Kopien aus Legacy (siehe AGENTS.md)
       - name: Kopien aus Legacy pruefen
+        id: copies
+        if: always()
         run: |
           cmp legacy/include/CalibCore.h next/gateway/components/light_core/include/CalibCore.h
           cmp legacy/include/ColorMath.h next/gateway/components/light_core/include/ColorMath.h
           cmp legacy/include/Palette.h   next/controller/components/controller_core/include/Palette.h
           echo "Kopien sind byte-gleich."
+
+      # Immer ausfuehren, auch nach Fehlern. Der Generator endet mit 0; der Status der Schritte oben bleibt massgeblich.
+      - name: Auswertung erzeugen (Vorschau)
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          printf '%s\n' "build=${{ steps.build.outcome }}" "run=${{ steps.run.outcome }}" "copies=${{ steps.copies.outcome }}" > "$RUNNER_TEMP/report/steps.txt"
+          python3 next/tests/tools/gen_report.py \
+            --results "$RUNNER_TEMP/report/results.jsonl" --log "$RUNNER_TEMP/report/console.log" \
+            --out "$RUNNER_TEMP/report/README.preview.md" \
+            --commit "${{ github.event.pull_request.head.sha || github.sha }}" --ref "${{ github.ref }}" --event "${{ github.event_name }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --step build=${{ steps.build.outcome }} --step run=${{ steps.run.outcome }} --step copies=${{ steps.copies.outcome }}
+          cat "$RUNNER_TEMP/report/README.preview.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ergebnisse als Artefakt ablegen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-test-results
+          path: ${{ runner.temp }}/report/
+          if-no-files-found: warn
+
+  # Abschluss: nur nach dem Merge auf main. Uebernimmt die Auswertung des getesteten Commits ins Repository.
+  report:
+    name: Testauswertung ablegen (next/tests/README.md)
+    needs: host-tests
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.host-tests.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # nur fuer den Bot-Commit der README
+      actions: read   # Status der Firmware-Builds (next.yml) lesen
+    concurrency:
+      group: test-report # nie zwei Berichtslaeufe gleichzeitig; ein wartender aelterer wird durch einen neueren ersetzt
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Ergebnisse laden
+        uses: actions/download-artifact@v4
+        with:
+          name: host-test-results
+          path: ${{ runner.temp }}/report
+        continue-on-error: true # fehlt das Artefakt, entsteht der Bericht als "nicht ausgefuehrt"
+
+      - name: Firmware-Builds desselben Commits abfragen
+        run: |
+          out="$RUNNER_TEMP/report/firmware.json"; mkdir -p "$RUNNER_TEMP/report"
+          # next.yml startet parallel; bis zu 40 Minuten auf den Abschluss warten, ohne Lauf nach 3 Minuten aufgeben
+          for i in $(seq 1 80); do
+            run=$(gh api "repos/${{ github.repository }}/actions/workflows/next.yml/runs?head_sha=${{ github.sha }}&event=push" \
+                  --jq '.workflow_runs | sort_by(.created_at) | last // empty' || true)
+            if [ -z "$run" ]; then
+              [ "$i" -ge 6 ] && break
+            elif [ "$(jq -r .status <<<"$run")" = completed ]; then
+              break
+            fi
+            sleep 30
+          done
+          if [ -n "${run:-}" ]; then
+            gh api "repos/${{ github.repository }}/actions/runs/$(jq -r .id <<<"$run")/jobs" \
+              --jq '[.jobs[] | {name, status, conclusion}]' > "$out" || rm -f "$out"
+          fi
+
+      - name: Auswertung erzeugen
+        run: |
+          R="$RUNNER_TEMP/report"
+          get() { sed -n "s/^$1=//p" "$R/steps.txt" 2>/dev/null | head -1; }
+          python3 next/tests/tools/gen_report.py \
+            --results "$R/results.jsonl" --log "$R/console.log" --firmware "$R/firmware.json" \
+            --out "$R/README.md" \
+            --commit "${{ github.sha }}" --ref "${{ github.ref }}" --event "${{ github.event_name }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --step "build=$(get build)" --step "run=$(get run)" --step "copies=$(get copies)"
+
+      - name: README im Repository ablegen
+        run: |
+          R="$RUNNER_TEMP/report"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin main
+            # Veraltet: ist seit dem getesteten Commit etwas anderes als die README hinzugekommen, ueberlaesst dieser
+            # Lauf die Auswertung dem Lauf des neueren Stands.
+            if ! git diff --quiet "${{ github.sha }}" origin/main -- . ':(exclude)next/tests/README.md'; then
+              echo "main enthaelt einen neueren Stand als ${{ github.sha }}; Auswertung wird vom neueren Lauf abgelegt."
+              exit 0
+            fi
+            git checkout --quiet --detach origin/main
+            cp "$R/README.md" next/tests/README.md
+            if git diff --quiet -- next/tests/README.md; then
+              echo "next/tests/README.md ist bereits aktuell."
+              exit 0
+            fi
+            git add next/tests/README.md
+            git commit --quiet -m "Testauswertung für ${GITHUB_SHA::7} aktualisieren [skip ci]" \
+              -m "Automatisch erzeugt aus dem CI-Lauf ${{ github.run_id }}. Getesteter Commit: ${{ github.sha }}. Nur next/tests/README.md."
+            # kein Force-Push: bei Wettlauf neu abgleichen und erneut pruefen
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push abgelehnt (Versuch $attempt)."
+          done
+          echo "::error::next/tests/README.md konnte nicht nach main geschrieben werden (Branch-Schutz? Berechtigungen?). Bericht liegt im Artefakt host-test-results."
+          exit 1

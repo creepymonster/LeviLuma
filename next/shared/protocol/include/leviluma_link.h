@@ -59,6 +59,8 @@ int lvl_txq_cancel_peer(lvl_txq_t *q, const uint8_t peer[LVP_ID_LEN]);
 // Gibt es eine offene Anfrage dieses Typs an diesen Peer?
 bool lvl_txq_has(const lvl_txq_t *q, const uint8_t peer[LVP_ID_LEN], uint8_t type);
 int lvl_txq_count(const lvl_txq_t *q);
+// Die offene Anfrage an diesen Peer (hoechstens eine pro Peer, wenn der Aufrufer das einhaelt) oder NULL.
+const lvl_pending_t *lvl_txq_find_peer(const lvl_txq_t *q, const uint8_t peer[LVP_ID_LEN]);
 
 typedef struct {
   bool used;

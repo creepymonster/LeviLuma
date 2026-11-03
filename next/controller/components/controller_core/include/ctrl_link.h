@@ -4,6 +4,17 @@
 // Online-/Offline-Erkennung und Kalibrierung. Funk ueber die Schnittstelle Radio.
 // Nicht threadsicher: der Aufrufer (Controller main) haelt den App-Mutex.
 //
+// Senderegel je Gateway (unabhaengig fuer jedes Gateway):
+//  - Hoechstens EINE Anfrage ist unterwegs (alle Typen). Wiederholungen nutzen dieselbe Sequenznummer
+//    und erzeugen keine neuen Eintraege. Nach endgueltigem Timeout wird nichts erneut eingereiht.
+//  - Zusaetzlich wartet hoechstens EIN Steuerbefehl. Ein neuer Lichtbefehl ersetzt den wartenden
+//    vollstaendig (kein Zusammenfuehren, keine FIFO-Schlange).
+//  - Kalibrierung speichern/zuruecksetzen ist ein expliziter Vorgang: Er wird nie von einem Lichtbefehl
+//    verdraengt (der Lichtbefehl wird mit LVP_ERR_BUSY abgewiesen). Er ersetzt nur einen wartenden Lichtbefehl.
+//  - Zustands-/Kalibrierabfragen ueberholen keine offene Anfrage und stauen sich nicht: sie werden als
+//    Bedarf (ein Merker je Art) vorgemerkt und gesendet, sobald nichts mehr offen ist und kein Befehl wartet.
+//    Sonst koennte das Gateway die Wiederholung eines verlorenen Befehls als veraltet verwerfen.
+//
 // Grundsatz: Der Controller zeigt nur bestaetigte Zustaende an. Ein Steuerbefehl gilt erst als
 // ausgefuehrt, wenn das Gateway mit STATE antwortet (autoritativer LightState).
 #include <stddef.h>
@@ -57,17 +68,22 @@ public:
   lvp_err_t pair(int idx, const uint8_t *key, uint32_t nowMs);
   // Entkoppeln: UNPAIR an das Gateway (best effort) und lokal sofort loeschen.
   bool unpair(int idx, uint32_t nowMs);
-  // Steuerbefehl. Laeuft bereits einer an dieses Gateway, wird der neue zusammengefasst
-  // und nach der Antwort gesendet (neuester Wert gewinnt).
+  // Lichtbefehl. Ist eine Anfrage unterwegs, wartet der Befehl und ersetzt einen bereits wartenden
+  // Lichtbefehl vollstaendig (neuester gewinnt). LVP_ERR_BUSY, wenn eine wartende Kalibrierung
+  // (speichern/zuruecksetzen) nicht verdraengt werden darf.
   lvp_err_t setState(int idx, const lvp_set_state_t &cmd, uint32_t nowMs);
+  // Abfragen: true = gesendet oder als Bedarf vorgemerkt; false = nicht gekoppelt oder dieselbe Abfrage laeuft bereits.
   bool requestState(int idx, uint32_t nowMs);
   bool requestCalib(int idx, uint32_t nowMs);
+  // Kalibrierung speichern/zuruecksetzen: false = nicht gekoppelt oder es wartet schon eine Kalibrierung (nicht verloren
+  // geben, spaeter erneut versuchen). Ein wartender Lichtbefehl wird ersetzt.
   bool sendCalib(int idx, const uint8_t points[LVP_CAL_BYTES], uint32_t nowMs);
   bool resetCalib(int idx, uint32_t nowMs);
 
   bool online(int idx, uint32_t nowMs) const;
-  // Steuerbefehl an dieses Gateway unterwegs (Anzeige "wird gesendet")
+  // Lichtbefehl an dieses Gateway unterwegs oder wartend (Anzeige "wird gesendet")
   bool commandPending(int idx) const;
+  // Kalibrierung laeuft: Abfrage/Speichern/Zuruecksetzen unterwegs, wartend oder vorgemerkt
   bool calibPending(int idx) const;
   // Steigt bei jeder fuer die Anzeige relevanten Aenderung
   uint32_t version() const {
@@ -88,7 +104,9 @@ private:
   bool request(int idx, lvp_msg_t &m, uint32_t nowMs);
   void handleResponse(int idx, const lvp_msg_t &m, const lvl_pending_t *req, uint32_t nowMs);
   void applyState(int idx, const lvp_state_t &s, uint32_t gwSession);
-  void sendQueuedSet(int idx, uint32_t nowMs);
+  const lvl_pending_t *inFlight(int idx) const;
+  // Naechstes Wartende senden, wenn nichts offen ist: Befehl, dann Zustandsabfrage, dann Kalibrierabfrage
+  void pump(int idx, uint32_t nowMs);
   void onTimeout(const lvl_pending_t &p, uint32_t nowMs);
   void changed(int idx);
 
@@ -102,10 +120,15 @@ private:
   uint32_t lastDiscover_ = 0;
   bool started_ = false;
   bool onlineCache_[GatewayRegistry::MAX_ENTRIES] = {false};
-  bool nextSetValid_[GatewayRegistry::MAX_ENTRIES] = {false};
-  lvp_set_state_t nextSet_[GatewayRegistry::MAX_ENTRIES] = {};
+  // Hoechstens ein wartender Steuerbefehl je Gateway
+  enum class WaitKind : uint8_t { None, Light, SetCalib, ResetCalib };
+  struct Waiting {
+    WaitKind kind = WaitKind::None;
+    lvp_set_state_t light = {};
+    uint8_t points[LVP_CAL_BYTES] = {0};
+  };
+  Waiting wait_[GatewayRegistry::MAX_ENTRIES];
+  bool needState_[GatewayRegistry::MAX_ENTRIES] = {false}; // zusammengefasster Abfragebedarf
+  bool needCalib_[GatewayRegistry::MAX_ENTRIES] = {false};
   Stats stats_;
 };
-
-// Zusammenfassen zweier Steuerbefehle (b ist neuer). Farbe kalibriert/roh schliessen sich aus.
-lvp_set_state_t ctrl_merge_set(const lvp_set_state_t &a, const lvp_set_state_t &b);

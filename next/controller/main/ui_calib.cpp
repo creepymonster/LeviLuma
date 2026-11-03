@@ -14,7 +14,7 @@ static lv_obj_t *statusLbl, *pointsLbl, *stepLbl, *preview, *sliders[3], *values
 static int step = -1; // -1 = Uebersicht
 static uint8_t cur[3], done[LVP_CAL_BYTES];
 static uint8_t restore[3];
-static bool restoreValid = false, saving = false;
+static bool restoreValid = false, saving = false, restoreDue = false;
 
 static void back() {
   uiShowGatewaySettings(gw);
@@ -26,6 +26,17 @@ static void restoreColor() {
   }
 }
 
+// Nach "Uebernehmen" erst wiederherstellen, wenn der Speichervorgang abgeschlossen ist: ein Lichtbefehl darf
+// einen wartenden Speichervorgang nicht verdraengen (der Link weist ihn sonst mit BUSY ab).
+static void restoreWhenSaved(const GatewayView &v) {
+  if (!restoreDue || v.calibPending) {
+    return;
+  }
+  if (!restoreValid || appSetColor(gw, restore[0], restore[1], restore[2]) != LVP_ERR_BUSY) {
+    restoreDue = false;
+  }
+}
+
 static void overviewRefresh(bool) {
   GatewayView v;
   if (!appView(gw, v) || !v.paired) {
@@ -34,8 +45,10 @@ static void overviewRefresh(bool) {
   }
   if (saving && !v.calibPending) {
     saving = false;
-    uiToast(v.lastError ? appErrorText(v.lastError, false) : "Gespeichert.");
+    // Ohne Antwort des Gateways ist die Kalibrierung nicht gespeichert: nicht als Erfolg melden
+    uiToast(v.lastError ? appErrorText(v.lastError, false) : v.lastTimeout ? appErrorText(0, true) : "Gespeichert.");
   }
+  restoreWhenSaved(v);
   if (!v.calibValid) {
     lv_label_set_text(statusLbl, v.calibPending ? "Lade Kalibrierung ..." : "Kalibrierung unbekannt (Gateway offline?)");
     lv_label_set_text(pointsLbl, "");
@@ -77,11 +90,13 @@ static void nextClicked(lv_event_t *) {
     return;
   }
   // fertig: speichern, dann vorherige Farbe wiederherstellen (wie calFinish)
-  if (!appSendCalib(gw, done)) {
+  if (appSendCalib(gw, done)) {
+    saving = true;
+    restoreDue = true; // Farbe folgt, sobald der Speichervorgang abgeschlossen ist (overviewRefresh)
+  } else {
     uiToast("Senden nicht moeglich");
+    restoreColor();
   }
-  saving = true;
-  restoreColor();
   showOverview();
 }
 
@@ -152,10 +167,11 @@ static void startClicked(lv_event_t *) {
 }
 
 static void doReset(void *) {
-  if (!appResetCalib(gw)) {
-    uiToast("Senden nicht moeglich");
+  if (appResetCalib(gw)) {
+    saving = true;
+  } else {
+    uiToast("Senden nicht moeglich"); // z. B. es wartet bereits ein Speichervorgang
   }
-  saving = true;
 }
 
 static void resetClicked(lv_event_t *) {
@@ -183,6 +199,9 @@ static void showOverview() {
 }
 
 void uiShowCalibration(int idx) {
+  if (idx != gw) {
+    restoreDue = false; // ausstehende Farbwiederherstellung gehoert zum vorherigen Gateway
+  }
   gw = idx;
   saving = false;
   showOverview();
