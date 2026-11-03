@@ -1,0 +1,20 @@
+# LeviLuma Diagnosegeraet - Seeed XIAO ESP32S3
+CONFIG_IDF_TARGET="esp32s3"
+
+# Gleiche Flash- und Partitionseinstellung wie das Gateway: Bootloader, Partitionstabelle und NVS-Lage bleiben kompatibel.
+# Diese Firmware liest und schreibt den NVS nicht (die Kopplungen/Schluessel eines frueheren Gateways bleiben erhalten).
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# Konsole ueber USB-Serial-JTAG (USB-C des XIAO)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Kein NVS fuer WLAN und PHY-Kalibrierdaten: die Firmware nutzt den NVS nicht
+CONFIG_ESP_WIFI_NVS_ENABLED=n
+CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=n
+
+# Kein Bluetooth, kein Zigbee, keine Oberflaeche
+CONFIG_BT_ENABLED=n
+
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_FREERTOS_HZ=1000

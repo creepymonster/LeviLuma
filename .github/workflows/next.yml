@@ -35,6 +35,16 @@ jobs:
             dir: next/controller-round
             target: esp32s3
             args: ""
+          - name: Diagnose ESP-NOW (esp32s3)
+            dir: next/debug
+            target: esp32s3
+            args: ""
+            build: build
+          - name: Diagnose ESP-NOW, alle Optionen (esp32s3)
+            dir: next/debug
+            target: esp32s3
+            args: '-B build-full -D SDKCONFIG=build-full/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.full"'
+            build: build-full
           - name: Controller mit Zigbee (esp32c5)
             dir: next/controller
             target: esp32c5
@@ -50,4 +60,8 @@ jobs:
           idf.py ${{ matrix.args }} set-target ${{ matrix.target }} build
           if [ "${{ matrix.dir }}" = "next/controller-round" ]; then
             python3 ${GITHUB_WORKSPACE}/next/tools/check_round_build.py build
+          fi
+          # Diagnosegeraet: passive Arbeitsweise pruefen (keine Sende-, Kopplungs-, NVS-Aufrufe; kein BLE/Zigbee/LVGL)
+          if [ "${{ matrix.dir }}" = "next/debug" ]; then
+            python3 ${GITHUB_WORKSPACE}/next/tools/check_debug_build.py ${{ matrix.build }}
           fi

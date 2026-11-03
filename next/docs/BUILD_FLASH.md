@@ -30,6 +30,12 @@ idf.py set-target esp32s3
 idf.py build
 idf.py -p /dev/ttyACM0 flash monitor
 
+# Diagnosegeraet (XIAO ESP32S3, ersetzt dort die bisherige Firmware!), siehe next/debug/README.md
+cd next/debug
+idf.py set-target esp32s3
+idf.py build
+idf.py -p /dev/ttyACM0 flash monitor
+
 # Controller ohne Zigbee (Standard)
 cd next/controller
 idf.py set-target esp32c5

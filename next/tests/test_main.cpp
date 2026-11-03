@@ -125,6 +125,8 @@ int main(int argc, char **argv) {
   tests_controller();
   levi_group("Runder Controller", "Ein-Gateway-Regel und Sendedrossel des runden Controllers.");
   tests_round();
+  levi_group("Diagnose", "ESP-NOW-Diagnosegeraet (next/debug): Rahmenauswertung, LeviLuma-Dekodierung aller Nachrichtentypen, Ausgabe, Filter, Doppelerkennung, Monitorbefehle, Fuzzing. Alle Rahmen sind synthetisch.");
+  tests_debug();
 
   printf("\n%d Pruefungen, %d Fehler\n", g_checks, g_failures);
   emit("{\"ev\":\"summary\",\"tests\":" + std::to_string(g_tests) + ",\"passed\":" + std::to_string(g_passed) + ",\"failed\":" + std::to_string(g_failed) +

@@ -1,10 +1,11 @@
 # AGENTS.md – Hinweise für KI-Agenten
 
-Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten. Das Repository enthält vier unabhängige Firmware-Projekte:
+Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten. Das Repository enthält fünf unabhängige Firmware-Projekte:
 
 - **Legacy** (`legacy/`): Firmware für einen ESP32-S3 mit rundem Touch-Display, die einen BLE-LED-Strip direkt steuert (PlatformIO, Arduino). Alle Abschnitte bis „LeviLuma Next“ beschreiben dieses Projekt; **Pfade dort sind relativ zu `legacy/`** (z. B. `src/main.cpp` = `legacy/src/main.cpp`).
 - **Next Controller** (`next/controller/`, ESP32-C5) und **Next Gateway** (`next/gateway/`, XIAO ESP32S3), beide natives ESP-IDF, siehe Abschnitt „LeviLuma Next“.
 - **Next Round** (`next/controller-round/`, Waveshare-Hardware von Legacy, ESP-IDF): temporäre Fernbedienung für genau ein Gateway, siehe „LeviLuma Next“.
+- **Next Diagnose** (`next/debug/`, XIAO ESP32S3, ESP-IDF): passiver ESP-NOW-Mitschnitt für den seriellen Monitor, siehe „Diagnosegerät“ unten.
 
 Die READMEs (`README.md`, `legacy/README.md`, `next/README.md`) enthalten Nutzerdokumentation, dieses Dokument enthält das, was man für sicheres Arbeiten im Code wissen muss.
 
@@ -155,7 +156,19 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 - **Hardwaredaten** (Pins, Treiber) nur mit Quelle ändern; Quellen stehen in `next/README.md`. Next ist **nicht am Gerät getestet**; keine Hardwaretests behaupten.
 - **Oberfläche (beide Controller):** Musikmodus ohne Bedienelement, bis er am Band getestet ist (Protokollbefehle bleiben). Statussymbole nur ESP-NOW-Verbindung (Gateway-Symbol) und Licht an/aus (Glühbirne). RockBase: Ein/Aus nur auf der Übersicht.
 - **Round Controller** (`next/controller-round/`): nur ESP-NOW. Kein BLE, keine WLAN-Verbindung/-Suche/AP, kein `esp_netif`, kein Zigbee/HTTP/MQTT; `set(COMPONENTS main)` hält ungenutzte Komponenten aus dem Build, `next/tools/check_round_build.py` prüft das. Display/Touch über LovyanGFX mit der Legacy-`LGFX_Board`-Konfiguration; Werte nur aus Legacy übernehmen. Genau ein Gateway (`Round::mayPair`). Nutzt `controller_core` aus `next/controller/` – Änderungen dort wirken auf beide Controller.
-- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml` (Firmware-Builds inkl. Round und Funkprüfung), `.github/workflows/tests.yml` (Host-Tests, Legacy-Kopien).
+- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner (auch `next/debug/`); Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml` (Firmware-Builds inkl. Round, Diagnose und Funkprüfungen), `.github/workflows/tests.yml` (Host-Tests, Legacy-Kopien).
+
+### Diagnosegerät (`next/debug/`)
+
+Eigenständiges ESP-IDF-Projekt (v5.5.6, esp32s3), das ESP-NOW-Verkehr **nur beobachtet** und ihn im seriellen Monitor ausgibt. Nutzerdoku und Empfangsgrenzen: `next/debug/README.md`.
+
+- **Passiv bleiben:** kein `esp_now_send`, `esp_now_add_peer`, `esp_wifi_connect`, WLAN-Scan, keine Frame-Injektion, kein NVS-Zugriff, kein BLE/Zigbee/LVGL. Dafür keine Ausnahmen einführen (auch nicht „nur zum Testen“). `next/tools/check_debug_build.py` prüft das im Build (CI, `.github/workflows/next.yml`) und muss grün bleiben; neue verbotene Aufrufe dort in die Liste aufnehmen.
+- **Empfang:** WLAN-Promiscuous-Modus (nur Management-Rahmen) liefert Unicasts zwischen fremden Geräten; der normale ESP-NOW-Callback nur Broadcasts und Rahmen an die eigene MAC. Beide Wege dürfen nie doppelt ausgeben (`dbg::Dedup`). Die Grenzen (ein Kanal, Verluste, verschlüsselte Rahmen) nicht beschönigen: verschlüsselte Nutzdaten (Protected-Bit) werden **nie** als dekodiert dargestellt; keine eigene Kryptografie, keine Schlüssel in Logs, Beispielen oder Kconfig.
+- **Aufteilung:** `components/debug_core/` ist reine, hosttestbare Logik ohne ESP-IDF (Rahmenauswertung `dbg_frame`, LeviLuma-Dekodierung `dbg_levi`, Ausgabe `dbg_format`/`dbg_text`, Zähler/Filter/Doppelerkennung/Kanalplan `dbg_state`, Befehle `dbg_cmd`). Funk, Tasks und serielle Ein-/Ausgabe liegen in `main/`. Die Callbacks kopieren nur begrenzt in die Queue (keine Formatierung, keine Ausgabe); verworfene Nachrichten werden gezählt. Jede Länge vor dem Feldzugriff prüfen.
+- **Protokoll:** Dekodierung nutzt `next/shared/protocol/` (`lvp_decode`, `lvp_crc16`, Namenstabellen), keine Kopie. **Neuer Nachrichtentyp oder neues Feld im Protokoll** (`lvp_msg_type_t`, `lvp_type_name`): in `dbg_levi.cpp` den Typ in `levi_type_supported` und `fill_fields` ergänzen (Feldnamen wie in den Protokoll-Structs, verständliche Werte), in `next/tests/test_debug.cpp` ein gültiges Beispiel in `sample_for` und ggf. Feldprüfungen in `test_dbg_levi_field_values` ergänzen. `test_dbg_levi_all_protocol_types` schlägt fehl, bis beides vorhanden ist (und zählt die bekannten Typen; die Zahl dort bewusst anpassen). Bei neuer `LVP_VERSION`: Verhalten bei unbekannter Version bleibt „Fehlergrund + Rohdaten, keine Felder erraten“.
+- **Tests:** Gruppe „Diagnose“ in `next/tests/` (`test_debug.cpp`). Alle Testrahmen sind synthetisch und so gekennzeichnet; keine Mitschnitte als echt ausgeben. Beispielausgaben in der README nur aus dem echten Formatierer erzeugen und als synthetisch kennzeichnen. Hardwaretests sind nicht erfolgt, solange sie nicht am Gerät liefen.
+- **Kconfig:** nicht gesetzte `bool`-Optionen fehlen in `sdkconfig.h`; im Code `#if CONFIG_…` bzw. die Makros `LEVI_DBG_*` aus `main/app.h` verwenden, nie direkt in Ausdrücken. Die Variante `sdkconfig.defaults.full` (alle Optionen) wird in der CI mitgebaut, damit auch die optionalen Pfade übersetzen.
+- **Bauen:** `idf.py set-target esp32s3 build` in `next/debug/`. Flashen ersetzt die Firmware auf dem XIAO (siehe README); nicht ungefragt flashen oder `erase-flash` empfehlen.
 
 ### Testauswertung (`next/tests/README.md`)
 Die Datei wird **automatisch** von `next/tests/tools/gen_report.py` aus den maschinenlesbaren Ergebnissen des Testprogramms erzeugt (`LEVI_TEST_RESULTS`, JSON Lines). Abschlusszeitpunkt ist der CI-Lauf nach dem Merge auf `main` (`.github/workflows/tests.yml`, Job `report`): Er legt die Datei per Bot-Commit (`[skip ci]`, nur diese Datei, kein Force-Push) ab und nennt darin den getesteten Commit. Jeder CI-Lauf erzeugt zusätzlich eine Vorschau als Artefakt.
@@ -171,7 +184,8 @@ Die Datei wird **automatisch** von `next/tests/tools/gen_report.py` aus den masc
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.
 - Commits, die ein KI-Agent erstellt, enden mit den Zeilen `Co-Authored-By` und `Claude-Session`, wie in der laufenden Sitzung vorgegeben.
 - Vor dem Push `git pull --rebase`. Kein Force-Push.
-- Nur committen oder pushen, wenn der Entwickler das verlangt.
+- Änderungen werden in einem eigenen Branch committet und gepusht, **nie direkt auf `main`**. Liegt der Arbeitsstand auf `main`, zuerst einen Branch anlegen (`git switch -c <name>`), dann committen.
+- Pull Requests nur auf ausdrücklichen Wunsch des Entwicklers erstellen; gemergt wird nicht durch den Agenten.
 
 ## Offene Punkte
 - Helligkeit: natives BLE-Paket (`Lotus::brightness`) bestätigt.

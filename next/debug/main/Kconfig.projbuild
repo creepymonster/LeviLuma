@@ -1,0 +1,97 @@
+menu "LeviLuma Diagnose (ESP-NOW-Empfaenger)"
+
+    config LEVILUMA_DEBUG_CHANNEL_FOLLOW
+        bool "Standardkanal = LeviLuma-ESP-NOW-Kanal (LEVILUMA_ESPNOW_CHANNEL)"
+        default y
+        help
+            Empfang standardmaessig auf dem konfigurierten LeviLuma-Kanal (Menue "LeviLuma ESP-NOW").
+            Zur Laufzeit per Monitorbefehl "channel <n>" aenderbar (nicht gespeichert).
+
+    config LEVILUMA_DEBUG_CHANNEL
+        int "Eigener Empfangskanal (2,4 GHz)"
+        range 1 14
+        default 1
+        depends on !LEVILUMA_DEBUG_CHANNEL_FOLLOW
+        help
+            Wird nur verwendet, wenn der LeviLuma-Kanal nicht uebernommen wird. Zulaessig ist nur, was Hardware
+            und Laenderregeln des Funktreibers erlauben; sonst meldet die Firmware den Fehler.
+
+    config LEVILUMA_DEBUG_COUNTRY
+        string "Laendercode fuer den Funktreiber (leer = Standard von ESP-IDF)"
+        default ""
+        help
+            Optional, z. B. zwei Grossbuchstaben des eigenen Landes. Bestimmt, welche Kanaele (z. B. 12 und 13) erlaubt sind.
+            Der Anwender ist fuer die Einhaltung der Vorschriften seines Landes verantwortlich.
+
+    config LEVILUMA_DEBUG_SCAN_ENABLE
+        bool "Kanalsuchlauf erlauben (Befehl \"scan\")"
+        default n
+        help
+            Ausdruecklich aktivierbar. Beim Suchlauf wechselt der Empfaenger zyklisch den Kanal; Nachrichten
+            auf allen anderen Kanaelen werden in der Zwischenzeit VERPASST. Ohne diese Option gibt es keinen Suchlauf.
+
+    config LEVILUMA_DEBUG_SCAN_AT_BOOT
+        bool "Suchlauf sofort nach dem Start beginnen"
+        default n
+        depends on LEVILUMA_DEBUG_SCAN_ENABLE
+
+    config LEVILUMA_DEBUG_SCAN_DWELL_MS
+        int "Verweilzeit je Kanal im Suchlauf (ms)"
+        range 100 5000
+        default 500
+        depends on LEVILUMA_DEBUG_SCAN_ENABLE
+        help
+            Der LeviLuma-Beacon (ANNOUNCE) kommt standardmaessig alle 2 s: kuerzere Verweilzeiten finden ihn
+            nicht zuverlaessig in einem Durchlauf.
+
+    config LEVILUMA_DEBUG_SCAN_STAY_ON_HIT
+        bool "Suchlauf beim ersten gueltigen LeviLuma-Rahmen beenden"
+        default y
+        depends on LEVILUMA_DEBUG_SCAN_ENABLE
+
+    config LEVILUMA_DEBUG_QUEUE_LEN
+        int "Laenge der Empfangs-Queue (Nachrichten)"
+        range 4 64
+        default 16
+        help
+            Jeder Eintrag belegt etwa 350 Byte RAM. Ist die Queue voll, wird die Nachricht verworfen und gezaehlt
+            (Befehl "stats").
+
+    config LEVILUMA_DEBUG_OUT_BUF
+        int "Ausgabepuffer je Nachricht (Byte)"
+        range 2048 16384
+        default 6144
+        help
+            Laengere Ausgaben (z. B. CALIB mit Hexdump) werden gekuerzt und als gekuerzt gezaehlt.
+
+    config LEVILUMA_DEBUG_ESPNOW_CB
+        bool "Zusaetzlicher Empfangsweg: normaler ESP-NOW-Callback (Vergleich)"
+        default n
+        help
+            Registriert zusaetzlich zum Promiscuous-Empfang den ESP-NOW-Empfang. Der normale Empfang liefert nur
+            Rahmen, die an dieses Geraet oder per Broadcast gehen, ohne 802.11-Kopf. Doppelt eintreffende Rahmen
+            werden erkannt und nur einmal ausgegeben. Das Geraet registriert keine Peers und sendet nichts.
+
+    config LEVILUMA_DEBUG_DEDUP_MS
+        int "Fenster der Doppelerkennung zwischen zwei Empfangswegen (ms)"
+        range 5 500
+        default 50
+        depends on LEVILUMA_DEBUG_ESPNOW_CB
+
+    config LEVILUMA_DEBUG_SHOW_ENCRYPTED
+        bool "Verschluesselte Rahmen anfangs anzeigen"
+        default y
+        help
+            Zur Laufzeit per "filter enc on|off" aenderbar.
+
+    config LEVILUMA_DEBUG_ASCII
+        bool "ASCII-Spalte im Hexdump anfangs anzeigen"
+        default y
+
+    config LEVILUMA_DEBUG_FULL_FRAME
+        bool "Kompletten 802.11-Rahmen anfangs immer als Hexdump anzeigen"
+        default n
+        help
+            Zur Laufzeit per "raw on|off" aenderbar. Nicht auswertbare Rahmen werden immer vollstaendig angezeigt.
+
+endmenu

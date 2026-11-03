@@ -229,7 +229,7 @@ def main():
         w("")
 
     w("## Hardwaretests\n")
-    w("**Nicht ausgeführt.** Weder Gateway noch Controller werden in der CI auf Hardware geflasht oder getestet; kein Punkt hier gilt als bestanden. "
+    w("**Nicht ausgeführt.** Weder Gateway, Controller noch Diagnosegerät werden in der CI auf Hardware geflasht oder getestet; kein Punkt hier gilt als bestanden. "
       "Offene Hardwaretests laut `next/README.md` (Abschnitt „Offene Hardwaretests“, automatisch übernommen):\n")
     hw = hardware_list(a.next_readme)
     w("\n".join(hw) if hw else "_Abschnitt in `next/README.md` nicht gefunden._")
