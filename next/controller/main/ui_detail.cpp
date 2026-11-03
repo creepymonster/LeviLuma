@@ -7,7 +7,7 @@
 #include "BluetoothIcon.h"
 #include "BulbIcon.h"
 #include "Palette.h"
-#include "WifiIcon.h"
+#include "GatewayIcon.h"
 #include "lv_theme_shadcn.h"
 #include "ui.h"
 
@@ -15,7 +15,7 @@ static int gw = -1;
 static lv_obj_t *ring, *dots[LeviPalette::N], *pickName, *pickHex;
 static lv_obj_t *pill, *pillLbl, *bar, *barLbl, *musicSw, *statusLbl;
 static lv_obj_t *dotOnline, *dotBle, *dotPower;
-static lv_image_dsc_t bulbDsc, wifiDsc, btDsc;
+static lv_image_dsc_t bulbDsc, gatewayDsc, btDsc;
 static int selected = -1; // Palettenindex der bestaetigten Farbe, -1 = eigene Farbe
 static bool lastActive = false;
 
@@ -182,9 +182,9 @@ void uiShowDetail(int idx) {
   lv_obj_set_scrollable(content, false);
   lv_obj_set_style_pad_all(content, 4, 0);
 
-  // Statuspunkte in der Kopfzeile: ESP-NOW (Funk), Band (BLE), Ein/Aus (wie Legacy)
+  // Statuspunkte in der Kopfzeile: Gateway per ESP-NOW erreichbar, Band (BLE), Ein/Aus (wie Legacy)
   lv_obj_t *h = uiHeader();
-  icon(h, wifiDsc, kWifiA8, sizeof(kWifiA8));
+  icon(h, gatewayDsc, kGatewayA8, sizeof(kGatewayA8));
   dotOnline = uiDot(h, 10);
   icon(h, btDsc, kBtA8, sizeof(kBtA8));
   dotBle = uiDot(h, 10);
