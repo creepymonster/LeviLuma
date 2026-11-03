@@ -211,9 +211,11 @@ lv_obj_t *uiList(lv_obj_t *parent) {
   return l;
 }
 
+// Abschnittsueberschrift in Listen: grau, zentriert, mit Abstand nach oben zum vorigen Abschnitt
 lv_obj_t *uiListText(lv_obj_t *list, const char *text) {
   lv_obj_t *t = uiLabel(list, text, true);
-  lv_obj_set_style_pad_top(t, 4, 0);
+  lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_margin_top(t, 12, 0);
   return t;
 }
 

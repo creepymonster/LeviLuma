@@ -108,7 +108,7 @@ static void buildGwList() {
     snprintf(line, sizeof(line), "%s\n%s%s", v.name, st, v.hasKey ? "  (Schluessel)" : "");
     uiListButton(gwList, v.online ? LV_SYMBOL_OK : LV_SYMBOL_WARNING, line, pairedClicked, (void *)(intptr_t)i);
   }
-  uiListText(gwList, "Gefunden, nicht gekoppelt");
+  uiListText(gwList, "Weitere"); // gefundene, noch nicht gekoppelte Gateways
 
   for (int i = 0; i < appGatewayCount(); i++) {
     if (!appView(i, v) || v.paired || !v.online) {
@@ -122,7 +122,7 @@ static void buildGwList() {
     unknown++;
   }
   if (!unknown) {
-    uiListText(gwList, "  keine (Suche laeuft automatisch)");
+    uiLabel(gwList, "Keine gefunden (Suche laeuft automatisch)", true);
   }
 }
 

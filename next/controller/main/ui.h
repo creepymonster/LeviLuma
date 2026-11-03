@@ -23,7 +23,7 @@ lv_obj_t *uiButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb, void *u
 lv_obj_t *uiDot(lv_obj_t *parent, int size = 10);
 // Liste als Flex-Spalte (lv_list ist in LVGL 9.6 abgekuendigt)
 lv_obj_t *uiList(lv_obj_t *parent);
-lv_obj_t *uiListText(lv_obj_t *list, const char *text);
+lv_obj_t *uiListText(lv_obj_t *list, const char *text); // Abschnittsueberschrift (zentriert)
 lv_obj_t *uiListButton(lv_obj_t *list, const char *icon, const char *text, lv_event_cb_t cb, void *user = nullptr);
 void uiDotColor(lv_obj_t *dot, int state); // 1 gruen, 0 rot, -1 weiss (unbekannt)
 void uiToast(const char *text);

@@ -72,7 +72,7 @@ static void buildEpList() {
     n++;
   }
   if (!n) {
-    uiListText(epList, "Keine gekoppelten Gateways.");
+    uiLabel(epList, "Keine gekoppelten Gateways.", true);
   }
 }
 
