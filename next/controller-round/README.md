@@ -11,7 +11,7 @@ Round Controller <--ESP-NOW (STATE)-- Gateway        (Gateway bleibt autoritativ
 - **Kein BLE, keine WLAN-Verbindung, kein WLAN-Scan, kein Access Point, kein TCP/IP-Dienst, kein HTTP/MQTT, kein Zigbee.** Der WLAN-Treiber läuft nur im STA-Modus als Funkteil für ESP-NOW; `esp_netif` wird nicht initialisiert. Geprüft mit `next/tools/check_round_build.py` (auch in der CI).
 - Keine eigene Kalibrierung: Farben werden als kalibrierte Farbe (`SET_STATE` mit `COLOR`) gesendet, die Kalibrierung wendet das Gateway an.
 
-![Hauptansicht](../screenshots/controller-round_240x240/05_main_on.png) ![Farbe](../screenshots/controller-round_240x240/06_color.png) ![Gateway](../screenshots/controller-round_240x240/07_gateway.png) ![Aus](../screenshots/controller-round_240x240/08_main_off.png)
+![Ein/Aus](../screenshots/controller-round_240x240/05_power_on.png) ![Helligkeit](../screenshots/controller-round_240x240/06_brightness.png) ![Farbe](../screenshots/controller-round_240x240/07_color.png) ![Gateway](../screenshots/controller-round_240x240/08_gateway.png)
 
 Die Bilder stammen aus der Host-Vorschau (`tools/preview/render.sh`: echtes `main/ui.cpp` gegen LVGL 9.6 mit nachgebildeten Daten, außerhalb des Kreises abgedunkelt). Sie sind nicht vom Gerät. Alle Bilder: `next/screenshots/controller-round_240x240/` und Abschnitt „Screenshots“ in [../README.md](../README.md).
 
@@ -92,16 +92,17 @@ Nebenläufigkeit wie beim RockBase-Controller: Der ESP-NOW-Callback kopiert nur 
 
 ## Bedienung
 
-Drei Seiten untereinander, **senkrecht wischen**. Drei Punkte am rechten Rand zeigen die aktuelle Seite.
+Vier Seiten untereinander, **senkrecht wischen**. Vier Punkte am rechten Rand zeigen die aktuelle Seite.
 
-1. **Hauptansicht:**
+1. **Ein/Aus:**
    - Oben: Gateway-Symbol mit Punkt (ESP-NOW-Verbindung grün/rot) und Glühbirne mit Punkt (Licht an grün, aus rot, unbekannt weiß), darunter der Gateway-Name.
-   - Mitte: große **Farbscheibe** in der bestätigten Farbe (grau, wenn aus). **Antippen schaltet Ein/Aus.**
-   - Ringsum: **Helligkeitsbogen** (1–100 %, Bereich aus dem Protokoll), darunter Prozentwert und Status („Bestaetigt“, „Wird gesendet …“, „Gateway offline“, „Band getrennt“, „Keine Antwort“).
-2. **Farbe:** Farbrad (Farbton = Winkel, Sättigung = Abstand zur Mitte; ziehen oder tippen) und darum der Palettenring mit den 15 Next/Legacy-Farben. Nur bei eingeschalteter Lampe aktiv.
-3. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Gateway wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
+   - Mitte: Farbscheibe in der bestätigten Farbe (grau, wenn aus), darunter der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
+   - Unten: Status („Bestaetigt“, „Wird gesendet …“, „Gateway offline“, „Band getrennt“, „Keine Antwort“).
+2. **Helligkeit:** großer Bogen (1–100 %, Bereich aus dem Protokoll) mit Prozentwert in der Mitte und Status darunter. Nur bei eingeschalteter Lampe aktiv („Lampe aus“).
+3. **Farbe:** Farbrad (Farbton = Winkel, Sättigung = Abstand zur Mitte; ziehen oder tippen) und darum der Palettenring mit den 15 Next/Legacy-Farben. Nur bei eingeschalteter Lampe aktiv.
+4. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Gateway wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
 
-Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weckt nur. Nach 60 s springt die Ansicht zur Hauptseite.
+Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weckt nur. Nach 60 s springt die Ansicht zur Seite Ein/Aus.
 
 **Musikmodus:** bewusst ohne Bedienelement, solange er am Band nicht ausreichend getestet ist. Die Befehle bleiben im Protokoll.
 

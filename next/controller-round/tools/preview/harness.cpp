@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
   gw(0, "LeviLuma-3A7F", false, true, -1, 100, 0, 0, 0, LVP_GW_KEY_REQUIRED);
   gw(1, "Wohnzimmer", false, true, -1, 100, 0, 0, 0, LVP_GW_PAIRING_OPEN);
   uiBuild();                 shot("01_unpaired");
-  uiShowTile(2);             shot("02_gateway_unpaired");
+  uiShowTile(3);             shot("02_gateway_unpaired");
   uiShowSearchForPreview();  shot("03_search");
   uiShowKeyForPreview(0);    shot("04_key");
 
@@ -85,12 +85,13 @@ int main(int argc, char **argv) {
   gw(1, "Wohnzimmer", true, true, 1, 75, 255, 107, 107);
   active = 1; version++;
   lv_screen_load(lv_obj_create(nullptr)); // frischer Bildschirm fuer den zweiten Aufbau
-  uiBuild();                 shot("05_main_on");
-  uiShowTile(1);             shot("06_color");
-  uiShowTile(2);             shot("07_gateway");
+  uiBuild();                 shot("05_power_on");
+  uiShowTile(1);             shot("06_brightness");
+  uiShowTile(2);             shot("07_color");
+  uiShowTile(3);             shot("08_gateway");
   gws[1].state.power = 0; version++;
-  uiShowTile(0);             shot("08_main_off");
+  uiShowTile(0);             shot("09_power_off");
   gws[1].online = false; version++;
-  uiShowTile(0);             shot("09_main_offline");
+  uiShowTile(0);             shot("10_power_offline");
   return 0;
 }

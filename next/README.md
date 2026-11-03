@@ -48,13 +48,17 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises a
 |---|---|---|
 | ![Ohne Gateway](screenshots/controller-round_240x240/01_unpaired.png) | ![Gateway-Seite ohne Kopplung](screenshots/controller-round_240x240/02_gateway_unpaired.png) | ![Gateway wählen](screenshots/controller-round_240x240/03_search.png) |
 
-| Schlüsseleingabe | Hauptansicht, an | Farbrad und Palette |
+| Schlüsseleingabe | Ein/Aus, an | Helligkeit |
 |---|---|---|
-| ![Schlüsseleingabe](screenshots/controller-round_240x240/04_key.png) | ![Hauptansicht, an](screenshots/controller-round_240x240/05_main_on.png) | ![Farbrad und Palette](screenshots/controller-round_240x240/06_color.png) |
+| ![Schlüsseleingabe](screenshots/controller-round_240x240/04_key.png) | ![Ein/Aus, an](screenshots/controller-round_240x240/05_power_on.png) | ![Helligkeit](screenshots/controller-round_240x240/06_brightness.png) |
 
-| Gateway-Seite | Hauptansicht, aus | Gateway offline |
+| Farbrad und Palette | Gateway-Seite | Ein/Aus, aus |
 |---|---|---|
-| ![Gateway-Seite](screenshots/controller-round_240x240/07_gateway.png) | ![Hauptansicht, aus](screenshots/controller-round_240x240/08_main_off.png) | ![Gateway offline](screenshots/controller-round_240x240/09_main_offline.png) |
+| ![Farbrad und Palette](screenshots/controller-round_240x240/07_color.png) | ![Gateway-Seite](screenshots/controller-round_240x240/08_gateway.png) | ![Ein/Aus, aus](screenshots/controller-round_240x240/09_power_off.png) |
+
+| Gateway offline |  |  |
+|---|---|---|
+| ![Gateway offline](screenshots/controller-round_240x240/10_power_offline.png) |  |  |
 
 ## Dokumentation
 

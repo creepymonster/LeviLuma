@@ -1,8 +1,9 @@
 // Runde LVGL-Oberflaeche (240x240) im LeviLuma-Next-Skin (shadcn zinc_dark, Montserrat, Statuspunkte
-// und Symbole wie Next). Drei Seiten untereinander (senkrecht wischen, Seitenpunkte rechts):
-//   0 Hauptansicht: Farbscheibe = Ein/Aus, Helligkeitsbogen, Status (ESP-NOW-Verbindung, Licht an/aus)
-//   1 Farbe: Farbrad (Farbton/Saettigung) mit Palettenring (LeviPalette)
-//   2 Gateway: Name, Status, Abgleich, Entkoppeln bzw. Suchen und Koppeln
+// und Symbole wie Next). Vier Seiten untereinander (senkrecht wischen, Seitenpunkte rechts):
+//   0 Ein/Aus: Schalter wie auf der RockBase-Uebersicht, Farbscheibe (bestaetigte Farbe), Status
+//   1 Helligkeit: Bogen (1..100 % wie Protokoll) mit grossem Prozentwert
+//   2 Farbe: Farbrad (Farbton/Saettigung) mit Palettenring (LeviPalette)
+//   3 Gateway: Name, Status, Abgleich, Entkoppeln bzw. Suchen und Koppeln
 // Der Musikmodus hat bewusst kein Bedienelement, solange er am Band nicht getestet ist
 // (die ESP-NOW-Befehle im gemeinsamen Protokoll bleiben bestehen).
 // Dazu eigene Bildschirme fuer die Gateway-Suche und die Schluesseleingabe.
@@ -30,10 +31,13 @@ static constexpr uint32_t UI_OFF = 0x3F3F46; // Farbscheibe bei ausgeschalteter 
 static constexpr int WHEEL_D = 150;          // Durchmesser Farbrad
 
 static lv_theme_shadcn_palette_t themePalette{};
-static constexpr int PAGES = 3;
+static constexpr int PAGES = 4;
+static constexpr int PAGE_POWER = 0, PAGE_BRIGHT = 1, PAGE_COLOR = 2, PAGE_GATEWAY = 3;
 static lv_obj_t *mainScr, *tv, *pager[PAGES];
-// Hauptansicht
-static lv_obj_t *dotGw, *dotPower, *gwName, *arc, *disc, *discSym, *discLbl, *brightLbl, *statusLbl, *setupBox;
+// Ein/Aus
+static lv_obj_t *dotGw, *dotPower, *gwName, *disc, *powerSw, *statusLbl, *setupBox;
+// Helligkeit
+static lv_obj_t *arc, *brightTitle, *brightLbl, *brightStatus;
 // Farbe
 static lv_obj_t *wheel, *marker, *palDots[LeviPalette::N];
 static uint8_t wheelBuf[WHEEL_D * WHEEL_D * 2];
@@ -135,14 +139,110 @@ static void reportError(lvp_err_t e) {
   }
 }
 
-// ---------------- Hauptansicht ----------------
+// ---------------- Gemeinsam ----------------
 
-static void discClicked(lv_event_t *) {
+static const char *statusText() {
+  if (!view.online) {
+    return "Gateway offline";
+  }
+  if (view.pending) {
+    return "Wird gesendet ...";
+  }
+  if (view.lastTimeout || view.lastError) {
+    return appErrorText(view.lastError, view.lastTimeout);
+  }
+  if (!view.stateValid) {
+    return "Abgleich ...";
+  }
+  if (!(view.state.flags & LVP_STATE_BLE)) {
+    return "Band getrennt";
+  }
+  return "Bestaetigt";
+}
+
+// ---------------- Seite Ein/Aus ----------------
+
+// Schalter wie auf der RockBase-Uebersicht (ui_home.cpp): Eingabe sendet, die Anzeige folgt der Bestaetigung
+static void powerChanged(lv_event_t *) {
   if (!usable()) {
     return;
   }
-  reportError(appSetPower(!lampOn()));
+  reportError(appSetPower(lv_obj_has_state(powerSw, LV_STATE_CHECKED)));
 }
+
+static void setupClicked(lv_event_t *) {
+  lv_tileview_set_tile_by_index(tv, 0, PAGE_GATEWAY, LV_ANIM_ON);
+}
+
+static void buildPower(lv_obj_t *tile) {
+  static lv_image_dsc_t gwDsc, bulbDsc;
+  lv_obj_t *row = plainBox(tile);
+  lv_obj_set_size(row, LV_SIZE_CONTENT, 16);
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_column(row, 4, 0);
+  lv_obj_align(row, LV_ALIGN_TOP_MID, 0, 24);
+  icon(row, gwDsc, kGatewayA8, sizeof(kGatewayA8));
+  dotGw = dot(row, 8);
+  icon(row, bulbDsc, kBulbA8, sizeof(kBulbA8));
+  dotPower = dot(row, 8);
+
+  gwName = label(tile, "", true);
+  lv_label_set_long_mode(gwName, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_width(gwName, 150);
+  lv_obj_align(gwName, LV_ALIGN_TOP_MID, 0, 42);
+
+  // Farbscheibe: zeigt nur die bestaetigte Farbe (grau, wenn aus)
+  disc = dot(tile, 72);
+  lv_obj_align(disc, LV_ALIGN_CENTER, 0, -14);
+
+  // Ein/Aus-Schalter (Theme-Schalter, gross fuer den Finger)
+  powerSw = lv_switch_create(tile);
+  lv_obj_set_size(powerSw, 96, 50);
+  lv_obj_align(powerSw, LV_ALIGN_CENTER, 0, 52);
+  lv_obj_set_ext_click_area(powerSw, 8);
+  lv_obj_add_event_cb(powerSw, powerChanged, LV_EVENT_VALUE_CHANGED, nullptr);
+
+  statusLbl = label(tile, "", true);
+  lv_label_set_long_mode(statusLbl, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_width(statusLbl, 150);
+  lv_obj_align(statusLbl, LV_ALIGN_CENTER, 0, 92);
+
+  // ohne gekoppeltes Gateway: Hinweis statt Bedienung
+  setupBox = plainBox(tile);
+  lv_obj_set_size(setupBox, 170, LV_SIZE_CONTENT);
+  lv_obj_center(setupBox);
+  lv_obj_set_flex_flow(setupBox, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(setupBox, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_row(setupBox, 10, 0);
+  label(setupBox, "Kein Gateway");
+  button(setupBox, "Einrichten", setupClicked);
+}
+
+static void refreshPower() {
+  bool paired = haveView && view.paired;
+  lv_obj_set_hidden(setupBox, paired);
+  lv_obj_set_hidden(disc, !paired);
+  lv_obj_set_hidden(powerSw, !paired);
+  lv_obj_set_hidden(statusLbl, !paired);
+  lv_obj_set_hidden(gwName, !paired);
+  dotState(dotGw, paired ? (view.online ? 1 : 0) : -1);
+  dotState(dotPower, paired && view.stateValid && view.state.power >= 0 ? (view.state.power == 1 ? 1 : 0) : -1);
+  if (!paired) {
+    return;
+  }
+  lv_label_set_text(gwName, view.name);
+  bool on = lampOn();
+  setEnabled(powerSw, usable());
+  if (!view.pending) { // waehrend ein Befehl laeuft, bleibt die Eingabe sichtbar (wie RockBase)
+    lv_obj_set_state(powerSw, LV_STATE_CHECKED, on);
+  }
+  uint8_t r = view.state.r, g = view.state.g, b = view.state.b;
+  lv_obj_set_style_bg_color(disc, on ? lv_color_make(r, g, b) : lv_color_hex(UI_OFF), 0);
+  lv_label_set_text(statusLbl, statusText());
+}
+
+// ---------------- Seite Helligkeit ----------------
 
 static void arcEvent(lv_event_t *e) {
   lv_event_code_t c = lv_event_get_code(e);
@@ -166,128 +266,48 @@ static void arcEvent(lv_event_t *e) {
   }
 }
 
-static void setupClicked(lv_event_t *) {
-  lv_tileview_set_tile_by_index(tv, 0, 2, LV_ANIM_ON);
-}
-
-static void buildMain(lv_obj_t *tile) {
-  static lv_image_dsc_t gwDsc, bulbDsc;
-  lv_obj_t *row = plainBox(tile);
-  lv_obj_set_size(row, LV_SIZE_CONTENT, 16);
-  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_column(row, 4, 0);
-  lv_obj_align(row, LV_ALIGN_TOP_MID, 0, 36); // innerhalb des Helligkeitsbogens
-  icon(row, gwDsc, kGatewayA8, sizeof(kGatewayA8));
-  dotGw = dot(row, 8);
-  icon(row, bulbDsc, kBulbA8, sizeof(kBulbA8));
-  dotPower = dot(row, 8);
-
-  // Helligkeitsbogen: Wertebereich wie Protokoll (LVP_BRIGHTNESS_MIN..MAX = 1..100)
+static void buildBrightness(lv_obj_t *tile) {
+  // Bogen ueber fast das ganze Rund: Wertebereich wie Protokoll (LVP_BRIGHTNESS_MIN..MAX = 1..100)
   arc = lv_arc_create(tile);
-  lv_obj_set_size(arc, 206, 206);
+  lv_obj_set_size(arc, 212, 212);
   lv_obj_center(arc);
   lv_arc_set_rotation(arc, 135);
   lv_arc_set_bg_angles(arc, 0, 270);
   lv_arc_set_range(arc, LVP_BRIGHTNESS_MIN, LVP_BRIGHTNESS_MAX);
-  lv_obj_set_style_arc_width(arc, 12, LV_PART_MAIN);
-  lv_obj_set_style_arc_width(arc, 12, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_width(arc, 18, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(arc, 18, LV_PART_INDICATOR);
+  lv_obj_set_style_pad_all(arc, 4, LV_PART_KNOB);
   lv_obj_add_event_cb(arc, arcEvent, LV_EVENT_ALL, nullptr);
 
-  gwName = label(tile, "", true);
-  lv_label_set_long_mode(gwName, LV_LABEL_LONG_MODE_DOTS);
-  lv_obj_set_width(gwName, 120);
-  lv_obj_align(gwName, LV_ALIGN_TOP_MID, 0, 50);
-
-  // Farbscheibe: zeigt die bestaetigte Farbe (grau, wenn aus) und schaltet Ein/Aus
-  disc = lv_obj_create(tile);
-  lv_obj_set_size(disc, 104, 104);
-  lv_obj_center(disc);
-  lv_obj_set_style_radius(disc, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_border_width(disc, 0, 0);
-  lv_obj_set_style_bg_opa(disc, LV_OPA_COVER, 0);
-  lv_obj_set_scrollable(disc, false);
-  lv_obj_set_clickable(disc, true);
-  lv_obj_add_event_cb(disc, discClicked, LV_EVENT_CLICKED, nullptr);
-  discSym = lv_label_create(disc);
-  lv_label_set_text(discSym, LV_SYMBOL_POWER);
-  lv_obj_set_style_text_font(discSym, &lv_font_montserrat_28, 0);
-  lv_obj_align(discSym, LV_ALIGN_CENTER, 0, -10);
-  discLbl = lv_label_create(disc);
-  lv_obj_align(discLbl, LV_ALIGN_CENTER, 0, 18);
-
-  brightLbl = label(tile, "");
-  lv_obj_set_style_text_font(brightLbl, &lv_font_montserrat_20, 0);
-  lv_obj_align(brightLbl, LV_ALIGN_CENTER, 0, 72);
-  statusLbl = label(tile, "", true);
-  lv_label_set_long_mode(statusLbl, LV_LABEL_LONG_MODE_DOTS);
-  lv_obj_set_width(statusLbl, 130);
-  lv_obj_align(statusLbl, LV_ALIGN_CENTER, 0, 96);
-
-  // ohne gekoppeltes Gateway: Hinweis statt Bedienung
-  setupBox = plainBox(tile);
-  lv_obj_set_size(setupBox, 170, LV_SIZE_CONTENT);
-  lv_obj_center(setupBox);
-  lv_obj_set_flex_flow(setupBox, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(setupBox, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_row(setupBox, 10, 0);
-  label(setupBox, "Kein Gateway");
-  button(setupBox, "Einrichten", setupClicked);
+  brightTitle = label(tile, "Helligkeit", true);
+  lv_obj_align(brightTitle, LV_ALIGN_CENTER, 0, -42);
+  brightLbl = label(tile, "-");
+  lv_obj_set_style_text_font(brightLbl, &lv_font_montserrat_48, 0);
+  lv_obj_align(brightLbl, LV_ALIGN_CENTER, 0, 0);
+  brightStatus = label(tile, "", true);
+  lv_label_set_long_mode(brightStatus, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_width(brightStatus, 130);
+  lv_obj_align(brightStatus, LV_ALIGN_CENTER, 0, 44);
 }
 
-static uint32_t textColorFor(uint8_t r, uint8_t g, uint8_t b) {
-  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? 0x000000 : 0xFFFFFF;
-}
-
-static void refreshMain() {
+static void refreshBrightness() {
   bool paired = haveView && view.paired;
-  lv_obj_set_hidden(setupBox, paired);
   lv_obj_set_hidden(arc, !paired);
-  lv_obj_set_hidden(disc, !paired);
   lv_obj_set_hidden(brightLbl, !paired);
-  lv_obj_set_hidden(statusLbl, !paired);
-  lv_obj_set_hidden(gwName, !paired);
-  dotState(dotGw, paired ? (view.online ? 1 : 0) : -1);
-  dotState(dotPower, paired && view.stateValid && view.state.power >= 0 ? (view.state.power == 1 ? 1 : 0) : -1);
   if (!paired) {
+    lv_label_set_text(brightStatus, "Kein Gateway");
     return;
   }
-  lv_label_set_text(gwName, view.name);
   bool on = lampOn();
-  bool use = usable();
-  setEnabled(disc, use);
-  setEnabled(arc, use && on);
-  uint8_t r = view.state.r, g = view.state.g, b = view.state.b;
-  lv_color_t col = on ? lv_color_make(r, g, b) : lv_color_hex(UI_OFF);
-  lv_obj_set_style_bg_color(disc, col, 0);
-  uint32_t fg = on ? textColorFor(r, g, b) : 0xFFFFFF;
-  lv_obj_set_style_text_color(discSym, lv_color_hex(fg), 0);
-  lv_obj_set_style_text_color(discLbl, lv_color_hex(fg), 0);
-  lv_obj_set_style_opa(disc, use ? LV_OPA_COVER : LV_OPA_50, 0);
-  lv_label_set_text(discLbl, !view.stateValid || view.state.power < 0 ? "?" : on ? "An" : "Aus");
-
-  // Helligkeit: bestaetigter Wert, ausser waehrend der Eingabe oder solange ein Befehl unterwegs ist
+  setEnabled(arc, usable() && on);
+  // bestaetigter Wert, ausser waehrend der Eingabe oder solange ein Befehl unterwegs ist
   if (view.stateValid && !arcActive && !view.pending) {
     lv_arc_set_value(arc, view.state.brightness);
     char t[12];
     snprintf(t, sizeof(t), "%u %%", view.state.brightness);
     lv_label_set_text(brightLbl, t);
   }
-  const char *st;
-  if (!view.online) {
-    st = "Gateway offline";
-  } else if (view.pending) {
-    st = "Wird gesendet ...";
-  } else if (view.lastTimeout || view.lastError) {
-    st = appErrorText(view.lastError, view.lastTimeout);
-  } else if (!view.stateValid) {
-    st = "Abgleich ...";
-  } else if (!(view.state.flags & LVP_STATE_BLE)) {
-    st = "Band getrennt";
-  } else {
-    st = "Bestaetigt";
-  }
-  lv_label_set_text(statusLbl, st);
+  lv_label_set_text(brightStatus, usable() && view.stateValid && !on && !view.pending ? "Lampe aus" : statusText());
 }
 
 // ---------------- Farbe ----------------
@@ -594,7 +614,7 @@ static void refreshSearch() {
   if (pairingIdx >= 0 && appView(pairingIdx, v)) {
     if (v.paired) {
       closeOverlay();
-      lv_tileview_set_tile_by_index(tv, 0, 0, LV_ANIM_OFF);
+      lv_tileview_set_tile_by_index(tv, 0, PAGE_POWER, LV_ANIM_OFF);
       toast("Gekoppelt");
       return;
     }
@@ -727,7 +747,8 @@ static void refreshTimer(lv_timer_t *) {
     if (!haveView) {
       memset(&view, 0, sizeof(view));
     }
-    refreshMain();
+    refreshPower();
+    refreshBrightness();
     refreshColor();
     refreshGateway();
   }
@@ -737,7 +758,7 @@ static void refreshTimer(lv_timer_t *) {
     if (overlay != Overlay::None) {
       closeOverlay();
     }
-    lv_tileview_set_tile_by_index(tv, 0, 0, LV_ANIM_OFF);
+    lv_tileview_set_tile_by_index(tv, 0, PAGE_POWER, LV_ANIM_OFF);
   }
   homeReturned = idle;
 }
@@ -761,17 +782,19 @@ void uiBuild() {
   lv_obj_set_size(tv, LCD_W_PX, LCD_H_PX);
   lv_obj_set_style_bg_opa(tv, LV_OPA_TRANSP, 0);
   lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_t *t0 = lv_tileview_add_tile(tv, 0, 0, LV_DIR_BOTTOM);
-  lv_obj_t *t1 = lv_tileview_add_tile(tv, 0, 1, (lv_dir_t)(LV_DIR_TOP | LV_DIR_BOTTOM));
-  lv_obj_t *t2 = lv_tileview_add_tile(tv, 0, 2, LV_DIR_TOP);
-  lv_obj_t *tiles[PAGES] = {t0, t1, t2};
+  lv_obj_t *t0 = lv_tileview_add_tile(tv, 0, PAGE_POWER, LV_DIR_BOTTOM);
+  lv_obj_t *t1 = lv_tileview_add_tile(tv, 0, PAGE_BRIGHT, (lv_dir_t)(LV_DIR_TOP | LV_DIR_BOTTOM));
+  lv_obj_t *t2 = lv_tileview_add_tile(tv, 0, PAGE_COLOR, (lv_dir_t)(LV_DIR_TOP | LV_DIR_BOTTOM));
+  lv_obj_t *t3 = lv_tileview_add_tile(tv, 0, PAGE_GATEWAY, LV_DIR_TOP);
+  lv_obj_t *tiles[PAGES] = {t0, t1, t2, t3};
   for (lv_obj_t *t : tiles) {
     lv_obj_set_style_pad_all(t, 0, 0);
     lv_obj_set_scrollbar_mode(t, LV_SCROLLBAR_MODE_OFF);
   }
-  buildMain(t0);
-  buildColor(t1);
-  buildGateway(t2);
+  buildPower(t0);
+  buildBrightness(t1);
+  buildColor(t2);
+  buildGateway(t3);
   lv_obj_add_event_cb(tv, tileChanged, LV_EVENT_VALUE_CHANGED, nullptr);
 
   // Seitenpunkte rechts (innerhalb des Kreises), zeigen die aktuelle Seite
@@ -779,7 +802,7 @@ void uiBuild() {
     pager[i] = dot(mainScr, 6);
     lv_obj_set_style_bg_color(pager[i], lv_color_white(), 0);
     lv_obj_set_style_bg_opa(pager[i], i == 0 ? LV_OPA_COVER : LV_OPA_40, 0);
-    lv_obj_align(pager[i], LV_ALIGN_RIGHT_MID, -8, -10 + i * 10);
+    lv_obj_align(pager[i], LV_ALIGN_RIGHT_MID, -8, -15 + i * 10);
   }
   lv_timer_create(refreshTimer, 100, nullptr);
   refreshTimer(nullptr);
