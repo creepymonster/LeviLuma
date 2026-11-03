@@ -1,0 +1,21 @@
+# RockBase-Controller: erster Start ohne gespeicherte Touch-Kalibrierung (--first-boot).
+# Drei Fadenkreuze antippen (Ziele aus ui_touchcal.cpp); die Maus liefert Displaykoordinaten.
+expect-text "Erster Start: Touch-Kalibrierung"
+expect-text "Punkt 1/3"
+press 30 30
+wait 250
+release
+expect-text "Punkt 2/3"
+press 290 120
+wait 250
+release
+expect-text "Punkt 3/3"
+press 60 210
+wait 250
+release
+expect-text "Touch kalibriert." 4000
+click-close
+expect-text "SIM Wohnzimmer" 8000
+click-switch 0
+expect-gw 1 power 0
+quit
