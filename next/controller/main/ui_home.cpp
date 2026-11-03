@@ -49,11 +49,7 @@ void uiGatewayStatusText(const GatewayView &v, char *out, size_t cap) {
   } else if (!(v.state.flags & LVP_STATE_BLE)) {
     snprintf(out, cap, "Band nicht verbunden");
   } else if (v.state.power == 1) {
-    if (v.state.flags & LVP_STATE_MUSIC) {
-      snprintf(out, cap, "An - Musik - %u %%", v.state.brightness);
-    } else {
-      snprintf(out, cap, "An - %u %%", v.state.brightness);
-    }
+    snprintf(out, cap, "An - %u %%", v.state.brightness);
   } else if (v.state.power == 0) {
     snprintf(out, cap, "Aus");
   } else {

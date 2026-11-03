@@ -10,7 +10,7 @@ add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=addre
 add_link_options(-fsanitize=address,undefined)
 
 add_executable(levi_tests
-  test_main.cpp test_protocol.cpp test_gateway.cpp test_controller.cpp
+  test_main.cpp test_protocol.cpp test_gateway.cpp test_controller.cpp test_round.cpp
   ${NEXT}/shared/protocol/src/leviluma_proto.c
   ${NEXT}/shared/protocol/src/leviluma_link.c
   ${NEXT}/shared/common/src/kv_store.cpp
@@ -23,11 +23,13 @@ add_executable(levi_tests
   ${NEXT}/controller/components/controller_core/src/gateway_registry.cpp
   ${NEXT}/controller/components/controller_core/src/ctrl_link.cpp
   ${NEXT}/controller/components/controller_core/src/zb_mapping.cpp
-  ${NEXT}/controller/components/controller_core/src/touch_cal.cpp)
+  ${NEXT}/controller/components/controller_core/src/touch_cal.cpp
+  ${NEXT}/controller-round/components/round_core/src/round_core.cpp)
 target_include_directories(levi_tests PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
   ${NEXT}/shared/protocol/include
   ${NEXT}/shared/common/include
   ${NEXT}/gateway/components/light_core/include
-  ${NEXT}/controller/components/controller_core/include)
+  ${NEXT}/controller/components/controller_core/include
+  ${NEXT}/controller-round/components/round_core/include)
 target_link_libraries(levi_tests m)

@@ -1,9 +1,10 @@
 # AGENTS.md – Hinweise für KI-Agenten
 
-Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten. Das Repository enthält drei unabhängige Firmware-Projekte:
+Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten. Das Repository enthält vier unabhängige Firmware-Projekte:
 
 - **Legacy** (`legacy/`): Firmware für einen ESP32-S3 mit rundem Touch-Display, die einen BLE-LED-Strip direkt steuert (PlatformIO, Arduino). Alle Abschnitte bis „LeviLuma Next“ beschreiben dieses Projekt; **Pfade dort sind relativ zu `legacy/`** (z. B. `src/main.cpp` = `legacy/src/main.cpp`).
 - **Next Controller** (`next/controller/`, ESP32-C5) und **Next Gateway** (`next/gateway/`, XIAO ESP32S3), beide natives ESP-IDF, siehe Abschnitt „LeviLuma Next“.
+- **Next Round** (`next/controller-round/`, Waveshare-Hardware von Legacy, ESP-IDF): temporäre Fernbedienung für genau ein Gateway, siehe „LeviLuma Next“.
 
 Die READMEs (`README.md`, `legacy/README.md`, `next/README.md`) enthalten Nutzerdokumentation, dieses Dokument enthält das, was man für sicheres Arbeiten im Code wissen muss.
 
@@ -152,7 +153,9 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 - **Sicherheit:** nur ESP-NOW-Bordmittel (PMK/LMK, CCMP). Keine eigene Kryptografie, Schlüssel nie übertragen.
 - **Abhängigkeiten des Controllers** (LVGL 9.6.0, lvgl_theme_shadcn 0.3.1, esp-zigbee-lib) werden per Git nach `next/controller/third_party/` geholt (`cmake/third_party.cmake`), nicht committen.
 - **Hardwaredaten** (Pins, Treiber) nur mit Quelle ändern; Quellen stehen in `next/README.md`. Next ist **nicht am Gerät getestet**; keine Hardwaretests behaupten.
-- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml` (Firmware-Builds), `.github/workflows/tests.yml` (Host-Tests, Legacy-Kopien).
+- **Oberfläche (beide Controller):** Musikmodus ohne Bedienelement, bis er am Band getestet ist (Protokollbefehle bleiben). Statussymbole nur ESP-NOW-Verbindung (Gateway-Symbol) und Licht an/aus (Glühbirne). RockBase: Ein/Aus nur auf der Übersicht.
+- **Round Controller** (`next/controller-round/`): nur ESP-NOW. Kein BLE, keine WLAN-Verbindung/-Suche/AP, kein `esp_netif`, kein Zigbee/HTTP/MQTT; `set(COMPONENTS main)` hält ungenutzte Komponenten aus dem Build, `next/tools/check_round_build.py` prüft das. Display/Touch über LovyanGFX mit der Legacy-`LGFX_Board`-Konfiguration; Werte nur aus Legacy übernehmen. Genau ein Gateway (`Round::mayPair`). Nutzt `controller_core` aus `next/controller/` – Änderungen dort wirken auf beide Controller.
+- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml` (Firmware-Builds inkl. Round und Funkprüfung), `.github/workflows/tests.yml` (Host-Tests, Legacy-Kopien).
 
 ## Git-Konventionen
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.

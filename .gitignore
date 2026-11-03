@@ -75,3 +75,4 @@ next/shared/protocol/test/build/
 
 # Controller: per Git geholte externe Komponenten (LVGL, Theme, Zigbee-Bibliothek)
 next/controller/third_party/
+next/controller-round/third_party/

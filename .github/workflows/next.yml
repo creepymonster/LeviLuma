@@ -31,6 +31,10 @@ jobs:
             dir: next/controller
             target: esp32c5
             args: ""
+          - name: Round Controller (esp32s3)
+            dir: next/controller-round
+            target: esp32s3
+            args: ""
           - name: Controller mit Zigbee (esp32c5)
             dir: next/controller
             target: esp32c5
@@ -44,3 +48,6 @@ jobs:
           git config --global --add safe.directory '*'
           cd ${{ matrix.dir }}
           idf.py ${{ matrix.args }} set-target ${{ matrix.target }} build
+          if [ "${{ matrix.dir }}" = "next/controller-round" ]; then
+            python3 ${GITHUB_WORKSPACE}/next/tools/check_round_build.py build
+          fi

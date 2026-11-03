@@ -11,6 +11,10 @@
     {
       "name": "Next – XIAO S3",
       "path": "next/gateway"
+    },
+    {
+      "name": "Next – Waveshare Round",
+      "path": "next/controller-round"
     }
   ],
   "extensions": {

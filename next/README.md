@@ -5,6 +5,8 @@ Zwei zusammengehörige ESP-IDF-Firmware-Projekte (kein Arduino):
 - **Controller** (`controller/`): RockBase NM-CYD-C5 mit ESP32-C5. LVGL-Oberfläche im LeviLuma-Skin, verwaltet beliebig viele Gateways (bis 8 gekoppelt) und steuert sie **ausschließlich per ESP-NOW**. Optional Zigbee-Light-Endpoints für die FRITZ!Box 5690 Pro (`CONFIG_LEVILUMA_ZIGBEE_ENABLED`, Standard **aus**).
 - **Gateway** (`gateway/`): Seeed XIAO ESP32S3. Steuert genau eine BLE-LED-Leiste (ELK-BLEDDM u. a.), hält deren **autoritativen LightState** und die **Farbkalibrierung** (NVS), spricht ESP-NOW mit dem Controller. Keine Oberfläche, kein Zigbee, kein Webserver.
 
+- **Round Controller** (`controller-round/`, temporär): Waveshare ESP32-S3-Touch-LCD-1.28 als runde Fernbedienung für **genau ein** Gateway, nur ESP-NOW. Eigene Doku: [controller-round/README.md](controller-round/README.md).
+
 Gemeinsam: `shared/protocol/` (ESP-NOW-Protokoll, zuerst entwickelt) und `shared/common/` (NVS-Speicher als Schnittstelle, Schlüsselformat).
 
 ```
@@ -39,8 +41,11 @@ Die Bilder stammen aus der Host-Vorschau (`tools/ui_preview/render.sh`, echte `u
 | `controller/components/controller_core/` | Hosttestbare Controller-Logik: `GatewayRegistry`, `CtrlLink` (Erkennung, Kopplung, Befehle, Abgleich), `ZbMap` (Endpoint-Zuordnung, Farbumrechnung), `TouchCal`, `Palette.h` (Kopie Legacy) |
 | `controller/main/` | Hardware (`board.cpp`), LVGL-Port, Dienst (`app.cpp`), Oberfläche (`ui_*.cpp`), Zigbee (`zigbee_bridge.cpp`, `ui_zigbee.cpp`, nur mit Flag) |
 | `controller/cmake/third_party.cmake` | LVGL 9.6.0, lvgl_theme_shadcn 0.3.1 und esp-zigbee-lib (nur mit Zigbee) per Git auf feste Versionen |
+| `controller-round/` | Temporärer runder Controller (eigenes Projekt, nutzt `shared/` und `controller_core`) |
 | `tests/` | Host-Tests (gcc, ASan/UBSan) |
-| `tools/` | `fetch_deps.sh`, `ui_preview/` |
+| `tools/` | `fetch_deps.sh`, `ui_preview/`, `check_round_build.py` |
+
+**Oberfläche:** Ein/Aus liegt auf der Übersicht (Schalter je Gateway); die Detailansicht zeigt nur Farbe, Helligkeit und Status. Statussymbole: Gateway per ESP-NOW erreichbar und Licht an/aus. Ob das Gateway mit der Leiste verbunden ist, steht als Text („Band nicht verbunden“). Der **Musikmodus hat kein Bedienelement**, solange er am Band nicht ausreichend getestet ist; die ESP-NOW-Befehle bleiben im Protokoll.
 
 ### Nebenläufigkeit
 
@@ -87,7 +92,7 @@ Die Flashgröße ist hier nicht belegt; die Firmware nutzt deshalb ein 4-MB-Layo
 3. ESP-NOW zwischen C5 und S3 auf Kanal 1 (C5 Dualband), Reichweite, Wiederholungen.
 4. Schlüssel: Kopplung mit richtigem/falschem Schlüssel; ob unverschlüsselte Unicasts eines verschlüsselt eingetragenen Peers verworfen werden.
 5. Gateway-BLE (NimBLE-Port): Scan, Verbindung, Schreiben ohne Antwort an 0xFFF3, Wiederverbindung, Koexistenz mit ESP-NOW.
-6. Musikmodus und Mikrofon-EQ (schon in Legacy ungetestet).
+6. Musikmodus und Mikrofon-EQ (schon in Legacy ungetestet; in Next ohne Bedienelement, nur im Protokoll).
 7. Zigbee: Beitritt zur FRITZ!Box 5690 Pro, Darstellung mehrerer Endpoints, Farbbefehle (xy/Hue/Farbtemperatur), Koexistenz Zigbee + ESP-NOW auf dem C5.
 8. Kalibrierassistent am Band (Vorschau-Drosselung 400 ms).
 9. XIAO: LED-Polarität, BOOT-Taste als Kopplungstaste im Betrieb.

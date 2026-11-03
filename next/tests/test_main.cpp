@@ -12,6 +12,8 @@ int main() {
   tests_gateway();
   printf("== Controller ==\n");
   tests_controller();
+  printf("== Runder Controller ==\n");
+  tests_round();
   printf("\n%d Pruefungen, %d Fehler\n", g_checks, g_failures);
   return g_failures != 0;
 }

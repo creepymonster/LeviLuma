@@ -1,0 +1,54 @@
+menu "LeviLuma Round Controller"
+
+    config LEVILUMA_CTRL_NAME
+        string "Name des Controllers (fuer das Gateway)"
+        default "LeviLuma Rund"
+        help
+            Wird beim Koppeln an das Gateway gemeldet. Hoechstens 24 Zeichen.
+
+    menu "Display und Touch (wie Legacy Config.h)"
+        config LEVILUMA_DISPLAY_SPI_MHZ
+            int "SPI-Takt Display (MHz), Legacy LEVI_DISPLAY_SPI_MHZ"
+            range 1 80
+            default 40
+        config LEVILUMA_DISPLAY_INVERT
+            bool "Panelfarben invertieren, Legacy LEVI_DISPLAY_INVERT"
+            default y
+        config LEVILUMA_BACKLIGHT_ACTIVE_HIGH
+            bool "Hintergrundbeleuchtung High-aktiv, Legacy LEVI_BACKLIGHT_ACTIVE_HIGH"
+            default y
+        config LEVILUMA_DISPLAY_ROTATION
+            int "Drehung in Grad (0, 90, 180, 270), Legacy LEVI_DISPLAY_ROTATION"
+            default 0
+        config LEVILUMA_TOUCH_OFFSET_ROTATION
+            int "Touch-Drehung in LovyanGFX (0..7), Legacy LEVI_TOUCH_OFFSET_ROTATION"
+            range 0 7
+            default 0
+            help
+                Wert fuer 270 Grad ist in Legacy noch nicht am Geraet bestimmt.
+        config LEVILUMA_TOUCH_BRIDGE_MS
+            int "Ueberbrueckung kurzer Touch-Aussetzer (ms), Legacy LEVI_TOUCH_BRIDGE_MS"
+            default 40
+        config LEVILUMA_RGB565_SWAP
+            bool "RGB565-Bytes tauschen, Legacy LEVI_RGB565_SWAP"
+            default y
+    endmenu
+
+    config LEVILUMA_DIM_MS
+        int "Hintergrundbeleuchtung aus nach (ms ohne Beruehrung)"
+        default 20000
+        help
+            Wie Legacy: nach 20 s aus, eine Beruehrung schaltet sie wieder ein (und wird verworfen).
+
+    config LEVILUMA_HOME_MS
+        int "Zurueck zur Hauptansicht nach (ms ohne Beruehrung)"
+        default 60000
+        help
+            Wie Legacy LEVI_RECENTER_MS.
+
+    config LEVILUMA_INPUT_SEND_MS
+        int "Mindestabstand fuer Befehle waehrend Farbrad/Bogen bewegt werden (ms)"
+        range 20 1000
+        default 120
+
+endmenu

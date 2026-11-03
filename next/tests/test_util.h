@@ -36,3 +36,4 @@ void tests_protocol(void);
 void tests_link(void);
 void tests_gateway(void);
 void tests_controller(void);
+void tests_round(void);
