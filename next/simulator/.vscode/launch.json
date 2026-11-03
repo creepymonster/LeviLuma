@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Simulator: Round (Debug)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/leviluma-sim-round",
+      "args": ["--no-dim"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Simulator: Bauen",
+      "externalConsole": false,
+      "linux": { "MIMode": "gdb" },
+      "osx": { "MIMode": "lldb" },
+      "windows": { "MIMode": "gdb", "program": "${workspaceFolder}/build/bin/leviluma-sim-round.exe" }
+    },
+    {
+      "name": "Simulator: RockBase (Debug)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/leviluma-sim-controller",
+      "args": ["--no-dim"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Simulator: Bauen",
+      "externalConsole": false,
+      "linux": { "MIMode": "gdb" },
+      "osx": { "MIMode": "lldb" },
+      "windows": { "MIMode": "gdb", "program": "${workspaceFolder}/build/bin/leviluma-sim-controller.exe" }
+    },
+    {
+      "name": "Simulator: Round (Debug, MSVC)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/leviluma-sim-round.exe",
+      "args": ["--no-dim"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Simulator: Bauen"
+    },
+    {
+      "name": "Simulator: RockBase (Debug, MSVC)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/leviluma-sim-controller.exe",
+      "args": ["--no-dim"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Simulator: Bauen"
+    }
+  ]
+}

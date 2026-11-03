@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Simulator: Konfigurieren",
+      "type": "process",
+      "command": "cmake",
+      "args": ["-S", ".", "-B", "build"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Simulator: Bauen",
+      "type": "process",
+      "command": "cmake",
+      "args": ["--build", "build", "--parallel"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": "Simulator: Konfigurieren",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Simulator: Tests",
+      "type": "process",
+      "command": "ctest",
+      "args": ["--test-dir", "build", "--output-on-failure"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": "Simulator: Bauen",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Simulator: Round starten",
+      "type": "process",
+      "command": "${workspaceFolder}/build/bin/leviluma-sim-round",
+      "windows": { "command": "${workspaceFolder}/build/bin/leviluma-sim-round.exe" },
+      "dependsOn": "Simulator: Bauen",
+      "problemMatcher": []
+    },
+    {
+      "label": "Simulator: RockBase starten",
+      "type": "process",
+      "command": "${workspaceFolder}/build/bin/leviluma-sim-controller",
+      "windows": { "command": "${workspaceFolder}/build/bin/leviluma-sim-controller.exe" },
+      "dependsOn": "Simulator: Bauen",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -7,6 +7,8 @@ Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran a
 - **Next Round** (`next/controller-round/`, Waveshare-Hardware von Legacy, ESP-IDF): temporäre Fernbedienung für genau ein Gateway, siehe „LeviLuma Next“.
 - **Next Diagnose** (`next/debug/`, XIAO ESP32S3, ESP-IDF): passiver ESP-NOW-Mitschnitt für den seriellen Monitor, siehe „Diagnosegerät“ unten.
 
+Dazu kommt **Next Simulator** (`next/simulator/`, Desktop, CMake + SDL2, keine Firmware): die Original-LVGL-Oberflächen beider Next-Controller am PC, siehe „Desktop-Simulator“ unten.
+
 Die READMEs (`README.md`, `legacy/README.md`, `next/README.md`) enthalten Nutzerdokumentation, dieses Dokument enthält das, was man für sicheres Arbeiten im Code wissen muss.
 
 Die Kommunikation mit dem Entwickler (Reimar) läuft auf Deutsch. Kommentare, Log-Meldungen und UI-Texte sind ebenfalls deutsch.
@@ -169,6 +171,18 @@ Eigenständiges ESP-IDF-Projekt (v5.5.6, esp32s3), das ESP-NOW-Verkehr **nur beo
 - **Tests:** Gruppe „Diagnose“ in `next/tests/` (`test_debug.cpp`). Alle Testrahmen sind synthetisch und so gekennzeichnet; keine Mitschnitte als echt ausgeben. Beispielausgaben in der README nur aus dem echten Formatierer erzeugen und als synthetisch kennzeichnen. Hardwaretests sind nicht erfolgt, solange sie nicht am Gerät liefen.
 - **Kconfig:** nicht gesetzte `bool`-Optionen fehlen in `sdkconfig.h`; im Code `#if CONFIG_…` bzw. die Makros `LEVI_DBG_*` aus `main/app.h` verwenden, nie direkt in Ausdrücken. Die Variante `sdkconfig.defaults.full` (alle Optionen) wird in der CI mitgebaut, damit auch die optionalen Pfade übersetzen.
 - **Bauen:** `idf.py set-target esp32s3 build` in `next/debug/`. Flashen ersetzt die Firmware auf dem XIAO (siehe README); nicht ungefragt flashen oder `erase-flash` empfehlen.
+
+### Desktop-Simulator (`next/simulator/`)
+
+Nativer LVGL-Simulator (C++20, CMake ≥ 3.20, SDL2) für die Oberflächen von RockBase (`leviluma-sim-controller`) und Round (`leviluma-sim-round`). Zwei Programme, weil beide UIs gleichnamige Symbole (`uiBuild`, `appView`, `GatewayView` …) definieren. Nutzerdoku: `next/simulator/README.md`.
+
+- **Keine UI-Kopien:** Die UI-Dateien aus `next/controller/main/` und `next/controller-round/main/` werden direkt übersetzt. Oberflächen nur dort ändern, nie im Simulator nachbauen. Neue UI-Quelldateien in `next/simulator/CMakeLists.txt` eintragen.
+- **Nur Plattform ersetzen:** Simulator-Adapter liegen in `next/simulator/targets/<variante>/` (`app_adapter.cpp` = Gegenstück zu `main/app.cpp`, `port_adapter.cpp` = Gegenstück zu `main/lvgl_port.cpp`). Wird `app.h`, `lvgl_port.h` oder die von der UI genutzte Seite von `board.h` geändert, den Adapter nachziehen (fehlende Funktionen meldet der Linker, neue `GatewayView`-Felder nicht). Logik gehört weiter in `controller_core`/`round_core`/`light_core`, nicht in die Adapter.
+- **Mock-Gateway** (`mocks/mock_gateway.cpp`) nutzt die echte `light_core`-Logik; Bedienung nur über `MockGateway::post()` (Queue), nie direkt an LVGL-Widgets. Alle simulierten Namen beginnen mit „SIM“, Schlüssel dort sind reine Simulationsschlüssel.
+- **Threading wie Firmware:** LVGL und SDL nur im Hauptthread; Link-Thread unter `appLock`; Funkempfang kopiert nur in Queues.
+- **Trennung:** Keine SDL-/Simulator-Abhängigkeit in Firmware-Code, keine ESP-IDF-/FreeRTOS-Abhängigkeit im Simulator (`shim/` enthält nur die zwei `esp_lcd`-Platzhalter für `board.h`; Test `sim_no_idf`). Firmware-Dateien nicht für den Simulator umbauen; ist eine Anpassung unvermeidbar, klein halten und in `next/simulator/README.md` begründen.
+- **Versionen:** LVGL/Theme werden aus `next/controller/cmake/third_party.cmake` gelesen (nicht doppelt pflegen). `config/lv_conf.h` entspricht den LVGL-Einstellungen der `sdkconfig.defaults`; `sdkconfig.h` wird aus den Kconfig-Dateien erzeugt.
+- **Tests:** `ctest --test-dir next/simulator/build` (Skripte in `next/simulator/tests/*.sim`, SDL-Treiber `offscreen`). Sie gehören nicht zur Host-Testsuite `next/tests` und sind keine Hardwaretests. Simulator-Ergebnisse nie als Gerätetest ausgeben.
 
 ### Testauswertung (`next/tests/README.md`)
 Die Datei wird **automatisch** von `next/tests/tools/gen_report.py` aus den maschinenlesbaren Ergebnissen des Testprogramms erzeugt (`LEVI_TEST_RESULTS`, JSON Lines). Abschlusszeitpunkt ist der CI-Lauf nach dem Merge auf `main` (`.github/workflows/tests.yml`, Job `report`): Er legt die Datei per Bot-Commit (`[skip ci]`, nur diese Datei, kein Force-Push) ab und nennt darin den getesteten Commit. Jeder CI-Lauf erzeugt zusätzlich eine Vorschau als Artefakt.

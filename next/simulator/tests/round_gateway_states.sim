@@ -1,0 +1,32 @@
+# Round Controller: Gateway-Zustaende ueber den normalen Rueckmeldeweg (alles simuliert)
+expect-switch 0 on 10000
+
+echo Band getrennt: Schalter gesperrt
+gw 1 ble 0
+expect-switch 0 disabled
+gw 1 ble 1
+expect-switch 0 enabled
+
+echo Zustandsaenderung am Gateway
+gw 1 power 0
+expect-switch 0 off
+gw 1 power 1
+expect-switch 0 on
+
+echo Musikmodus im Gateway, Farbwahl beendet ihn
+gw 1 music 1
+expect-gw 1 music 1
+drag 120 205 120 40 300
+drag 120 205 120 40 300
+expect-text "Koralle"
+click 175 130
+expect-gw 1 music 0
+expect-gw 1 rgb FF7828
+
+echo Gateway offline / online (Gateway-Seite)
+drag 120 205 120 40 300
+gw 1 online 0
+expect-text "offline" 12000
+gw 1 online 1
+expect-text "online, vor" 12000
+quit

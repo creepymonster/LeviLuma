@@ -10,6 +10,8 @@ Das Repository enthält vier unabhängige Firmware-Projekte:
 | **Next Gateway** | [`next/gateway/`](next/gateway/) | Seeed XIAO ESP32S3 | ESP-IDF 5.5 (nativ) | Je Leiste ein Gateway: BLE zur Leiste, ESP-NOW zum Controller, autoritativer LightState und Kalibrierung |
 | **Next Round** (temporär) | [`next/controller-round/`](next/controller-round/) | Waveshare ESP32-S3-Touch-LCD-1.28 (rund) | ESP-IDF 5.5 (nativ) | Fernbedienung für genau ein Gateway per ESP-NOW, runde LVGL-Oberfläche; Alternative zum C5-Controller |
 
+Die Oberflächen beider Next-Controller laufen auch am PC: [`next/simulator/`](next/simulator/) (Desktop-Simulator mit SDL2, simuliertes Gateway, kein ESP-IDF nötig).
+
 Gemeinsamer Code von Next: [`next/shared/`](next/shared/) (ESP-NOW-Protokoll, Speicher-Hilfen).
 Dokumentation zu Next: [`next/README.md`](next/README.md) und [`next/docs/`](next/docs/).
 

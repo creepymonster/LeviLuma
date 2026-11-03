@@ -1,0 +1,108 @@
+# Round Controller: Entkoppeln, Suchen, Kopplung mit falschem und richtigem Schluessel (Simulationsschluessel),
+# dann Kopplung ohne Schluessel. Genau ein Gateway darf gekoppelt sein.
+expect-switch 0 on 10000
+drag 120 205 120 40 300
+drag 120 205 120 40 300
+drag 120 205 120 40 300
+expect-text "online, vor"
+
+echo Entkoppeln
+click-text @TRASH
+expect-text "Gateway entkoppeln?"
+click-text "=Ja"
+expect-gw 1 paired 0 8000
+expect-text "Kein Gateway"
+
+echo Suchen, Gateway mit Schluessel waehlen, falscher Schluessel
+click-text "Suchen"
+expect-text "Gateway waehlen"
+expect-text "SIM Kueche" 8000
+expect-text "SIM Wohnz" 8000
+click-text "SIM Kueche"
+expect-text "0/32"
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+click-button 1
+expect-text "32/32"
+click-button @OK
+expect-text "Schluessel falsch?" 12000
+expect-gw 2 paired 0
+
+echo Richtiger Schluessel
+click-text "SIM Kueche"
+expect-text "0/32"
+click-button 0
+click-button 0
+click-button 1
+click-button 1
+click-button 2
+click-button 2
+click-button 3
+click-button 3
+click-button 4
+click-button 4
+click-button 5
+click-button 5
+click-button 6
+click-button 6
+click-button 7
+click-button 7
+click-button 8
+click-button 8
+click-button 9
+click-button 9
+click-button A
+click-button A
+click-button B
+click-button B
+click-button C
+click-button C
+click-button D
+click-button D
+click-button E
+click-button E
+click-button F
+click-button F
+click-button @OK
+expect-text "Gekoppelt" 8000
+expect-gw 2 paired 1
+click-close
+expect-text "SIM Kueche"
+expect-switch 0 on
+
+echo Nur ein Gateway: Seite Gateway zeigt das gekoppelte, keine Suche
+drag 120 205 120 40 300
+drag 120 205 120 40 300
+drag 120 205 120 40 300
+expect-text "verschluesselt"
+expect-no-text "Suchen"
+quit

@@ -6,6 +6,7 @@ Zwei zusammengehörige ESP-IDF-Firmware-Projekte (kein Arduino):
 - **Gateway** (`gateway/`): Seeed XIAO ESP32S3. Steuert genau eine BLE-LED-Leiste (ELK-BLEDDM u. a.), hält deren **autoritativen LightState** und die **Farbkalibrierung** (NVS), spricht ESP-NOW mit dem Controller. Keine Oberfläche, kein Zigbee, kein Webserver.
 
 - **Round Controller** (`controller-round/`, temporär): Waveshare ESP32-S3-Touch-LCD-1.28 als runde Fernbedienung für **genau ein** Gateway, nur ESP-NOW. Eigene Doku: [controller-round/README.md](controller-round/README.md).
+- **Desktop-Simulator** (`simulator/`): beide Controller-Oberflächen (Original-LVGL-Code) auf dem PC mit SDL2, mit der Maus bedienbar, gegen ein simuliertes Gateway (echte Gateway-Logik `light_core`). Kein ESP-IDF nötig. Eigene Doku: [simulator/README.md](simulator/README.md).
 
 Gemeinsam: `shared/protocol/` (ESP-NOW-Protokoll, zuerst entwickelt) und `shared/common/` (NVS-Speicher als Schnittstelle, Schlüsselformat).
 
@@ -70,6 +71,7 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 | Kalibrierung | [docs/KALIBRIERUNG.md](docs/KALIBRIERUNG.md) |
 | Zigbee / FRITZ!Box | [docs/ZIGBEE.md](docs/ZIGBEE.md) |
 | ESP-NOW mitlesen (Diagnose) | [debug/README.md](debug/README.md) |
+| Oberflächen am PC (Simulator) | [simulator/README.md](simulator/README.md) |
 
 ## Aufbau
 
@@ -83,6 +85,7 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 | `controller/main/` | Hardware (`board.cpp`), LVGL-Port, Dienst (`app.cpp`), Oberfläche (`ui_*.cpp`), Zigbee (`zigbee_bridge.cpp`, `ui_zigbee.cpp`, nur mit Flag) |
 | `controller/cmake/third_party.cmake` | LVGL 9.6.0, lvgl_theme_shadcn 0.3.1 und esp-zigbee-lib (nur mit Zigbee) per Git auf feste Versionen |
 | `controller-round/` | Temporärer runder Controller (eigenes Projekt, nutzt `shared/` und `controller_core`) |
+| `simulator/` | Nativer LVGL-Desktop-Simulator (CMake, SDL2) für beide Controller-Oberflächen; übersetzt die UI-Dateien der Firmware direkt, ersetzt nur Display, Touch, Zeit, Funk, Gateway und NVS |
 | `tests/` | Host-Tests (gcc, ASan/UBSan) |
 | `debug/` | Eigenständiges, passives ESP-NOW-Diagnosegerät für den XIAO ESP32-S3 (seriell, Promiscuous-Empfang), siehe [debug/README.md](debug/README.md); nutzt `shared/protocol` |
 | `tools/` | `fetch_deps.sh`, `ui_preview/`, `check_round_build.py`, `check_debug_build.py` |

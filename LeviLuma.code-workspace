@@ -15,12 +15,18 @@
     {
       "name": "Next – Waveshare Round",
       "path": "next/controller-round"
+    },
+    {
+      "name": "Next – LVGL Simulator",
+      "path": "next/simulator"
     }
   ],
   "extensions": {
     "recommendations": [
       "platformio.platformio-ide",
-      "espressif.esp-idf-extension"
+      "espressif.esp-idf-extension",
+      "ms-vscode.cmake-tools",
+      "ms-vscode.cpptools"
     ]
   }
 }
