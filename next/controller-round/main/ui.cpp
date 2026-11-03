@@ -1,6 +1,6 @@
 // Runde LVGL-Oberflaeche (240x240) im LeviLuma-Next-Skin (shadcn zinc_dark, Montserrat, Statuspunkte
 // und Symbole wie Next). Vier Seiten untereinander (senkrecht wischen, Seitenpunkte rechts):
-//   0 Ein/Aus: Schalter wie auf der RockBase-Uebersicht, Status
+//   0 Ein/Aus: Schalter wie auf der RockBase-Uebersicht, Statuspunkte (ESP-NOW, Licht an/aus)
 //   1 Helligkeit: waagerechter Regler (1..100 % wie Protokoll) mit grossem Prozentwert (wie Legacy)
 //   2 Farbe: Farbpunkte des Farbsets (LeviPalette) auf einem Kreis, Name und Hex in der Mitte,
 //     Tipp rechts = naechste, links = vorige Farbe (wie die Legacy-LCD-UI)
@@ -9,6 +9,8 @@
 // (die ESP-NOW-Befehle im gemeinsamen Protokoll bleiben bestehen).
 // Dazu eigene Bildschirme fuer die Gateway-Suche und die Schluesseleingabe.
 //
+// Keine Statustexte: Verbindung und Licht zeigen die Statuspunkte, gesperrte Bedienelemente zeigen,
+// dass gerade nichts gesteuert werden kann (Gateway offline, Band getrennt, Lampe aus).
 // Zustand: Angezeigt wird der vom Gateway bestaetigte LightState. Nur waehrend der Finger auf
 // dem Helligkeitsregler liegt bzw. ein Befehl unterwegs ist, zeigt die Oberflaeche den Eingabewert.
 #include <math.h>
@@ -34,9 +36,9 @@ static constexpr int PAGES = 4;
 static constexpr int PAGE_POWER = 0, PAGE_BRIGHT = 1, PAGE_COLOR = 2, PAGE_GATEWAY = 3;
 static lv_obj_t *mainScr, *tv, *pager[PAGES];
 // Ein/Aus
-static lv_obj_t *dotGw, *dotPower, *gwName, *powerSw, *statusLbl, *setupBox;
+static lv_obj_t *dotGw, *dotPower, *gwName, *powerSw, *setupBox;
 // Helligkeit
-static lv_obj_t *bright, *brightTitle, *brightLbl, *brightStatus;
+static lv_obj_t *bright, *brightTitle, *brightLbl;
 // Farbe
 static lv_obj_t *colorTile, *palDots[LeviPalette::N], *colorName, *colorHex;
 static int colorSel = -1; // Index der bestaetigten Farbe im Farbset, -1 = eigene Farbe
@@ -137,27 +139,6 @@ static void reportError(lvp_err_t e) {
   }
 }
 
-// ---------------- Gemeinsam ----------------
-
-static const char *statusText() {
-  if (!view.online) {
-    return "Gateway offline";
-  }
-  if (view.pending) {
-    return "Wird gesendet ...";
-  }
-  if (view.lastTimeout || view.lastError) {
-    return appErrorText(view.lastError, view.lastTimeout);
-  }
-  if (!view.stateValid) {
-    return "Abgleich ...";
-  }
-  if (!(view.state.flags & LVP_STATE_BLE)) {
-    return "Band getrennt";
-  }
-  return "Bestaetigt";
-}
-
 // ---------------- Seite Ein/Aus ----------------
 
 // Schalter wie auf der RockBase-Uebersicht (ui_home.cpp): Eingabe sendet, die Anzeige folgt der Bestaetigung
@@ -197,10 +178,6 @@ static void buildPower(lv_obj_t *tile) {
   lv_obj_set_ext_click_area(powerSw, 8);
   lv_obj_add_event_cb(powerSw, powerChanged, LV_EVENT_VALUE_CHANGED, nullptr);
 
-  statusLbl = label(tile, "", true);
-  lv_label_set_long_mode(statusLbl, LV_LABEL_LONG_MODE_DOTS);
-  lv_obj_set_width(statusLbl, 150);
-  lv_obj_align(statusLbl, LV_ALIGN_CENTER, 0, 60);
 
   // ohne gekoppeltes Gateway: Hinweis statt Bedienung
   setupBox = plainBox(tile);
@@ -217,7 +194,6 @@ static void refreshPower() {
   bool paired = haveView && view.paired;
   lv_obj_set_hidden(setupBox, paired);
   lv_obj_set_hidden(powerSw, !paired);
-  lv_obj_set_hidden(statusLbl, !paired);
   lv_obj_set_hidden(gwName, !paired);
   dotState(dotGw, paired ? (view.online ? 1 : 0) : -1);
   dotState(dotPower, paired && view.stateValid && view.state.power >= 0 ? (view.state.power == 1 ? 1 : 0) : -1);
@@ -230,7 +206,6 @@ static void refreshPower() {
   if (!view.pending) { // waehrend ein Befehl laeuft, bleibt die Eingabe sichtbar (wie RockBase)
     lv_obj_set_state(powerSw, LV_STATE_CHECKED, on);
   }
-  lv_label_set_text(statusLbl, statusText());
 }
 
 // ---------------- Seite Helligkeit ----------------
@@ -263,28 +238,24 @@ static void buildBrightness(lv_obj_t *tile) {
   bright = lv_slider_create(tile);
   lv_slider_set_range(bright, LVP_BRIGHTNESS_MIN, LVP_BRIGHTNESS_MAX);
   lv_obj_set_size(bright, 180, 18);
-  lv_obj_align(bright, LV_ALIGN_CENTER, 0, 30);
+  lv_obj_align(bright, LV_ALIGN_CENTER, 0, 40);
   lv_obj_set_ext_click_area(bright, 14);
   lv_obj_set_scroll_chain(bright, false);
   lv_obj_add_event_cb(bright, brightEvent, LV_EVENT_ALL, nullptr);
 
   brightTitle = label(tile, "Helligkeit", true);
-  lv_obj_align(brightTitle, LV_ALIGN_CENTER, 0, -54);
+  lv_obj_align(brightTitle, LV_ALIGN_CENTER, 0, -46);
   brightLbl = label(tile, "-");
   lv_obj_set_style_text_font(brightLbl, &lv_font_montserrat_48, 0);
-  lv_obj_align(brightLbl, LV_ALIGN_CENTER, 0, -18);
-  brightStatus = label(tile, "", true);
-  lv_label_set_long_mode(brightStatus, LV_LABEL_LONG_MODE_DOTS);
-  lv_obj_set_width(brightStatus, 130);
-  lv_obj_align(brightStatus, LV_ALIGN_CENTER, 0, 66);
+  lv_obj_align(brightLbl, LV_ALIGN_CENTER, 0, -10);
 }
 
 static void refreshBrightness() {
   bool paired = haveView && view.paired;
   lv_obj_set_hidden(bright, !paired);
   lv_obj_set_hidden(brightLbl, !paired);
+  lv_label_set_text(brightTitle, paired ? "Helligkeit" : "Kein Gateway");
   if (!paired) {
-    lv_label_set_text(brightStatus, "Kein Gateway");
     return;
   }
   bool on = lampOn();
@@ -296,7 +267,6 @@ static void refreshBrightness() {
     snprintf(t, sizeof(t), "%u %%", view.state.brightness);
     lv_label_set_text(brightLbl, t);
   }
-  lv_label_set_text(brightStatus, usable() && view.stateValid && !on && !view.pending ? "Lampe aus" : statusText());
 }
 
 // ---------------- Farbe (wie Legacy) ----------------

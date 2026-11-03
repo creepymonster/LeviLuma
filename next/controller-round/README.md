@@ -88,7 +88,7 @@ Nebenläufigkeit wie beim RockBase-Controller: Der ESP-NOW-Callback kopiert nur 
 - Angezeigt wird der vom Gateway bestätigte Zustand (`STATE`). Nur während der Finger auf dem Helligkeitsregler liegt oder ein Befehl unterwegs ist, zeigt die Oberfläche den Eingabewert; danach gilt wieder der bestätigte Wert.
 - Wiederholung, Zusammenfassen (immer höchstens ein Befehl unterwegs, neuester Wert gewinnt), Zeitüberschreitung, Duplikaterkennung und Abgleich nach Neustart oder Offline-Phase übernimmt `CtrlLink` (wie beim RockBase-Controller). Veraltete Antworten (kleinere Revision derselben Sitzung) werden verworfen.
 - Zusätzlich sendet die Oberfläche beim Ziehen des Helligkeitsreglers höchstens alle 120 ms einen Befehl; der letzte Wert geht beim Loslassen immer raus.
-- Offline: nach drei verpassten Beacons. Die Bedienelemente werden gesperrt, der Status zeigt „Gateway offline“. Befehle werden nicht gesammelt. Ist das Gateway wieder da, wird der vollständige Zustand abgefragt.
+- Offline: nach drei verpassten Beacons. Der ESP-NOW-Punkt wird rot und die Bedienelemente werden gesperrt (keine Statustexte). Befehle werden nicht gesammelt. Ist das Gateway wieder da, wird der vollständige Zustand abgefragt.
 
 ## Bedienung
 
@@ -96,9 +96,8 @@ Vier Seiten untereinander, **senkrecht wischen**. Vier Punkte am rechten Rand ze
 
 1. **Ein/Aus:**
    - Oben: Gateway-Symbol mit Punkt (ESP-NOW-Verbindung grün/rot) und Glühbirne mit Punkt (Licht an grün, aus rot, unbekannt weiß), darunter der Gateway-Name.
-   - Mitte: der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers; er ist zugleich die Statusanzeige. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
-   - Unten: Status („Bestaetigt“, „Wird gesendet …“, „Gateway offline“, „Band getrennt“, „Keine Antwort“).
-2. **Helligkeit:** großer Prozentwert und darunter ein **waagerechter Regler** wie in Legacy (1–100 %, Bereich aus dem Protokoll), darunter der Status. Nur bei eingeschalteter Lampe aktiv („Lampe aus“).
+   - Mitte: der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers. Zusammen mit den Statuspunkten ist er die einzige Zustandsanzeige; Statustexte gibt es bewusst nicht. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
+2. **Helligkeit:** großer Prozentwert und darunter ein **waagerechter Regler** wie in Legacy (1–100 %, Bereich aus dem Protokoll). Nur bei eingeschalteter, erreichbarer Lampe bedienbar, sonst gesperrt.
 3. **Farbe:** wie die Legacy-LCD-UI – die 15 Farben des Farbsets (`LeviPalette`) als Punkte auf einem Kreis, die aktive Farbe weiß umrandet, in der Mitte Name und Hex-Wert. **Tipp rechts = nächste Farbe, links = vorige**, am Ende wieder vorn. Kein freier RGB-Wähler. Nur bei eingeschalteter Lampe aktiv.
 4. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Gateway wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
 
@@ -120,7 +119,7 @@ Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weck
 1. Display-Initialisierung und Touch mit LovyanGFX unter ESP-IDF (in Legacy unter Arduino bewährt), Touch-Drehung.
 2. LVGL-Darstellung auf dem Panel (Farben, Bytetausch, Lesbarkeit, Bedienung von Schalter, Helligkeitsregler und Farbwahl mit dem Finger, Wischen zwischen den Seiten).
 3. ESP-NOW-Erkennung, Kopplung (mit/ohne Schlüssel), Wiederverbindung nach Neustart von Controller und Gateway.
-4. Ein/Aus, Farbe, Helligkeit über das Gateway an der Leiste; Offline- und Timeout-Anzeige.
+4. Ein/Aus, Farbe, Helligkeit über das Gateway an der Leiste; Sperren der Bedienung bei Offline/Timeout.
 5. Gleichzeitiger Betrieb mit dem RockBase-Controller am selben Gateway.
 
 ## Bekannte Einschränkungen
