@@ -1,0 +1,53 @@
+name: Next Firmware
+
+# Host-Tests laufen separat in tests.yml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "next/**"
+      - ".github/workflows/next.yml"
+  pull_request:
+    paths:
+      - "next/**"
+      - ".github/workflows/next.yml"
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    name: ESP-IDF ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.5.6
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Gateway (esp32s3)
+            dir: next/gateway
+            target: esp32s3
+            args: ""
+          - name: Controller ohne Zigbee (esp32c5)
+            dir: next/controller
+            target: esp32c5
+            args: ""
+          - name: Round Controller (esp32s3)
+            dir: next/controller-round
+            target: esp32s3
+            args: ""
+          - name: Controller mit Zigbee (esp32c5)
+            dir: next/controller
+            target: esp32c5
+            args: '-B build-zigbee -D SDKCONFIG=build-zigbee/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.zigbee"'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Bauen
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          git config --global --add safe.directory '*'
+          cd ${{ matrix.dir }}
+          idf.py ${{ matrix.args }} set-target ${{ matrix.target }} build
+          if [ "${{ matrix.dir }}" = "next/controller-round" ]; then
+            python3 ${GITHUB_WORKSPACE}/next/tools/check_round_build.py build
+          fi
