@@ -308,11 +308,9 @@ static void detailRefresh(bool) {
   char st[48];
   uiGatewayStatusText(v, st, sizeof(st));
   int n = snprintf(t, sizeof(t),
-                   "ID: %s\nGemeldeter Name: %s\nFirmware: %u.%u\nVerbindung: %s (zuletzt %s)\nBand (BLE): %s\nZustand: %s\nRevision %lu, an Band "
-                   "gesendet bis %lu\nSchluessel: %s",
+                   "ID: %s\nGemeldeter Name: %s\nFirmware: %u.%u\nVerbindung: %s (zuletzt %s)\nBand (BLE): %s\nZustand: %s\nSchluessel: %s",
                    id, v.announcedName[0] ? v.announcedName : "-", v.fwVersion >> 8, v.fwVersion & 0xFF, v.online ? "online" : "offline", seen,
-                   v.stateValid && (v.state.flags & LVP_STATE_BLE) ? "verbunden" : "getrennt", st, (unsigned long)v.state.revision,
-                   (unsigned long)v.state.sent_revision, v.hasKey ? "individuell (verschluesselt)" : "keiner (unverschluesselt)");
+                   v.stateValid && (v.state.flags & LVP_STATE_BLE) ? "verbunden" : "getrennt", st, v.hasKey ? "individuell (verschluesselt)" : "keiner (unverschluesselt)");
 #if CONFIG_LEVILUMA_ZIGBEE_ENABLED
   if (n > 0 && n < (int)sizeof(t)) {
     if (v.zbEndpoint && v.zbEndpoint != 0xFF) {

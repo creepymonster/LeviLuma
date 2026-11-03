@@ -1,6 +1,7 @@
 // Detailansicht eines Gateways im Stil der Legacy-LCD-UI, auf 320x240 nebeneinander:
 // links das Farbrad (Farbset aus LeviPalette, Name und Hex in der Mitte, Tippen = naechste Farbe),
-// rechts die Helligkeit (5..100 % in 5er-Schritten wie Legacy) und der Status.
+// rechts die Helligkeit (5..100 % in 5er-Schritten wie Legacy). Keine Statustexte: Verbindung und
+// Licht zeigen die Statuspunkte, gesperrte Bedienelemente zeigen, dass nichts steuerbar ist.
 // Ein/Aus liegt auf der Uebersicht (Schalter je Gateway). Der Musikmodus hat bewusst kein
 // Bedienelement, solange er am Band nicht getestet ist (die ESP-NOW-Befehle bleiben bestehen).
 // Alle Anzeigen folgen dem vom Gateway bestaetigten Zustand.
@@ -14,7 +15,7 @@
 
 static int gw = -1;
 static lv_obj_t *ring, *dots[LeviPalette::N], *pickName, *pickHex;
-static lv_obj_t *bar, *barLbl, *statusLbl;
+static lv_obj_t *bar, *barLbl;
 static lv_obj_t *dotOnline, *dotPower;
 static lv_image_dsc_t bulbDsc, gatewayDsc;
 static int selected = -1; // Palettenindex der bestaetigten Farbe, -1 = eigene Farbe
@@ -129,25 +130,6 @@ static void refresh(bool) {
   lv_label_set_text(pickName, name);
   lv_label_set_text(pickHex, hex);
 
-  char st[64];
-  if (!v.online) {
-    snprintf(st, sizeof(st), "Gateway offline");
-  } else if (v.pending) {
-    snprintf(st, sizeof(st), "Wird gesendet ...");
-  } else if (v.lastTimeout || v.lastError) {
-    snprintf(st, sizeof(st), "%s", appErrorText(v.lastError, v.lastTimeout));
-  } else if (!v.stateValid) {
-    snprintf(st, sizeof(st), "Abgleich ...");
-  } else if (!ble) {
-    snprintf(st, sizeof(st), "Band nicht verbunden");
-  } else if (!on) {
-    snprintf(st, sizeof(st), "Aus (Einschalten in der Uebersicht)");
-  } else if (v.state.sent_revision >= v.state.revision) {
-    snprintf(st, sizeof(st), "Bestaetigt, an Band gesendet");
-  } else {
-    snprintf(st, sizeof(st), "Bestaetigt, Band folgt ...");
-  }
-  lv_label_set_text(statusLbl, st);
 }
 
 void uiShowDetail(int idx) {
@@ -197,7 +179,7 @@ void uiShowDetail(int idx) {
   lv_theme_shadcn_set_text_role(pickHex, LV_THEME_SHADCN_TEXT_MUTED);
   lv_obj_align(pickHex, LV_ALIGN_CENTER, 0, 12);
 
-  // rechte Spalte: Helligkeit und Status
+  // rechte Spalte: Helligkeit
   lv_obj_t *col = lv_obj_create(content);
   lv_obj_set_flex_grow(col, 1);
   lv_obj_set_height(col, LV_PCT(100));
@@ -217,9 +199,5 @@ void uiShowDetail(int idx) {
   lv_obj_set_size(bar, LV_PCT(90), 16);
   lv_obj_add_event_cb(bar, barChanged, LV_EVENT_VALUE_CHANGED, nullptr);
 
-  statusLbl = uiLabel(col, "", true);
-  lv_label_set_long_mode(statusLbl, LV_LABEL_LONG_MODE_WRAP);
-  lv_obj_set_width(statusLbl, LV_PCT(100));
-  lv_obj_set_style_text_align(statusLbl, LV_TEXT_ALIGN_CENTER, 0);
   refresh(true);
 }

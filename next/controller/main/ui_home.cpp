@@ -1,6 +1,6 @@
 // Uebersicht: alle gekoppelten Gateways als Karten (Farbe, Name, Status, Ein/Aus-Schalter).
 // Antippen der Karte oeffnet die Detailansicht. Angezeigt wird nur der bestaetigte Zustand;
-// waehrend ein Befehl unterwegs ist, steht "Wird gesendet ...".
+// waehrend ein Befehl unterwegs ist, bleibt die Eingabe am Schalter sichtbar (keine Statustexte).
 #include <stdio.h>
 #include "lv_theme_shadcn.h"
 #include "ui.h"
@@ -36,16 +36,12 @@ static void setupClicked(lv_event_t *) {
   uiShowGateways();
 }
 
-// Statuszeile einer Karte aus dem bestaetigten Zustand
+// Statuszeile einer Karte aus dem bestaetigten Zustand (nur Lampenzustand, keine Sende-/Bestaetigungsinfos)
 void uiGatewayStatusText(const GatewayView &v, char *out, size_t cap) {
   if (!v.online) {
     snprintf(out, cap, "Offline");
-  } else if (v.pending) {
-    snprintf(out, cap, "Wird gesendet ...");
-  } else if (v.lastTimeout) {
-    snprintf(out, cap, "Keine Antwort");
   } else if (!v.stateValid) {
-    snprintf(out, cap, "Abgleich ...");
+    snprintf(out, cap, "-");
   } else if (!(v.state.flags & LVP_STATE_BLE)) {
     snprintf(out, cap, "Band nicht verbunden");
   } else if (v.state.power == 1) {

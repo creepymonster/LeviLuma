@@ -27,7 +27,7 @@ Mit Schlüssel ist kein Kopplungsfenster nötig – der Schlüssel ist der Nachw
 ## Verwalten
 
 - **Anzeigename:** Gateway-Seite → *Name*. Der Name wird im Controller gespeichert (leer = Name des Gateways). Den Namen im Gateway selbst ändert die Konsole: `name Wohnzimmer`.
-- **Status:** Die Gateway-Seite zeigt ID, Firmware, online/offline (zuletzt gesehen), Band verbunden, Revision und „an Band gesendet bis“.
+- **Status:** Die Gateway-Seite zeigt ID, Firmware, online/offline (zuletzt gesehen), Band verbunden, Lampenzustand und Schlüssel ja/nein.
 - **Abgleich:** *Abgleich* fragt Zustand und Kalibrierung neu ab (passiert sonst automatisch).
 - **Entkoppeln:** *Entkoppeln* sendet `UNPAIR` an das Gateway und löscht Kopplung, Schlüssel und Zigbee-Zuordnung im Controller sofort (auch wenn das Gateway nicht erreichbar ist). Am Gateway löscht `unpair all` alle Kopplungen.
 - **Konsole des Gateways:** `status` zeigt ID, Name, Schlüssel ja/nein, gekoppelte Controller, Kalibrierung und Bandzustand.
