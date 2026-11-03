@@ -9,7 +9,7 @@ Round Controller <--ESP-NOW (STATE)-- Gateway        (Gateway bleibt autoritativ
 
 - Funk ausschließlich **ESP-NOW** über das gemeinsame Protokoll `next/shared/protocol/` (dieselben Nachrichten, Versionen und Revisionen wie der RockBase-Controller).
 - **Kein BLE, keine WLAN-Verbindung, kein WLAN-Scan, kein Access Point, kein TCP/IP-Dienst, kein HTTP/MQTT, kein Zigbee.** Der WLAN-Treiber läuft nur im STA-Modus als Funkteil für ESP-NOW; `esp_netif` wird nicht initialisiert. Geprüft mit `next/tools/check_round_build.py` (auch in der CI).
-- Keine eigene Kalibrierung: Farben werden als kalibrierte Farbe (`SET_STATE` mit `COLOR`) gesendet, die Kalibrierung wendet das Gateway an.
+- Keine eigene Kalibrierung: Farben aus dem Farbset werden als kalibrierte Farbe (`SET_STATE` mit `COLOR`) gesendet, die Kalibrierung wendet das Gateway an.
 
 ![Ein/Aus](../screenshots/controller-round_240x240/05_power_on.png) ![Helligkeit](../screenshots/controller-round_240x240/06_brightness.png) ![Farbe](../screenshots/controller-round_240x240/07_color.png) ![Gateway](../screenshots/controller-round_240x240/08_gateway.png)
 
@@ -56,7 +56,7 @@ In VS Code ist das Projekt der Workspace-Ordner **„Next – Waveshare Round“
 | `LEVILUMA_TOUCH_BRIDGE_MS` | 40 | `LEVI_TOUCH_BRIDGE_MS` |
 | `LEVILUMA_RGB565_SWAP` | y | `LEVI_RGB565_SWAP` |
 | `LEVILUMA_DIM_MS` / `LEVILUMA_HOME_MS` | 20000 / 60000 | Abschaltung / `LEVI_RECENTER_MS` |
-| `LEVILUMA_INPUT_SEND_MS` | 120 | – (Sendedrossel für Farbrad und Bogen) |
+| `LEVILUMA_INPUT_SEND_MS` | 120 | – (Sendedrossel für den Helligkeitsregler) |
 | `LEVILUMA_CTRL_NAME` | „LeviLuma Rund“ | – |
 
 Kanal, PMK und Zeiten unter „LeviLuma ESP-NOW“ müssen wie bei Gateway und RockBase-Controller eingestellt sein.
@@ -69,7 +69,7 @@ Kanal, PMK und Zeiten unter „LeviLuma ESP-NOW“ müssen wie bei Gateway und R
 | `main/lvgl_port.cpp` | LVGL-Display und -Touch (aus Legacy portiert), LVGL-Task, Abschaltung |
 | `main/app.cpp` | ESP-NOW-Dienst: Radio, Link-Task, Aktionen (Aufbau wie `next/controller/main/app.cpp`, ohne `esp_netif`, ein Gateway) |
 | `main/ui.cpp` | runde Oberfläche |
-| `components/round_core/` | hosttestbar: Ein-Gateway-Regel, Farbrad-Umrechnung, Sendedrossel |
+| `components/round_core/` | hosttestbar: Ein-Gateway-Regel, Sendedrossel |
 | eingebunden, nicht kopiert | `next/shared/protocol`, `next/shared/common`, `next/controller/components/controller_core` (`GatewayRegistry`, `CtrlLink`, `Palette.h`) |
 | `main/BulbIcon.h`, `main/GatewayIcon.h` | Symbole (Kopien aus Legacy bzw. RockBase-Controller) |
 
@@ -85,9 +85,9 @@ Nebenläufigkeit wie beim RockBase-Controller: Der ESP-NOW-Callback kopiert nur 
 
 ## LightState-Synchronisierung
 
-- Angezeigt wird der vom Gateway bestätigte Zustand (`STATE`). Nur während der Finger auf Bogen oder Farbrad liegt oder ein Befehl unterwegs ist, zeigt die Oberfläche den Eingabewert; danach gilt wieder der bestätigte Wert.
+- Angezeigt wird der vom Gateway bestätigte Zustand (`STATE`). Nur während der Finger auf dem Helligkeitsregler liegt oder ein Befehl unterwegs ist, zeigt die Oberfläche den Eingabewert; danach gilt wieder der bestätigte Wert.
 - Wiederholung, Zusammenfassen (immer höchstens ein Befehl unterwegs, neuester Wert gewinnt), Zeitüberschreitung, Duplikaterkennung und Abgleich nach Neustart oder Offline-Phase übernimmt `CtrlLink` (wie beim RockBase-Controller). Veraltete Antworten (kleinere Revision derselben Sitzung) werden verworfen.
-- Zusätzlich sendet die Oberfläche beim Ziehen höchstens alle 120 ms einen Befehl; der letzte Wert geht beim Loslassen immer raus.
+- Zusätzlich sendet die Oberfläche beim Ziehen des Helligkeitsreglers höchstens alle 120 ms einen Befehl; der letzte Wert geht beim Loslassen immer raus.
 - Offline: nach drei verpassten Beacons. Die Bedienelemente werden gesperrt, der Status zeigt „Gateway offline“. Befehle werden nicht gesammelt. Ist das Gateway wieder da, wird der vollständige Zustand abgefragt.
 
 ## Bedienung
@@ -96,10 +96,10 @@ Vier Seiten untereinander, **senkrecht wischen**. Vier Punkte am rechten Rand ze
 
 1. **Ein/Aus:**
    - Oben: Gateway-Symbol mit Punkt (ESP-NOW-Verbindung grün/rot) und Glühbirne mit Punkt (Licht an grün, aus rot, unbekannt weiß), darunter der Gateway-Name.
-   - Mitte: Farbscheibe in der bestätigten Farbe (grau, wenn aus), darunter der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
+   - Mitte: der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers; er ist zugleich die Statusanzeige. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
    - Unten: Status („Bestaetigt“, „Wird gesendet …“, „Gateway offline“, „Band getrennt“, „Keine Antwort“).
-2. **Helligkeit:** großer Bogen (1–100 %, Bereich aus dem Protokoll) mit Prozentwert in der Mitte und Status darunter. Nur bei eingeschalteter Lampe aktiv („Lampe aus“).
-3. **Farbe:** Farbrad (Farbton = Winkel, Sättigung = Abstand zur Mitte; ziehen oder tippen) und darum der Palettenring mit den 15 Next/Legacy-Farben. Nur bei eingeschalteter Lampe aktiv.
+2. **Helligkeit:** großer Prozentwert und darunter ein **waagerechter Regler** wie in Legacy (1–100 %, Bereich aus dem Protokoll), darunter der Status. Nur bei eingeschalteter Lampe aktiv („Lampe aus“).
+3. **Farbe:** wie die Legacy-LCD-UI – die 15 Farben des Farbsets (`LeviPalette`) als Punkte auf einem Kreis, die aktive Farbe weiß umrandet, in der Mitte Name und Hex-Wert. **Tipp rechts = nächste Farbe, links = vorige**, am Ende wieder vorn. Kein freier RGB-Wähler. Nur bei eingeschalteter Lampe aktiv.
 4. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Gateway wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
 
 Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weckt nur. Nach 60 s springt die Ansicht zur Seite Ein/Aus.
@@ -111,14 +111,14 @@ Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weck
 | Art | Stand |
 |---|---|
 | Build | `idf.py -C next/controller-round build` (ESP-IDF 5.5.6, esp32s3) erfolgreich, ohne Warnungen im eigenen Code. Prüfskript: kein BLE/Zigbee/HTTP/MQTT, keine WLAN-Verbindung/-Suche/AP, kein `esp_netif`. |
-| Host-Tests | `next/tests/run_tests.sh`: Ein-Gateway-Regel inkl. NVS, Farbrad (Hin- und Rückrechnung), Sendedrossel. Discovery, Kopplung (auch mit Schlüssel), Wiederverbindung, Revisionen, Offline/Timeout laufen über denselben `CtrlLink` und sind dort End-to-End gegen den echten Gateway-Code getestet. |
+| Host-Tests | `next/tests/run_tests.sh`: Ein-Gateway-Regel inkl. NVS, Sendedrossel. Discovery, Kopplung (auch mit Schlüssel), Wiederverbindung, Revisionen, Offline/Timeout laufen über denselben `CtrlLink` und sind dort End-to-End gegen den echten Gateway-Code getestet. |
 | UI-Vorschau | `tools/preview/render.sh` rendert alle Seiten ohne Fehler (hat einen Zugriff auf einen gelöschten Bildschirm gefunden, behoben). |
 | **Hardware** | **Nicht getestet.** |
 
 ### Offene Hardwaretests
 
 1. Display-Initialisierung und Touch mit LovyanGFX unter ESP-IDF (in Legacy unter Arduino bewährt), Touch-Drehung.
-2. LVGL-Darstellung auf dem Panel (Farben, Bytetausch, Lesbarkeit, Bogen- und Farbradbedienung mit dem Finger, Wischen zwischen den Seiten).
+2. LVGL-Darstellung auf dem Panel (Farben, Bytetausch, Lesbarkeit, Bedienung von Schalter, Helligkeitsregler und Farbwahl mit dem Finger, Wischen zwischen den Seiten).
 3. ESP-NOW-Erkennung, Kopplung (mit/ohne Schlüssel), Wiederverbindung nach Neustart von Controller und Gateway.
 4. Ein/Aus, Farbe, Helligkeit über das Gateway an der Leiste; Offline- und Timeout-Anzeige.
 5. Gleichzeitiger Betrieb mit dem RockBase-Controller am selben Gateway.

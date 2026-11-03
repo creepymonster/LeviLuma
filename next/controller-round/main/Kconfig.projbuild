@@ -47,7 +47,7 @@ menu "LeviLuma Round Controller"
             Wie Legacy LEVI_RECENTER_MS.
 
     config LEVILUMA_INPUT_SEND_MS
-        int "Mindestabstand fuer Befehle waehrend Farbrad/Bogen bewegt werden (ms)"
+        int "Mindestabstand fuer Befehle waehrend der Helligkeitsregler bewegt wird (ms)"
         range 20 1000
         default 120
 

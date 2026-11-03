@@ -1,8 +1,7 @@
 #pragma once
 // Hosttestbare Logik des runden Controllers (keine ESP-IDF-Abhaengigkeit):
 //  - Ein-Gateway-Regel auf dem gemeinsamen GatewayRegistry
-//  - Farbrad: Punkt im Kreis <-> RGB (Farbton = Winkel, Saettigung = Abstand, volle Helligkeit)
-//  - Sendedrossel fuer fortlaufende Touch-Eingaben (Farbrad, Helligkeitsbogen)
+//  - Sendedrossel fuer fortlaufende Touch-Eingaben (Helligkeitsregler)
 #include <stdint.h>
 #include "gateway_registry.h"
 
@@ -13,13 +12,6 @@ namespace Round {
 int activeGateway(const GatewayRegistry &reg);
 // Neues Koppeln nur, wenn noch keines gekoppelt ist.
 bool mayPair(const GatewayRegistry &reg);
-
-// ---- Farbrad ----
-// Punkt (dx, dy) relativ zur Radmitte, Radius r (Pixel). Farbton 0 = Rot oben, im Uhrzeigersinn.
-// Punkte ausserhalb werden auf den Rand gezogen. Ergebnis: RGB mit voller Helligkeit.
-void wheelToRgb(float dx, float dy, float r, uint8_t rgb[3]);
-// Position einer Farbe im Rad (Helligkeit wird ignoriert, Grau/Weiss -> Mitte).
-void rgbToWheel(const uint8_t rgb[3], float r, float *dx, float *dy);
 
 // ---- Sendedrossel ----
 // Waehrend einer Touch-Bewegung hoechstens alle intervalMs einen Befehl; der letzte Wert wird beim

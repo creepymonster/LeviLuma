@@ -1,15 +1,16 @@
 // Runde LVGL-Oberflaeche (240x240) im LeviLuma-Next-Skin (shadcn zinc_dark, Montserrat, Statuspunkte
 // und Symbole wie Next). Vier Seiten untereinander (senkrecht wischen, Seitenpunkte rechts):
-//   0 Ein/Aus: Schalter wie auf der RockBase-Uebersicht, Farbscheibe (bestaetigte Farbe), Status
-//   1 Helligkeit: Bogen (1..100 % wie Protokoll) mit grossem Prozentwert
-//   2 Farbe: Farbrad (Farbton/Saettigung) mit Palettenring (LeviPalette)
+//   0 Ein/Aus: Schalter wie auf der RockBase-Uebersicht, Status
+//   1 Helligkeit: waagerechter Regler (1..100 % wie Protokoll) mit grossem Prozentwert (wie Legacy)
+//   2 Farbe: Farbpunkte des Farbsets (LeviPalette) auf einem Kreis, Name und Hex in der Mitte,
+//     Tipp rechts = naechste, links = vorige Farbe (wie die Legacy-LCD-UI)
 //   3 Gateway: Name, Status, Abgleich, Entkoppeln bzw. Suchen und Koppeln
 // Der Musikmodus hat bewusst kein Bedienelement, solange er am Band nicht getestet ist
 // (die ESP-NOW-Befehle im gemeinsamen Protokoll bleiben bestehen).
 // Dazu eigene Bildschirme fuer die Gateway-Suche und die Schluesseleingabe.
 //
 // Zustand: Angezeigt wird der vom Gateway bestaetigte LightState. Nur waehrend der Finger auf
-// Bogen oder Farbrad liegt bzw. ein Befehl unterwegs ist, zeigt die Oberflaeche den Eingabewert.
+// dem Helligkeitsregler liegt bzw. ein Befehl unterwegs ist, zeigt die Oberflaeche den Eingabewert.
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -27,26 +28,23 @@
 static constexpr uint32_t UI_GREEN = 0x79DA89; // wie Legacy/Next
 static constexpr uint32_t UI_RED = 0xE5484D;
 static constexpr uint32_t UI_ICON_GREY = 0x9AA3AE;
-static constexpr uint32_t UI_OFF = 0x3F3F46; // Farbscheibe bei ausgeschalteter Lampe
-static constexpr int WHEEL_D = 150;          // Durchmesser Farbrad
 
 static lv_theme_shadcn_palette_t themePalette{};
 static constexpr int PAGES = 4;
 static constexpr int PAGE_POWER = 0, PAGE_BRIGHT = 1, PAGE_COLOR = 2, PAGE_GATEWAY = 3;
 static lv_obj_t *mainScr, *tv, *pager[PAGES];
 // Ein/Aus
-static lv_obj_t *dotGw, *dotPower, *gwName, *disc, *powerSw, *statusLbl, *setupBox;
+static lv_obj_t *dotGw, *dotPower, *gwName, *powerSw, *statusLbl, *setupBox;
 // Helligkeit
-static lv_obj_t *arc, *brightTitle, *brightLbl, *brightStatus;
+static lv_obj_t *bright, *brightTitle, *brightLbl, *brightStatus;
 // Farbe
-static lv_obj_t *wheel, *marker, *palDots[LeviPalette::N];
-static uint8_t wheelBuf[WHEEL_D * WHEEL_D * 2];
+static lv_obj_t *colorTile, *palDots[LeviPalette::N], *colorName, *colorHex;
+static int colorSel = -1; // Index der bestaetigten Farbe im Farbset, -1 = eigene Farbe
 // Gateway
 static lv_obj_t *gwTitle, *gwInfo, *gwPaired, *gwUnpaired;
 
-static bool arcActive = false, wheelActive = false;
-static uint8_t inputRgb[3] = {255, 255, 255};
-static Round::Throttle arcThrottle(CONFIG_LEVILUMA_INPUT_SEND_MS), wheelThrottle(CONFIG_LEVILUMA_INPUT_SEND_MS);
+static bool brightActive = false;
+static Round::Throttle brightThrottle(CONFIG_LEVILUMA_INPUT_SEND_MS);
 static uint32_t lastVersion = 0, lastFull = 0;
 static GatewayView view;
 static bool haveView = false;
@@ -192,21 +190,17 @@ static void buildPower(lv_obj_t *tile) {
   lv_obj_set_width(gwName, 150);
   lv_obj_align(gwName, LV_ALIGN_TOP_MID, 0, 42);
 
-  // Farbscheibe: zeigt nur die bestaetigte Farbe (grau, wenn aus)
-  disc = dot(tile, 72);
-  lv_obj_align(disc, LV_ALIGN_CENTER, 0, -14);
-
   // Ein/Aus-Schalter (Theme-Schalter, gross fuer den Finger)
   powerSw = lv_switch_create(tile);
   lv_obj_set_size(powerSw, 96, 50);
-  lv_obj_align(powerSw, LV_ALIGN_CENTER, 0, 52);
+  lv_obj_align(powerSw, LV_ALIGN_CENTER, 0, 8);
   lv_obj_set_ext_click_area(powerSw, 8);
   lv_obj_add_event_cb(powerSw, powerChanged, LV_EVENT_VALUE_CHANGED, nullptr);
 
   statusLbl = label(tile, "", true);
   lv_label_set_long_mode(statusLbl, LV_LABEL_LONG_MODE_DOTS);
   lv_obj_set_width(statusLbl, 150);
-  lv_obj_align(statusLbl, LV_ALIGN_CENTER, 0, 92);
+  lv_obj_align(statusLbl, LV_ALIGN_CENTER, 0, 60);
 
   // ohne gekoppeltes Gateway: Hinweis statt Bedienung
   setupBox = plainBox(tile);
@@ -222,7 +216,6 @@ static void buildPower(lv_obj_t *tile) {
 static void refreshPower() {
   bool paired = haveView && view.paired;
   lv_obj_set_hidden(setupBox, paired);
-  lv_obj_set_hidden(disc, !paired);
   lv_obj_set_hidden(powerSw, !paired);
   lv_obj_set_hidden(statusLbl, !paired);
   lv_obj_set_hidden(gwName, !paired);
@@ -237,72 +230,68 @@ static void refreshPower() {
   if (!view.pending) { // waehrend ein Befehl laeuft, bleibt die Eingabe sichtbar (wie RockBase)
     lv_obj_set_state(powerSw, LV_STATE_CHECKED, on);
   }
-  uint8_t r = view.state.r, g = view.state.g, b = view.state.b;
-  lv_obj_set_style_bg_color(disc, on ? lv_color_make(r, g, b) : lv_color_hex(UI_OFF), 0);
   lv_label_set_text(statusLbl, statusText());
 }
 
 // ---------------- Seite Helligkeit ----------------
 
-static void arcEvent(lv_event_t *e) {
+static void brightEvent(lv_event_t *e) {
   lv_event_code_t c = lv_event_get_code(e);
-  int v = lv_arc_get_value(arc);
+  int v = lv_slider_get_value(bright);
   char t[12];
   snprintf(t, sizeof(t), "%d %%", v);
 
   if (c == LV_EVENT_PRESSED) {
-    arcActive = true;
-    arcThrottle.reset();
-  } else if (c == LV_EVENT_VALUE_CHANGED && arcActive) {
+    brightActive = true;
+    brightThrottle.reset();
+  } else if (c == LV_EVENT_VALUE_CHANGED && brightActive) {
     lv_label_set_text(brightLbl, t); // vorlaeufiger Eingabewert
-    if (arcThrottle.update(appMillis())) {
+    if (brightThrottle.update(appMillis())) {
       appSetBrightness((uint8_t)v);
     }
   } else if (c == LV_EVENT_RELEASED || c == LV_EVENT_PRESS_LOST) {
-    if (arcThrottle.release(appMillis())) {
+    if (brightThrottle.release(appMillis())) {
       appSetBrightness((uint8_t)v);
     }
-    arcActive = false;
+    brightActive = false;
   }
 }
 
 static void buildBrightness(lv_obj_t *tile) {
-  // Bogen ueber fast das ganze Rund: Wertebereich wie Protokoll (LVP_BRIGHTNESS_MIN..MAX = 1..100)
-  arc = lv_arc_create(tile);
-  lv_obj_set_size(arc, 212, 212);
-  lv_obj_center(arc);
-  lv_arc_set_rotation(arc, 135);
-  lv_arc_set_bg_angles(arc, 0, 270);
-  lv_arc_set_range(arc, LVP_BRIGHTNESS_MIN, LVP_BRIGHTNESS_MAX);
-  lv_obj_set_style_arc_width(arc, 18, LV_PART_MAIN);
-  lv_obj_set_style_arc_width(arc, 18, LV_PART_INDICATOR);
-  lv_obj_set_style_pad_all(arc, 4, LV_PART_KNOB);
-  lv_obj_add_event_cb(arc, arcEvent, LV_EVENT_ALL, nullptr);
+  // Waagerechter Regler wie Legacy (Helligkeitsseite), Wertebereich wie Protokoll (LVP_BRIGHTNESS_MIN..MAX = 1..100).
+  // Ziehen im Regler blaettert nicht die Seite (die Seiten wechseln senkrecht).
+  bright = lv_slider_create(tile);
+  lv_slider_set_range(bright, LVP_BRIGHTNESS_MIN, LVP_BRIGHTNESS_MAX);
+  lv_obj_set_size(bright, 180, 18);
+  lv_obj_align(bright, LV_ALIGN_CENTER, 0, 30);
+  lv_obj_set_ext_click_area(bright, 14);
+  lv_obj_set_scroll_chain(bright, false);
+  lv_obj_add_event_cb(bright, brightEvent, LV_EVENT_ALL, nullptr);
 
   brightTitle = label(tile, "Helligkeit", true);
-  lv_obj_align(brightTitle, LV_ALIGN_CENTER, 0, -42);
+  lv_obj_align(brightTitle, LV_ALIGN_CENTER, 0, -54);
   brightLbl = label(tile, "-");
   lv_obj_set_style_text_font(brightLbl, &lv_font_montserrat_48, 0);
-  lv_obj_align(brightLbl, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_align(brightLbl, LV_ALIGN_CENTER, 0, -18);
   brightStatus = label(tile, "", true);
   lv_label_set_long_mode(brightStatus, LV_LABEL_LONG_MODE_DOTS);
   lv_obj_set_width(brightStatus, 130);
-  lv_obj_align(brightStatus, LV_ALIGN_CENTER, 0, 44);
+  lv_obj_align(brightStatus, LV_ALIGN_CENTER, 0, 66);
 }
 
 static void refreshBrightness() {
   bool paired = haveView && view.paired;
-  lv_obj_set_hidden(arc, !paired);
+  lv_obj_set_hidden(bright, !paired);
   lv_obj_set_hidden(brightLbl, !paired);
   if (!paired) {
     lv_label_set_text(brightStatus, "Kein Gateway");
     return;
   }
   bool on = lampOn();
-  setEnabled(arc, usable() && on);
+  setEnabled(bright, usable() && on);
   // bestaetigter Wert, ausser waehrend der Eingabe oder solange ein Befehl unterwegs ist
-  if (view.stateValid && !arcActive && !view.pending) {
-    lv_arc_set_value(arc, view.state.brightness);
+  if (view.stateValid && !brightActive && !view.pending) {
+    lv_slider_set_value(bright, view.state.brightness, LV_ANIM_OFF);
     char t[12];
     snprintf(t, sizeof(t), "%u %%", view.state.brightness);
     lv_label_set_text(brightLbl, t);
@@ -310,118 +299,72 @@ static void refreshBrightness() {
   lv_label_set_text(brightStatus, usable() && view.stateValid && !on && !view.pending ? "Lampe aus" : statusText());
 }
 
-// ---------------- Farbe ----------------
+// ---------------- Farbe (wie Legacy) ----------------
 
-static void placeMarker(const uint8_t rgb[3]) {
-  float dx, dy;
-  Round::rgbToWheel(rgb, WHEEL_D / 2.f - 4, &dx, &dy);
-  lv_obj_align(marker, LV_ALIGN_CENTER, (int)lroundf(dx), (int)lroundf(dy));
-  lv_obj_set_style_bg_color(marker, lv_color_make(rgb[0], rgb[1], rgb[2]), 0);
-}
-
-static void wheelEvent(lv_event_t *e) {
-  lv_event_code_t c = lv_event_get_code(e);
+// Tipp auf die Seite: rechte Haelfte naechste, linke vorige Farbe; am Ende wieder vorn (Legacy nextColorClicked)
+static void colorClicked(lv_event_t *) {
   if (!(usable() && lampOn())) {
     return;
   }
-  if (c == LV_EVENT_PRESSED || c == LV_EVENT_PRESSING) {
-    lv_point_t p;
-    lv_indev_get_point(lv_indev_active(), &p);
-    lv_area_t a;
-    lv_obj_get_coords(wheel, &a);
-    float dx = p.x - (a.x1 + a.x2) / 2.f, dy = p.y - (a.y1 + a.y2) / 2.f;
-    if (c == LV_EVENT_PRESSED) {
-      wheelActive = true;
-      wheelThrottle.reset();
-    }
-    Round::wheelToRgb(dx, dy, WHEEL_D / 2.f - 4, inputRgb);
-    placeMarker(inputRgb); // vorlaeufiger Eingabewert
-    if (wheelThrottle.update(appMillis())) {
-      appSetColor(inputRgb[0], inputRgb[1], inputRgb[2]);
-    }
-  } else if (c == LV_EVENT_RELEASED || c == LV_EVENT_PRESS_LOST) {
-    if (wheelThrottle.release(appMillis())) {
-      appSetColor(inputRgb[0], inputRgb[1], inputRgb[2]);
-    }
-    wheelActive = false;
-  }
-}
-
-static void paletteClicked(lv_event_t *e) {
-  if (!(usable() && lampOn())) {
+  lv_indev_t *in = lv_indev_active();
+  if (!in) {
     return;
   }
+  lv_point_t p;
+  lv_indev_get_point(in, &p);
+  lv_area_t a;
+  lv_obj_get_coords(colorTile, &a);
+  bool right = p.x >= (a.x1 + a.x2) / 2;
+  int n = (colorSel < 0) ? (right ? 0 : LeviPalette::N - 1) : (colorSel + (right ? 1 : LeviPalette::N - 1)) % LeviPalette::N;
   uint8_t r, g, b;
-  LeviPalette::get((int)(intptr_t)lv_event_get_user_data(e), r, g, b);
-  reportError(appSetColor(r, g, b));
+  LeviPalette::get(n, r, g, b);
+  reportError(appSetColor(r, g, b)); // kalibriert: die Kalibrierung wendet das Gateway an
 }
 
 static void buildColor(lv_obj_t *tile) {
-  // Farbrad einmal berechnen (Farbton = Winkel, Saettigung = Abstand), rund beschnitten
-  wheel = lv_canvas_create(tile);
-  lv_canvas_set_buffer(wheel, wheelBuf, WHEEL_D, WHEEL_D, LV_COLOR_FORMAT_RGB565);
-  lv_canvas_fill_bg(wheel, lv_color_black(), LV_OPA_COVER);
-  float r = WHEEL_D / 2.f;
-  for (int y = 0; y < WHEEL_D; y++) {
-    for (int x = 0; x < WHEEL_D; x++) {
-      float dx = x + 0.5f - r, dy = y + 0.5f - r;
-      if (dx * dx + dy * dy > r * r) {
-        continue;
-      }
-      uint8_t c[3];
-      Round::wheelToRgb(dx, dy, r - 4, c);
-      lv_canvas_set_px(wheel, x, y, lv_color_make(c[0], c[1], c[2]), LV_OPA_COVER);
-    }
-  }
-  lv_obj_set_style_radius(wheel, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_clip_corner(wheel, true, 0);
-  lv_obj_center(wheel);
-  lv_obj_set_clickable(wheel, true);
-  lv_obj_set_scroll_chain(wheel, false); // Ziehen im Rad blaettert nicht die Seite
-  lv_obj_add_event_cb(wheel, wheelEvent, LV_EVENT_ALL, nullptr);
-
-  marker = dot(tile, 18);
-  lv_obj_set_style_border_width(marker, 3, 0);
-  lv_obj_set_style_border_color(marker, lv_color_white(), 0);
-  lv_obj_set_style_bg_opa(marker, LV_OPA_COVER, 0);
-  lv_obj_set_style_shadow_width(marker, 6, 0);
-  lv_obj_set_style_shadow_opa(marker, LV_OPA_50, 0);
-
-  // Palettenring aus LeviPalette (wie Next/Legacy), oben beginnend im Uhrzeigersinn
-  const float ringR = 100.f;
+  colorTile = tile;
+  // Farbpunkte auf einem Kreis, oben beginnend im Uhrzeigersinn (wie Legacy layoutRound240)
+  const float ringR = 90.f;
   for (int k = 0; k < LeviPalette::N; k++) {
-    palDots[k] = lv_obj_create(tile);
-    lv_obj_set_size(palDots[k], 16, 16);
-    lv_obj_set_scrollable(palDots[k], false);
-    lv_obj_set_style_radius(palDots[k], LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_all(palDots[k], 0, 0);
+    palDots[k] = dot(tile, 16);
     lv_obj_set_style_border_color(palDots[k], lv_color_white(), 0);
     uint8_t pr, pg, pb;
     LeviPalette::get(k, pr, pg, pb);
     lv_obj_set_style_bg_color(palDots[k], lv_color_make(pr, pg, pb), 0);
     lv_obj_set_style_bg_opa(palDots[k], LV_OPA_COVER, 0);
-    lv_obj_set_ext_click_area(palDots[k], 5);
     float a = -1.5707963f + 6.2831853f * k / LeviPalette::N;
     lv_obj_align(palDots[k], LV_ALIGN_CENTER, (int)lroundf(cosf(a) * ringR), (int)lroundf(sinf(a) * ringR));
-    lv_obj_add_event_cb(palDots[k], paletteClicked, LV_EVENT_CLICKED, (void *)(intptr_t)k);
   }
+  colorName = label(tile, "");
+  lv_obj_set_style_text_font(colorName, &lv_font_montserrat_20, 0);
+  lv_obj_align(colorName, LV_ALIGN_CENTER, 0, -10);
+  colorHex = label(tile, "", true);
+  lv_obj_align(colorHex, LV_ALIGN_CENTER, 0, 14);
+  lv_obj_set_clickable(tile, true);
+  lv_obj_add_event_cb(tile, colorClicked, LV_EVENT_CLICKED, nullptr);
 }
 
 static void refreshColor() {
   bool active = usable() && lampOn();
-  lv_obj_set_style_opa(wheel, active ? LV_OPA_COVER : LV_OPA_40, 0);
-  for (int k = 0; k < LeviPalette::N; k++) {
+  bool valid = haveView && view.stateValid;
+  colorSel = -1;
+  for (int k = 0; valid && k < LeviPalette::N; k++) {
     uint8_t r, g, b;
     LeviPalette::get(k, r, g, b);
-    bool sel = haveView && view.stateValid && r == view.state.r && g == view.state.g && b == view.state.b;
-    lv_obj_set_style_border_width(palDots[k], sel ? 2 : 0, 0);
+    if (r == view.state.r && g == view.state.g && b == view.state.b && !(view.state.flags & LVP_STATE_RAW)) {
+      colorSel = k;
+    }
+  }
+  for (int k = 0; k < LeviPalette::N; k++) {
+    lv_obj_set_style_border_width(palDots[k], k == colorSel ? 2 : 0, 0);
     lv_obj_set_style_opa(palDots[k], active ? LV_OPA_COVER : LV_OPA_40, 0);
   }
-  lv_obj_set_hidden(marker, !(haveView && view.stateValid));
-  if (haveView && view.stateValid && !wheelActive && !view.pending) {
-    uint8_t c[3] = {view.state.r, view.state.g, view.state.b};
-    placeMarker(c);
+  char hex[12] = "";
+  if (valid) {
+    snprintf(hex, sizeof(hex), "#%02X%02X%02X", view.state.r, view.state.g, view.state.b);
   }
+  lv_label_set_text(colorName, !(haveView && view.paired) ? "Kein Gateway" : colorSel >= 0 ? LeviPalette::name(colorSel) : "Eigene Farbe");
+  lv_label_set_text(colorHex, hex);
 }
 
 // ---------------- Gateway ----------------

@@ -52,9 +52,9 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises a
 |---|---|---|
 | ![Schlüsseleingabe](screenshots/controller-round_240x240/04_key.png) | ![Ein/Aus, an](screenshots/controller-round_240x240/05_power_on.png) | ![Helligkeit](screenshots/controller-round_240x240/06_brightness.png) |
 
-| Farbrad und Palette | Gateway-Seite | Ein/Aus, aus |
+| Farbe (Farbset) | Gateway-Seite | Ein/Aus, aus |
 |---|---|---|
-| ![Farbrad und Palette](screenshots/controller-round_240x240/07_color.png) | ![Gateway-Seite](screenshots/controller-round_240x240/08_gateway.png) | ![Ein/Aus, aus](screenshots/controller-round_240x240/09_power_off.png) |
+| ![Farbe (Farbset)](screenshots/controller-round_240x240/07_color.png) | ![Gateway-Seite](screenshots/controller-round_240x240/08_gateway.png) | ![Ein/Aus, aus](screenshots/controller-round_240x240/09_power_off.png) |
 
 | Gateway offline |  |  |
 |---|---|---|

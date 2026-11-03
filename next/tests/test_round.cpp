@@ -1,5 +1,4 @@
-// Host-Tests: runder Controller (round_core) – Ein-Gateway-Regel, Farbrad, Sendedrossel.
-#include <math.h>
+// Host-Tests: runder Controller (round_core) – Ein-Gateway-Regel, Sendedrossel.
 #include "test_util.h"
 #include "gateway_registry.h"
 #include "round_core.h"
@@ -25,28 +24,6 @@ static void test_round_single_gateway() {
   CHECK_EQ(Round::activeGateway(r), ia);
 }
 
-static void test_round_wheel_mapping() {
-  uint8_t c[3];
-  Round::wheelToRgb(0, -50, 50, c); // oben = Rot
-  CHECK(c[0] == 255 && c[1] == 0 && c[2] == 0);
-  Round::wheelToRgb(0, 0, 50, c); // Mitte = Weiss
-  CHECK(c[0] == 255 && c[1] == 255 && c[2] == 255);
-  Round::wheelToRgb(0, -500, 50, c); // ausserhalb wird auf den Rand gezogen
-  CHECK(c[0] == 255 && c[1] == 0 && c[2] == 0);
-  // Hin und zurueck: Position -> Farbe -> Position
-  for (int k = 0; k < 24; k++) {
-    float a = k * 0.2618f, rr = 10 + k * 1.5f;
-    float dx = sinf(a) * rr, dy = -cosf(a) * rr, x2, y2;
-    Round::wheelToRgb(dx, dy, 50, c);
-    Round::rgbToWheel(c, 50, &x2, &y2);
-    CHECK(fabsf(x2 - dx) < 1.5f && fabsf(y2 - dy) < 1.5f);
-  }
-  const uint8_t grey[3] = {40, 40, 40};
-  float x, y;
-  Round::rgbToWheel(grey, 50, &x, &y);
-  CHECK(fabsf(x) < 0.01f && fabsf(y) < 0.01f);
-}
-
 static void test_round_throttle() {
   Round::Throttle t(100);
   CHECK(t.update(1000));  // erste Bewegung sofort
@@ -62,6 +39,5 @@ static void test_round_throttle() {
 
 void tests_round(void) {
   RUN(test_round_single_gateway);
-  RUN(test_round_wheel_mapping);
   RUN(test_round_throttle);
 }
