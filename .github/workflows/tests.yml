@@ -1,0 +1,41 @@
+name: Tests
+
+# Host-Tests von LeviLuma Next (ohne Hardware, ohne ESP-IDF) und Pruefung der aus Legacy
+# kopierten Dateien. Laeuft auf jedem Branch, damit Fehler vor dem Merge auffallen.
+on:
+  push:
+    paths:
+      - "next/**"
+      - "legacy/include/CalibCore.h"
+      - "legacy/include/ColorMath.h"
+      - "legacy/include/Palette.h"
+      - ".github/workflows/tests.yml"
+  pull_request:
+    paths:
+      - "next/**"
+      - "legacy/include/CalibCore.h"
+      - "legacy/include/ColorMath.h"
+      - "legacy/include/Palette.h"
+      - ".github/workflows/tests.yml"
+  workflow_dispatch:
+
+jobs:
+  host-tests:
+    name: Host-Tests (Protokoll, Gateway, Controller)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Werkzeuge installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build g++
+
+      - name: Tests bauen und ausfuehren (ASan/UBSan)
+        run: next/tests/run_tests.sh
+
+      # CalibCore.h, ColorMath.h und Palette.h sind byte-gleiche Kopien aus Legacy (siehe AGENTS.md)
+      - name: Kopien aus Legacy pruefen
+        run: |
+          cmp legacy/include/CalibCore.h next/gateway/components/light_core/include/CalibCore.h
+          cmp legacy/include/ColorMath.h next/gateway/components/light_core/include/ColorMath.h
+          cmp legacy/include/Palette.h   next/controller/components/controller_core/include/Palette.h
+          echo "Kopien sind byte-gleich."

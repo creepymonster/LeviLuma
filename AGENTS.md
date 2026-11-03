@@ -152,7 +152,7 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 - **Sicherheit:** nur ESP-NOW-Bordmittel (PMK/LMK, CCMP). Keine eigene Kryptografie, Schlüssel nie übertragen.
 - **Abhängigkeiten des Controllers** (LVGL 9.6.0, lvgl_theme_shadcn 0.3.1, esp-zigbee-lib) werden per Git nach `next/controller/third_party/` geholt (`cmake/third_party.cmake`), nicht committen.
 - **Hardwaredaten** (Pins, Treiber) nur mit Quelle ändern; Quellen stehen in `next/README.md`. Next ist **nicht am Gerät getestet**; keine Hardwaretests behaupten.
-- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml`.
+- Bauen: `idf.py set-target esp32s3|esp32c5 build` im jeweiligen Projektordner; Zigbee-Variante siehe `next/docs/BUILD_FLASH.md`. CI: `.github/workflows/next.yml` (Firmware-Builds), `.github/workflows/tests.yml` (Host-Tests, Legacy-Kopien).
 
 ## Git-Konventionen
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.

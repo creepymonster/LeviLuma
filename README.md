@@ -24,7 +24,7 @@ LeviLuma/
 │   ├── tests/                Host-Tests (Protokoll, Gateway, Controller)
 │   ├── tools/                Abhängigkeiten holen, UI-Vorschau
 │   └── docs/                 Protokoll, Kopplung, Kalibrierung, Zigbee, Build/Flash
-└── .github/workflows/        CI (Legacy-Build, Legacy-Screenshots, Next)
+└── .github/workflows/        CI (Legacy-Build, Legacy-Screenshots, Next-Firmware, Tests)
 ```
 
 ## Schnellstart

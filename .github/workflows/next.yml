@@ -1,4 +1,6 @@
-name: Next
+name: Next Firmware
+
+# Host-Tests laufen separat in tests.yml.
 
 on:
   push:
@@ -13,14 +15,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  host-tests:
-    name: Host-Tests (Protokoll, Gateway, Controller)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Tests bauen und ausfuehren
-        run: next/tests/run_tests.sh
-
   firmware:
     name: ESP-IDF ${{ matrix.name }}
     runs-on: ubuntu-24.04
