@@ -8,22 +8,22 @@
 
 | Kennzahl | Wert |
 |---|---|
-| Tests ausgeführt | 63 |
-| – bestanden | 63 |
+| Tests ausgeführt | 85 |
+| – bestanden | 85 |
 | – fehlgeschlagen | 0 |
 | – übersprungen (nicht ausgeführt) | 0 |
-| Assertions (Prüfungen) ausgeführt | 759 |
+| Assertions (Prüfungen) ausgeführt | 10509 |
 | – davon fehlgeschlagen | 0 |
-| Eigene Summenzeile des Testprogramms | 63 Tests, 759 Assertions, 0 Fehler |
+| Eigene Summenzeile des Testprogramms | 85 Tests, 10509 Assertions, 0 Fehler |
 
 ## Getesteter Stand
 
 | | |
 |---|---|
-| Getesteter Commit | `506002ad251b7851e37a675dfb04f2b604e7a691` |
+| Getesteter Commit | `b9090d5d90043b7c6a68d83eadfaaf454a010c02` |
 | Ref | `refs/heads/main` (Auslöser: push) |
-| Testlauf gestartet | 2026-11-03 12:05:01 UTC (2026-11-03 13:05:01 CET) |
-| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/41632650357 |
+| Testlauf gestartet | 2026-11-03 20:01:20 UTC (2026-11-03 21:01:20 CET) |
+| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/41708571893 |
 
 Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `next/tests/README.md` erfolgt in einem **separaten Folge-Commit** (Bot, `[skip ci]`), der nur diese Datei ändert; der Quellstand ist deshalb der genannte Commit, nicht der Berichts-Commit.
 
@@ -142,6 +142,35 @@ _Ein-Gateway-Regel und Sendedrossel des runden Controllers._
 | `test_round_single_gateway` | bestanden | 9 |  |
 | `test_round_throttle` | bestanden | 9 |  |
 
+### Diagnose (22/22 bestanden)
+
+_ESP-NOW-Diagnosegeraet (next/debug): Rahmenauswertung, LeviLuma-Dekodierung aller Nachrichtentypen, Ausgabe, Filter, Doppelerkennung, Monitorbefehle, Fuzzing. Alle Rahmen sind synthetisch._
+
+| Test | Ergebnis | Assertions | Abdeckung |
+|---|---|---|---|
+| `test_dbg_frame_valid_broadcast` | bestanden | 31 | Gueltiger Broadcast-Rahmen (synthetisch): Adressen, Laengen, ESP-NOW-Kopf, LeviLuma-Felder, CRC. |
+| `test_dbg_frame_unicast_multicast_retry` | bestanden | 5 | Unicast, Multicast, Retry-Bit (synthetisch). |
+| `test_dbg_frame_encrypted_not_decoded` | bestanden | 13 | Verschluesselter Rahmen (Protected-Bit, synthetisch): nur Metadaten und Rohdaten, nie dekodiert. |
+| `test_dbg_frame_candidate_prefilter` | bestanden | 8 | Vorfilter im Callback: Action/Action-No-Ack, Kategorie 127, Beacon und kurze Rahmen. |
+| `test_dbg_frame_not_espnow` | bestanden | 6 | Fremde Rahmen (Beacon, andere Kategorie, andere OUI) werden nicht als ESP-NOW ausgewertet. |
+| `test_dbg_frame_too_short_and_malformed` | bestanden | 22 | Zu kurze und beschaedigte Rahmen (Elementlaenge, fehlendes Element, falsche Treiberlaenge) ohne Absturz. |
+| `test_dbg_frame_capture_truncated` | bestanden | 15 | Abgeschnittene Erfassung: Urteil, keine CRC-Aussage, ungepruefte Kopffelder gekennzeichnet; mehrere Elemente. |
+| `test_dbg_frame_multi_element_and_version` | bestanden | 7 | Mehrere ESP-NOW-Elemente und rohes Versionsfeld (nicht gedeutet). |
+| `test_dbg_frame_payload_only_path` | bestanden | 10 | Normaler ESP-NOW-Empfang (nur Nutzdaten): fehlende Angaben als nicht verfuegbar. |
+| `test_dbg_levi_errors` | bestanden | 29 | LeviLuma-Fehlerfaelle: CRC, unbekannte Version/Typ, falsche Nutzdaten, Laenge, kurzer Kopf, Fremddaten. |
+| `test_dbg_levi_flags` | bestanden | 5 | Flag-Beschriftung inkl. unbekannter Bits und kleinem Puffer. |
+| `test_dbg_levi_all_protocol_types` | bestanden | 394 | Jeder Nachrichtentyp des gemeinsamen Protokolls hat Testrahmen und Dekodierung (faengt neue Typen). |
+| `test_dbg_levi_field_values` | bestanden | 26 | Feldnamen und Werte (SET_STATE, STATE, CALIB, NACK, PAIR_RSP, DISCOVER). |
+| `test_dbg_format_record` | bestanden | 20 | Ausgabeformat einer Nachricht, Hexdump, ASCII-Spalte, Rohrahmen. |
+| `test_dbg_out_truncation` | bestanden | 5 | Ausgabepuffer: Abschneiden ohne Ueberlauf. |
+| `test_dbg_hexdump_and_mac` | bestanden | 11 | Hexdump und MAC-Parser. |
+| `test_dbg_filter` | bestanden | 28 | Filter nach MAC, LeviLuma-Typ, Kennung, Verschluesselung. |
+| `test_dbg_dedup` | bestanden | 16 | Doppelerkennung zwischen zwei Empfangswegen (nie bei gleichem Weg). |
+| `test_dbg_commands` | bestanden | 60 | Monitorbefehle: Hilfe, Kanal, Suchlauf, Filter, Anzeige, Statistik, Eingabegrenzen. |
+| `test_dbg_stats_format` | bestanden | 5 | Statistikausgabe inkl. Verlustwarnung. |
+| `test_dbg_channel_plan` | bestanden | 9 | Kanalplan: zulaessiger Bereich und Umlauf. |
+| `test_dbg_fuzz_no_crash` | bestanden | 9025 | Fuzzing (20000 Faelle) von Rahmenauswertung, Dekodierung und Ausgabe unter ASan/UBSan. |
+
 ## Fehlgeschlagene, übersprungene und nicht ausgeführte Prüfungen
 
 Keine.
@@ -152,14 +181,16 @@ Gebaut von `.github/workflows/next.yml` (ESP-IDF in Container). Der Status wird 
 
 | Job | Status | Ergebnis |
 |---|---|---|
-| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
-| ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
-| ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
+| ESP-IDF Diagnose ESP-NOW, alle Optionen (esp32s3) | completed | erfolgreich |
+| ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
 | ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
+| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
+| ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
+| ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
 
 ## Hardwaretests
 
-**Nicht ausgeführt.** Weder Gateway noch Controller werden in der CI auf Hardware geflasht oder getestet; kein Punkt hier gilt als bestanden. Offene Hardwaretests laut `next/README.md` (Abschnitt „Offene Hardwaretests“, automatisch übernommen):
+**Nicht ausgeführt.** Weder Gateway, Controller noch Diagnosegerät werden in der CI auf Hardware geflasht oder getestet; kein Punkt hier gilt als bestanden. Offene Hardwaretests laut `next/README.md` (Abschnitt „Offene Hardwaretests“, automatisch übernommen):
 
 1. Display: Ausrichtung/Spiegelung (`LEVILUMA_LCD_ROT_*`), Farben (RGB/BGR, Inversion), SPI-Takt.
 2. Touch: Rohbereiche, Drei-Punkt-Kalibrierung, gemeinsamer SPI-Bus mit dem Display unter Last.
