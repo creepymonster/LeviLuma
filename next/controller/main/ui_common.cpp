@@ -149,6 +149,12 @@ lv_obj_t *uiButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb, void *u
   lv_obj_t *b = lv_button_create(parent);
   lv_theme_shadcn_set_variant(b, primary ? LV_THEME_SHADCN_VARIANT_DEFAULT : LV_THEME_SHADCN_VARIANT_OUTLINE);
   lv_theme_shadcn_set_size(b, LV_THEME_SHADCN_SIZE_SM);
+  // Mehr Luft: Innenabstand oben/unten und Abstand zu Texten darueber/darunter (Flex-Layout)
+  lv_obj_set_height(b, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_ver(b, 10, 0);
+  lv_obj_set_style_pad_hor(b, 14, 0);
+  lv_obj_set_style_margin_top(b, 6, 0);
+  lv_obj_set_style_margin_bottom(b, 4, 0);
   lv_obj_t *l = lv_label_create(b);
   lv_label_set_text(l, text);
   lv_obj_center(l);

@@ -98,6 +98,11 @@ static lv_obj_t *label(lv_obj_t *parent, const char *t, bool muted = false) {
 static lv_obj_t *button(lv_obj_t *parent, const char *t, lv_event_cb_t cb, bool primary = true) {
   lv_obj_t *b = lv_button_create(parent);
   lv_theme_shadcn_set_variant(b, primary ? LV_THEME_SHADCN_VARIANT_DEFAULT : LV_THEME_SHADCN_VARIANT_OUTLINE);
+  // Mehr Luft wie beim RockBase-Controller (uiButton): Innenabstand und Abstand zum Text
+  lv_obj_set_height(b, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_ver(b, 10, 0);
+  lv_obj_set_style_pad_hor(b, 16, 0);
+  lv_obj_set_style_margin_top(b, 6, 0);
   lv_obj_t *l = lv_label_create(b);
   lv_label_set_text(l, t);
   lv_obj_center(l);

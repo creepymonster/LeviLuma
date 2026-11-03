@@ -173,6 +173,8 @@ static void showOverview() {
   lv_label_set_long_mode(pointsLbl, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_set_width(pointsLbl, LV_PCT(100));
   lv_obj_t *r = uiRow(c);
+  lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW_WRAP); // Buttons umbrechen statt abschneiden
+  lv_obj_set_style_pad_row(r, 4, 0);
   uiButton(r, "Kalibrierung starten", startClicked);
   uiButton(r, "Zuruecksetzen", resetClicked, nullptr, false);
   uiLabel(c, "Gespeichert wird auf dem Gateway (NVS).", true);
