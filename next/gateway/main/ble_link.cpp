@@ -1,5 +1,5 @@
 // BLE-Anbindung des Gateways an genau ein Band der ELK-/Lotus-Familie (NimBLE, ESP-IDF).
-// Portiert aus legacy/src/ble.cpp (NimBLE-Arduino): Scan (2 s, staerkstes passendes Geraet),
+// Portiert aus legacy/src/ble.cpp (NimBLE-Arduino): Scan (CONFIG_LEVILUMA_BLE_SCAN_MS, staerkstes passendes Geraet),
 // Verbinden, 1 s warten, Service 0xFFF0 / Characteristic 0xFFF3 suchen, dann Befehle senden
 // (ein Befehl pro Zeitfenster, 200 ms Pause nach jedem gesendeten Befehl). Neuer Versuch alle 4 s.
 #include "freertos/FreeRTOS.h"
@@ -145,15 +145,17 @@ static bool scanAndConnect() {
   seenN = 0;
   struct ble_gap_disc_params dp = {};
   dp.passive = 0; // aktiver Scan wie Legacy (Namen in der Scan-Antwort)
-  dp.filter_duplicates = 1;
+  // Keine Duplikatfilterung im Controller: Sie kann die Scan-Antwort derselben Adresse verwerfen,
+  // die bei vielen Baendern erst den Namen enthaelt. Doppelte Adressen fasst seenFind() zusammen.
+  dp.filter_duplicates = 0;
   xSemaphoreTake(evSem, 0);
-  int rc = ble_gap_disc(ownAddrType, 2000, &dp, gapEvent, nullptr);
+  int rc = ble_gap_disc(ownAddrType, CONFIG_LEVILUMA_BLE_SCAN_MS, &dp, gapEvent, nullptr);
 
   if (rc != 0) {
     ESP_LOGW(TAG, "BLE: Scan-Start fehlgeschlagen (%d)", rc);
     return false;
   }
-  waitEv(4000);
+  waitEv(CONFIG_LEVILUMA_BLE_SCAN_MS + 2000);
   ESP_LOGI(TAG, "BLE: Scan fertig, %d Geraete gefunden", seenN);
   int best = -1;
 
@@ -161,7 +163,11 @@ static bool scanAndConnect() {
     char a[18];
     const uint8_t *v = seen[i].addr.val;
     snprintf(a, sizeof(a), "%02x:%02x:%02x:%02x:%02x:%02x", v[5], v[4], v[3], v[2], v[1], v[0]);
-    ESP_LOGD(TAG, "BLE:   %s  RSSI %d  Name \"%s\"", a, seen[i].rssi, seen[i].name);
+    if (seen[i].name[0]) {
+      ESP_LOGI(TAG, "BLE:   %s  RSSI %d  Name \"%s\"", a, seen[i].rssi, seen[i].name);
+    } else {
+      ESP_LOGI(TAG, "BLE:   %s  RSSI %d  (kein Name empfangen)", a, seen[i].rssi);
+    }
 
     if (bleNameMatches(seen[i].name) && (best < 0 || seen[i].rssi > seen[best].rssi)) {
       best = i;

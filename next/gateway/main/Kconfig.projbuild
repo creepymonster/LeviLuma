@@ -44,6 +44,15 @@ menu "LeviLuma Gateway"
         bool "Status-LED leuchtet bei Low"
         default y
 
+    config LEVILUMA_BLE_SCAN_MS
+        int "Dauer eines BLE-Scans nach dem Band (ms)"
+        range 1000 10000
+        default 4000
+        help
+            Legacy scannt 2 s. Das Gateway teilt das Funkteil mit ESP-NOW (Koexistenz) und bekommt
+            dadurch weniger Empfangszeit; ein laengerer Scan findet schwache Baender zuverlaessiger.
+            Zwischen zwei Versuchen liegen weiterhin 4 s.
+
     config LEVILUMA_BRIGHTNESS_MAX
         int "Helligkeitsbereich des Bandes (100 oder 255)"
         default 100
