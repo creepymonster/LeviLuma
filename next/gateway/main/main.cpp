@@ -172,8 +172,16 @@ extern "C" void app_main(void) {
   if (CONFIG_LEVILUMA_PAIRING_WINDOW_S > 0) {
     gwOpenPairingWindow(CONFIG_LEVILUMA_PAIRING_WINDOW_S);
   }
+  uint8_t bleOff = 0;
+  size_t bl = sizeof(bleOff);
+  gw.bleOff = gw.kv->getBlob("bleoff", &bleOff, &bl) && bl == 1 && bleOff == 1;
   statusIoStart();
   linkStart();
-  bleStart();
+  if (gw.bleOff) {
+    // Diagnose: ohne BLE gibt es keine Funk-Koexistenz; zeigt, ob ESP-NOW-Empfang dann funktioniert
+    ESP_LOGW(TAG, "BLE ist per Konsole abgeschaltet (Diagnose): kein Band wird verbunden. Wieder einschalten: \"ble on\"");
+  } else {
+    bleStart();
+  }
   consoleStart();
 }
