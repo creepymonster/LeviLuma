@@ -523,6 +523,115 @@ static int pairOpen(Rig &r, SimGateway &g) {
   return idx;
 }
 
+// Zweiter Druck auf den Gateway-Eintrag waehrend einer laufenden Kopplung: kein zweiter PAIR_REQ
+static void test_e2e_pair_busy_while_pending() {
+  Rig r;
+  SimGateway g(0x0A, nullptr);
+  g.pairing.openWindow(0, 0xFFFFFFF);
+  r.net.gws.push_back(&g);
+  r.link->start(r.now);
+  r.settle();
+  int idx = r.reg.find(g.id());
+  r.net.dropNext = 1; // erste Sendung geht verloren: Kopplung bleibt eine Weile offen
+  CHECK_EQ(r.link->pair(idx, nullptr, r.now), LVP_OK);
+  r.step();
+  CHECK(r.reg.at(idx).pairPhase == PairPhase::Pending);
+  CHECK_EQ(r.link->pair(idx, nullptr, r.now), LVP_ERR_BUSY);
+  r.settle(100);
+  CHECK(r.reg.at(idx).paired);
+  // alle Sendungen gehoeren zu derselben Anfrage (Wiederholungen mit gleicher Sequenznummer)
+  int pairSends = r.net.countSent(LVP_MSG_PAIR_REQ);
+  CHECK(pairSends >= 2);
+  uint16_t seq = 0;
+  for (auto &e : r.net.sentLog) {
+    if (e.type == LVP_MSG_PAIR_REQ) {
+      seq = e.seq;
+      break;
+    }
+  }
+  CHECK_EQ(r.net.countSent(LVP_MSG_PAIR_REQ, -1, seq), pairSends);
+}
+
+// Diagnose-Schnittstelle: Sendungen mit Versuch und Wartezeit, Antwort und endgueltiger Timeout
+struct TraceLog : CtrlLink::Trace {
+  struct Ev {
+    char kind; // 'S' Sendung, 'A' Antwort, 'T' Timeout
+    uint8_t type, rsp, error, tryNo, maxTries;
+    uint16_t seq;
+    uint32_t ms;
+  };
+  std::vector<Ev> ev;
+  void onSend(const uint8_t *, uint8_t type, uint16_t seq, uint8_t tryNo, uint8_t maxTries, uint32_t waitMs) override {
+    ev.push_back({'S', type, 0, 0, tryNo, maxTries, seq, waitMs});
+  }
+  void onAnswer(const uint8_t *, uint8_t reqType, uint8_t rspType, uint8_t error, uint16_t seq, uint8_t tries, uint32_t elapsedMs) override {
+    ev.push_back({'A', reqType, rspType, error, tries, 0, seq, elapsedMs});
+  }
+  void onTimeout(const uint8_t *, uint8_t type, uint16_t seq, uint8_t tries, uint32_t elapsedMs) override {
+    ev.push_back({'T', type, 0, 0, tries, 0, seq, elapsedMs});
+  }
+};
+
+static void test_e2e_trace_pair_retry_and_timeout() {
+  Rig r;
+  TraceLog t;
+  r.link->setTrace(&t);
+  SimGateway g(0x0B, nullptr);
+  g.pairing.openWindow(0, 0xFFFFFFF);
+  r.net.gws.push_back(&g);
+  r.link->start(r.now);
+  r.settle();
+  int idx = r.reg.find(g.id());
+  r.net.dropNext = 1;
+  CHECK_EQ(r.link->pair(idx, nullptr, r.now), LVP_OK);
+  r.settle(100);
+  CHECK(r.reg.at(idx).paired);
+  // Erstsendung (250 ms), Wiederholung (500 ms), dann PAIR_RSP nach dem zweiten Versuch
+  CHECK(t.ev.size() >= 3);
+  CHECK(t.ev[0].kind == 'S' && t.ev[0].type == LVP_MSG_PAIR_REQ && t.ev[0].tryNo == 1 && t.ev[0].maxTries == 4);
+  CHECK_EQ(t.ev[0].ms, 250u);
+  CHECK(t.ev[1].kind == 'S' && t.ev[1].tryNo == 2 && t.ev[1].seq == t.ev[0].seq);
+  CHECK_EQ(t.ev[1].ms, 500u);
+  CHECK(t.ev[2].kind == 'A' && t.ev[2].type == LVP_MSG_PAIR_REQ && t.ev[2].rsp == LVP_MSG_PAIR_RSP && t.ev[2].tryNo == 2);
+  CHECK(t.ev[2].ms >= 250u);
+
+  // Gateway nicht erreichbar: vier Sendungen, dann Timeout nach 250+500+750+1000 ms
+  Rig r2;
+  TraceLog t2;
+  r2.link->setTrace(&t2);
+  SimGateway g2(0x0C, nullptr);
+  g2.pairing.openWindow(0, 0xFFFFFFF);
+  r2.net.gws.push_back(&g2);
+  r2.link->start(r2.now);
+  r2.settle();
+  int idx2 = r2.reg.find(g2.id());
+  r2.net.dropNext = 100;
+  CHECK_EQ(r2.link->pair(idx2, nullptr, r2.now), LVP_OK);
+  r2.settle(400);
+  CHECK(r2.reg.at(idx2).pairPhase == PairPhase::Failed);
+  CHECK(r2.reg.at(idx2).lastTimeout);
+  int sends = 0;
+  const TraceLog::Ev *to = nullptr;
+  for (auto &e : t2.ev) {
+    sends += e.kind == 'S' && e.type == LVP_MSG_PAIR_REQ;
+    if (e.kind == 'T') {
+      to = &e;
+    }
+  }
+  CHECK_EQ(sends, 4);
+  CHECK(to != nullptr);
+  if (to) {
+    CHECK_EQ(to->type, LVP_MSG_PAIR_REQ);
+    CHECK_EQ(to->tryNo, 4);
+    CHECK(to->ms >= 2500u && to->ms < 2600u);
+  }
+  // Nach dem Timeout ist eine neue Kopplung wieder erlaubt
+  r2.net.dropNext = 0;
+  CHECK_EQ(r2.link->pair(idx2, nullptr, r2.now), LVP_OK);
+  r2.settle(100);
+  CHECK(r2.reg.at(idx2).paired);
+}
+
 static void test_e2e_retry_on_loss() {
   Rig r;
   SimGateway g(0x04, nullptr);
@@ -1056,6 +1165,8 @@ void tests_controller(void) {
   RUN(test_e2e_key_required);
   RUN(test_e2e_pairing_window_closed);
   RUN(test_e2e_retry_on_loss);
+  RUN_D(test_e2e_pair_busy_while_pending, "Zweiter Kopplungsversuch waehrend einer laufenden Kopplung wird abgewiesen, kein zweiter PAIR_REQ");
+  RUN_D(test_e2e_trace_pair_retry_and_timeout, "Diagnose meldet Versuche mit Wartezeit, Antwort und endgueltigen Timeout");
   RUN_D(test_e2e_coalescing_latest_wins, "Viele Befehle waehrend einer offenen Anfrage: nur erster (unterwegs) und letzter (wartend) erreichen das Gateway");
   RUN_D(test_e2e_waiting_command_replaced_not_merged, "A unterwegs, B/C/D folgen: ausschliesslich D; keine Felder aelterer Befehle uebernommen");
   RUN_D(test_e2e_loss_then_query_does_not_overtake, "SET_STATE geht verloren, GET_CALIB/GET_STATE ueberholen die Wiederholung nicht (kein STALE)");

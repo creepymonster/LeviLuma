@@ -53,9 +53,25 @@ public:
     virtual void onPairResult(int idx, bool ok) {}
   };
 
+  // Diagnose (optional, z. B. fuers Log): jede Sendung einer Anfrage, ihre Antwort oder ihr endgueltiger Timeout.
+  // Unabhaengig vom Listener, damit Oberflaeche/Zigbee und Log sich nicht gegenseitig verdraengen.
+  class Trace {
+  public:
+    virtual ~Trace() = default;
+    // tryNo 1 = Erstsendung, danach Wiederholungen. waitMs = Wartezeit bis zur naechsten Wiederholung bzw. zum Timeout.
+    virtual void onSend(const uint8_t peer[LVP_ID_LEN], uint8_t type, uint16_t seq, uint8_t tryNo, uint8_t maxTries, uint32_t waitMs) {}
+    // Antwort auf eine offene Anfrage. error = NACK-Fehler (lvp_err_t), sonst 0. elapsedMs ab der Erstsendung.
+    virtual void onAnswer(const uint8_t peer[LVP_ID_LEN], uint8_t reqType, uint8_t rspType, uint8_t error, uint16_t seq, uint8_t tries,
+                          uint32_t elapsedMs) {}
+    virtual void onTimeout(const uint8_t peer[LVP_ID_LEN], uint8_t type, uint16_t seq, uint8_t tries, uint32_t elapsedMs) {}
+  };
+
   CtrlLink(GatewayRegistry &reg, Radio &radio, const Config &cfg);
   void setListener(Listener *l) {
     listener_ = l;
+  }
+  void setTrace(Trace *t) {
+    trace_ = t;
   }
 
   // Start: gekoppelte Gateways als Peers eintragen, Erkennung und Zustandsabfrage
@@ -65,6 +81,7 @@ public:
 
   void discover(uint32_t nowMs);
   // Kopplung starten. key = nullptr: ohne Schluessel. Ergebnis ueber pairPhase/onPairResult.
+  // LVP_ERR_BUSY, solange eine Kopplung oder eine andere Anfrage an dieses Gateway laeuft (kein zweiter PAIR_REQ).
   lvp_err_t pair(int idx, const uint8_t *key, uint32_t nowMs);
   // Entkoppeln: UNPAIR an das Gateway (best effort) und lokal sofort loeschen.
   bool unpair(int idx, uint32_t nowMs);
@@ -102,6 +119,9 @@ public:
 
 private:
   bool request(int idx, lvp_msg_t &m, uint32_t nowMs);
+  uint32_t waitMs(uint8_t tryNo) const {
+    return cfg_.timeoutMs * tryNo; // wie lvl_txq_poll: linear wachsend
+  }
   void handleResponse(int idx, const lvp_msg_t &m, const lvl_pending_t *req, uint32_t nowMs);
   void applyState(int idx, const lvp_state_t &s, uint32_t gwSession);
   const lvl_pending_t *inFlight(int idx) const;
@@ -114,6 +134,7 @@ private:
   Radio &radio_;
   Config cfg_;
   Listener *listener_ = nullptr;
+  Trace *trace_ = nullptr;
   lvl_txq_t txq_;
   uint16_t seq_ = 0;
   uint32_t version_ = 1;

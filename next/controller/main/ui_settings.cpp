@@ -151,14 +151,32 @@ void uiShowGateways() {
 // ---------------- Kopplung ----------------
 
 static int pairIdx = -1;
-static lv_obj_t *pairStatus = nullptr, *keyArea = nullptr, *pairBtn = nullptr;
+static lv_obj_t *pairStatus = nullptr, *keyArea = nullptr, *pairBtn = nullptr, *pairKb = nullptr;
 static bool pairStarted = false, pairUsedKey = false;
+
+// Bedienelemente der Kopplung waehrend eines laufenden Versuchs sperren (Darstellung durch das Theme)
+static void pairControlsSetEnabled(bool on) {
+  lv_obj_t *objs[] = {pairBtn, keyArea, pairKb};
+  for (lv_obj_t *o : objs) {
+    if (!o) {
+      continue;
+    }
+    if (on) {
+      lv_obj_remove_state(o, LV_STATE_DISABLED);
+    } else {
+      lv_obj_add_state(o, LV_STATE_DISABLED);
+    }
+  }
+}
 
 static void backToGateways() {
   uiShowGateways();
 }
 
 static void startPair() {
+  if (pairStarted) {
+    return; // Kopplung laeuft bereits
+  }
   GatewayView v;
   if (!appView(pairIdx, v)) {
     return;
@@ -180,7 +198,10 @@ static void startPair() {
   }
   pairStarted = true;
   pairUsedKey = k != nullptr;
-  lv_label_set_text(pairStatus, "Kopple ...");
+  pairControlsSetEnabled(false);
+  char t[64];
+  snprintf(t, sizeof(t), "Kopple mit %s ...", v.name);
+  lv_label_set_text(pairStatus, t);
 }
 
 static void pairClicked(lv_event_t *) {
@@ -210,6 +231,7 @@ static void pairRefresh(bool) {
   }
   if (v.pairPhase == PairPhase::Failed) {
     pairStarted = false;
+    pairControlsSetEnabled(true);
     char t[128];
     if (v.lastTimeout && !v.lastError) {
       snprintf(t, sizeof(t), "%s", pairUsedKey ? "Keine Antwort: Schluessel pruefen oder Gateway ausser Reichweite" : "Keine Antwort vom Gateway");
@@ -249,7 +271,8 @@ void uiShowPair(int idx) {
                                    LV_SYMBOL_BACKSPACE, LV_SYMBOL_OK, ""};
     static const lv_buttonmatrix_ctrl_t W1 = LV_BUTTONMATRIX_CTRL_WIDTH_1, W2 = LV_BUTTONMATRIX_CTRL_WIDTH_2;
     static const lv_buttonmatrix_ctrl_t hexCtrl[] = {W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W1, W2, W2};
-    lv_obj_t *kb = lv_keyboard_create(c);
+    pairBtn = nullptr;
+    lv_obj_t *kb = pairKb = lv_keyboard_create(c);
     lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_USER_1, hexMap, hexCtrl);
     lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_USER_1);
     lv_keyboard_set_textarea(kb, keyArea);
@@ -257,6 +280,7 @@ void uiShowPair(int idx) {
     pairStatus = uiLabel(c, "Schluessel wie am Gateway hinterlegt eingeben, dann " LV_SYMBOL_OK, true);
   } else {
     keyArea = nullptr;
+    pairKb = nullptr;
     uiLabel(c, "Dieses Gateway nutzt keinen Schluessel: die Verbindung ist unverschluesselt.");
     uiLabel(c, (v.caps & LVP_GW_PAIRING_OPEN) ? "Kopplungsfenster ist offen." : "Am Gateway die BOOT-Taste kurz druecken (Kopplungsfenster).", true);
     pairBtn = uiButton(c, "Koppeln", pairClicked);

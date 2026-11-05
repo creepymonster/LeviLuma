@@ -24,6 +24,13 @@ struct RxFrame {
 
 static QueueHandle_t rxQueue;
 
+// Ergebnis der MAC-Bestaetigung eines Unicast-Rahmens (aus dem Sende-Callback, Ausgabe im Link-Task)
+struct TxResult {
+  uint8_t dst[ESP_NOW_ETH_ALEN];
+  bool ok;
+};
+static QueueHandle_t txQueue;
+
 // Laeuft im WLAN-Task: nur kopieren, keine Verarbeitung.
 static void onRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   if (!info || !data || len <= 0 || len > LVP_MAX_FRAME) {
@@ -40,9 +47,78 @@ static void onRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len
   }
 }
 
-static void onSent(const esp_now_send_info_t *, esp_now_send_status_t status) {
-  if (status != ESP_NOW_SEND_SUCCESS) {
-    ESP_LOGD(TAG, "Senden ohne MAC-Bestaetigung");
+// Laeuft im WLAN-Task: nur kopieren, keine Ausgabe. Broadcasts haben keine MAC-Bestaetigung.
+static void onSent(const esp_now_send_info_t *info, esp_now_send_status_t status) {
+  if (!info || !info->des_addr || memcmp(info->des_addr, BCAST, ESP_NOW_ETH_ALEN) == 0) {
+    return;
+  }
+  TxResult r;
+  memcpy(r.dst, info->des_addr, ESP_NOW_ETH_ALEN);
+  r.ok = status == ESP_NOW_SEND_SUCCESS;
+  xQueueSend(txQueue, &r, 0); // bei voller Queue verwerfen (nur Diagnose)
+}
+
+static void logTxResults() {
+  TxResult r;
+  while (xQueueReceive(txQueue, &r, 0) == pdTRUE) {
+    char id[18];
+    lvp_id_to_str(r.dst, id, sizeof(id));
+    if (r.ok) {
+      ESP_LOGD(TAG, "Rahmen an %s: MAC-Bestaetigung erhalten", id);
+    } else {
+      ESP_LOGW(TAG, "Rahmen an %s: keine MAC-Bestaetigung (Controller nicht erreichbar oder ausgeschaltet)", id);
+    }
+  }
+}
+
+// Diagnose: empfangene Anfrage und Ergebnis. Erkennung und Kopplung auf Info-Stufe, Ablehnungen als Warnung,
+// uebrige Anfragen gekoppelter Controller auf Debug-Stufe (sonst bei jeder Reglerbewegung eine Zeile).
+static void logRequest(const RxFrame &f, const GatewayHandler::Output &out) {
+  char id[18];
+  lvp_id_to_str(f.src, id, sizeof(id));
+  lvp_msg_t in;
+
+  if (lvp_decode(f.data, f.len, &in) != LVP_OK) {
+    lvp_err_t e = (lvp_err_t)out.dropReason;
+    if (e == LVP_ERR_SHORT || e == LVP_ERR_MAGIC || e == LVP_ERR_CRC || e == LVP_ERR_LENGTH) {
+      ESP_LOGD(TAG, "Fremder/beschaedigter Rahmen von %s verworfen (%s)", id, lvp_err_name(out.dropReason));
+    } else {
+      ESP_LOGW(TAG, "Rahmen von %s verworfen (%s)", id, lvp_err_name(out.dropReason));
+    }
+    return;
+  }
+  const char *type = lvp_type_name(in.hdr.type);
+  const char *via = f.broadcast ? "Broadcast" : "Unicast";
+
+  if (out.dropReason) {
+    if (in.hdr.type == LVP_MSG_ANNOUNCE) {
+      ESP_LOGD(TAG, "ANNOUNCE eines anderen Gateways (%s) ignoriert", id); // alle 2 s, keine Warnung
+    } else {
+      ESP_LOGW(TAG, "%s von %s (%s, Seq %u) verworfen (%s)", type, id, via, in.hdr.seq, lvp_err_name(out.dropReason));
+    }
+    return;
+  }
+  lvp_msg_t rsp;
+  bool hasRsp = out.replyLen && lvp_decode(out.reply, out.replyLen, &rsp) == LVP_OK;
+
+  if (hasRsp && rsp.hdr.type == LVP_MSG_NACK) {
+    ESP_LOGW(TAG, "%s von %s (Seq %u) abgelehnt: %s", type, id, in.hdr.seq, lvp_err_name(rsp.u.nack.error));
+    return;
+  }
+  switch (in.hdr.type) {
+  case LVP_MSG_DISCOVER:
+    ESP_LOGI(TAG, "%s von %s (%s), antworte mit ANNOUNCE", type, id, via);
+    break;
+  case LVP_MSG_PAIR_REQ:
+    ESP_LOGI(TAG, "%s von %s (Seq %u): %s, antworte mit %s", type, id, in.hdr.seq,
+             out.pairedChanged ? "neu gekoppelt" : "bereits gekoppelt (Wiederholung)", hasRsp ? lvp_type_name(rsp.hdr.type) : "-");
+    break;
+  case LVP_MSG_UNPAIR:
+    ESP_LOGI(TAG, "%s von %s (Seq %u)", type, id, in.hdr.seq);
+    break;
+  default:
+    ESP_LOGD(TAG, "%s von %s (Seq %u), antworte mit %s", type, id, in.hdr.seq, hasRsp ? lvp_type_name(rsp.hdr.type) : "-");
+    break;
   }
 }
 
@@ -133,6 +209,7 @@ static void linkTask(void *) {
   uint8_t buf[LVP_MAX_FRAME];
 
   for (;;) {
+    logTxResults();
     RxFrame f;
 
     if (xQueueReceive(rxQueue, &f, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -140,6 +217,7 @@ static void linkTask(void *) {
       xSemaphoreTake(gw.lock, portMAX_DELAY);
       gw.handler->handle(f.src, f.broadcast, f.data, f.len, gwMillis(), out);
       xSemaphoreGive(gw.lock);
+      logRequest(f, out);
 
       if (out.ensurePeer) {
         ensurePeer(f.src);
@@ -159,9 +237,6 @@ static void linkTask(void *) {
       }
       if (out.stateChanged) {
         notifyPending = true; // andere Controller erfahren die Aenderung
-      }
-      if (out.dropReason) {
-        ESP_LOGD(TAG, "Rahmen verworfen (%s)", lvp_err_name(out.dropReason));
       }
     }
 
@@ -193,6 +268,7 @@ static void linkTask(void *) {
 
 void linkStart() {
   rxQueue = xQueueCreate(8, sizeof(RxFrame));
+  txQueue = xQueueCreate(8, sizeof(TxResult));
   ESP_ERROR_CHECK(esp_netif_init());
   esp_err_t e = esp_event_loop_create_default();
 

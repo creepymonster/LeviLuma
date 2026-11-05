@@ -81,6 +81,9 @@ bool CtrlLink::request(int idx, lvp_msg_t &m, uint32_t nowMs) {
   }
   radio_.send(g.id, buf, n);
   stats_.sent++;
+  if (trace_) {
+    trace_->onSend(g.id, m.hdr.type, m.hdr.seq, 1, cfg_.tries, waitMs(1));
+  }
   return true;
 }
 
@@ -89,6 +92,9 @@ lvp_err_t CtrlLink::pair(int idx, const uint8_t *key, uint32_t nowMs) {
 
   if (!g.used || g.paired) {
     return LVP_ERR_BAD_REQUEST;
+  }
+  if (g.pairPhase == PairPhase::Pending || inFlight(idx)) {
+    return LVP_ERR_BUSY; // laufende Kopplung nicht doppeln (zweiter Druck auf den Eintrag)
   }
   if (reg_.pairedCount() >= GatewayRegistry::MAX_PAIRED) {
     return LVP_ERR_FULL;
@@ -434,6 +440,10 @@ void CtrlLink::onFrame(const uint8_t src[LVP_ID_LEN], bool broadcast, const uint
     if (!matched && m.hdr.type != LVP_MSG_STATE) {
       return; // verspaetete Antwort auf eine bereits abgeschlossene Anfrage
     }
+    if (matched && trace_) {
+      trace_->onAnswer(src, req.type, m.hdr.type, m.hdr.type == LVP_MSG_NACK ? m.u.nack.error : 0, req.seq, req.tries,
+                       (uint32_t)(nowMs - req.first_ms));
+    }
     handleResponse(idx, m, matched ? &req : nullptr, nowMs);
     pump(idx, nowMs);
     return;
@@ -498,7 +508,13 @@ void CtrlLink::tick(uint32_t nowMs) {
       }
       radio_.send(q.peer, q.frame, q.len);
       stats_.resent++;
+      if (trace_) {
+        trace_->onSend(q.peer, q.type, q.seq, q.tries, cfg_.tries, waitMs(q.tries));
+      }
     } else {
+      if (trace_) {
+        trace_->onTimeout(p.peer, p.type, p.seq, p.tries, (uint32_t)(nowMs - p.first_ms));
+      }
       onTimeout(p, nowMs);
     }
   }
