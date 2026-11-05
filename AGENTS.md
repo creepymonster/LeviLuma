@@ -150,7 +150,7 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 - **Protokoll:** nur in `next/shared/protocol/` ändern, beide Seiten nutzen dieselben Dateien. Version (`LVP_VERSION`) bei inkompatiblen Änderungen erhöhen und `next/docs/ESP_NOW_PROTOKOLL.md` nachziehen. Rahmen ≤ 250 Byte, Little Endian, byteweise Serialisierung.
 - **Hosttestbare Logik** liegt in `gateway/components/light_core/` und `controller/components/controller_core/` (ohne ESP-IDF-Abhängigkeit, NVS über `KvStore`). Neue Logik dorthin, Plattformcode in `main/`. Tests: `next/tests/run_tests.sh` (muss grün sein); Auswertung siehe „Testauswertung“ unten.
 - **Kopien aus Legacy:** `CalibCore.h`, `ColorMath.h` (Gateway) und `Palette.h` (Controller) sind byte-gleiche Kopien; `LotusProtocol.h` nur ohne `<Arduino.h>`. Änderungen an der Kalibrierung in beiden Projekten konsistent halten.
-- **Nebenläufigkeit Gateway:** `gwLock` für Modell/Kalibrierung/Kopplungen/Handler; BLE-Task nur mit Kopien; ESP-NOW-Callback kopiert nur in eine Queue.
+- **Nebenläufigkeit Gateway:** `gwLock` für Modell/Kalibrierung/Kopplungen/Handler/gemerktes Band (`BandMemory`); BLE-Task nur mit Kopien; ESP-NOW-Callback kopiert nur in eine Queue.
 - **Nebenläufigkeit Controller:** `appLock` (rekursiv) für Register und Link; LVGL nur im LVGL-Task; Zigbee-Lock und App-Lock nie gleichzeitig halten.
 - **Zigbee:** nur mit `CONFIG_LEVILUMA_ZIGBEE_ENABLED` (Standard aus). Ohne Flag kein Zigbee-Code im Build (`main/CMakeLists.txt` über die Build-Eigenschaft `LEVI_WITH_ZIGBEE`). Endpoint-IDs sind stabil und persistent (`ZbMap`); nie umnummerieren.
 - **Sicherheit:** nur ESP-NOW-Bordmittel (PMK/LMK, CCMP). Keine eigene Kryptografie, Schlüssel nie übertragen.

@@ -131,8 +131,10 @@ extern "C" void app_main(void) {
   gw.light = new LightModel();
   gw.calib = new CalibStore(*gw.kv, calibDefaults());
   gw.pairing = new PairingTable(*gw.kv);
+  gw.band = new BandMemory(*gw.kv);
   gw.calib->load();
   gw.pairing->load();
+  gw.band->load();
   gw.light->setCalibRevision(gw.calib->revision());
   loadKey();
 
@@ -160,6 +162,13 @@ extern "C" void app_main(void) {
   ESP_LOGI(TAG, "Gateway-ID %s, Name \"%s\", %d Controller gekoppelt, Kalibrierung %s (Rev. %u)", idStr, id.name, gw.pairing->count(),
            gw.calib->custom() ? "gespeichert" : "Standard", (unsigned)gw.calib->revision());
 
+  if (gw.band->has()) {
+    char a[18];
+    BandMemory::addrToStr(gw.band->addr(), a, sizeof(a));
+    ESP_LOGI(TAG, "Gemerktes Band %s: nur dieses Band wird verbunden (Konsole \"band forget\" zum Vergessen)", a);
+  } else {
+    ESP_LOGI(TAG, "Kein Band gemerkt: das staerkste passende Band wird verbunden und danach gemerkt");
+  }
   if (CONFIG_LEVILUMA_PAIRING_WINDOW_S > 0) {
     gwOpenPairingWindow(CONFIG_LEVILUMA_PAIRING_WINDOW_S);
   }

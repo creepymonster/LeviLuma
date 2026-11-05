@@ -1,5 +1,6 @@
 // Host-Tests: Gateway-Logik (LightState, BLE-Befehlsreihenfolge, Kalibrierung mit NVS-Ersatz,
 // Kopplungstabelle und vollstaendiger Protokollablauf Controller -> Gateway).
+#include "band_memory.h"
 #include <math.h>
 #include "test_util.h"
 #include "ble_scheduler.h"
@@ -301,6 +302,102 @@ static void test_calib_matches_legacy_core() {
 }
 
 // ---- Kopplungstabelle ----
+
+static BandMemory::Candidate cand(uint8_t last, int8_t rssi, const char *name, uint8_t type = 0) {
+  BandMemory::Candidate c;
+  c.addr.type = type;
+  const uint8_t v[6] = {last, 0x22, 0x33, 0x44, 0x55, 0x66};
+  memcpy(c.addr.val, v, 6);
+  c.rssi = rssi;
+  c.name = name;
+  return c;
+}
+
+static void test_band_memory_choose_and_persist() {
+  MemKvStore kv;
+  BandMemory m(kv);
+  m.load();
+  CHECK(!m.has());
+  CHECK(BandMemory::nameMatches("ELK-BLEDDM 96"));
+  CHECK(BandMemory::nameMatches("MELK-OA10"));
+  CHECK(!BandMemory::nameMatches(""));
+  CHECK(!BandMemory::nameMatches(nullptr));
+  CHECK(!BandMemory::nameMatches("BLE MF8470"));
+
+  // Nichts gemerkt: staerkstes passendes Geraet, Geraete ohne passenden Namen zaehlen nicht
+  BandMemory::Candidate c[] = {cand(1, -40, ""), cand(2, -87, "ELK-BLEDDM 96"), cand(3, -60, "LEDBLE-1"), cand(4, -30, "Fridge")};
+  BandMemory::Choice ch = m.choose(c, 4);
+  CHECK(ch.reason == BandMemory::Reason::Strongest);
+  CHECK_EQ(ch.index, 2);
+  CHECK_EQ(ch.ignored, 0);
+  BandMemory::Candidate none[] = {cand(1, -40, ""), cand(4, -30, "Fridge")};
+  CHECK(m.choose(none, 2).reason == BandMemory::Reason::None);
+  CHECK(m.choose(nullptr, 0).reason == BandMemory::Reason::None);
+
+  // Merken und nach "Neustart" wieder laden
+  CHECK(m.remember(c[1].addr));
+  BandMemory m2(kv);
+  m2.load();
+  CHECK(m2.has());
+  CHECK(BandMemory::sameAddr(m2.addr(), c[1].addr));
+  char s[18];
+  BandMemory::addrToStr(m2.addr(), s, sizeof(s));
+  CHECK(strcmp(s, "66:55:44:33:22:02") == 0);
+
+  // Gemerkt: nur dieses Band, auch schwaecher und ohne empfangenen Namen; andere passende werden ignoriert
+  BandMemory::Candidate c2[] = {cand(3, -40, "LEDBLE-1"), cand(2, -95, ""), cand(5, -50, "ELK-BLEDOM")};
+  ch = m2.choose(c2, 3);
+  CHECK(ch.reason == BandMemory::Reason::Remembered);
+  CHECK_EQ(ch.index, 1);
+  CHECK_EQ(ch.ignored, 2);
+
+  // Gemerktes Band fehlt: keine Ausweichwahl
+  BandMemory::Candidate c3[] = {cand(3, -40, "LEDBLE-1"), cand(5, -50, "ELK-BLEDOM")};
+  ch = m2.choose(c3, 2);
+  CHECK(ch.reason == BandMemory::Reason::RememberedMissing);
+  CHECK_EQ(ch.index, -1);
+  CHECK_EQ(ch.ignored, 2);
+  CHECK(m2.choose(nullptr, 0).reason == BandMemory::Reason::RememberedMissing);
+
+  // Gleiche Adressbytes, anderer Adresstyp: nicht dasselbe Band
+  BandMemory::Candidate c4[] = {cand(2, -50, "ELK-BLEDDM 96", 1)};
+  CHECK(m2.choose(c4, 1).reason == BandMemory::Reason::RememberedMissing);
+
+  // Vergessen: danach wieder staerkstes passendes Geraet, auch nach erneutem Laden
+  CHECK(m2.forget());
+  CHECK(!m2.has());
+  BandMemory m3(kv);
+  m3.load();
+  CHECK(!m3.has());
+  CHECK(m3.choose(c3, 2).reason == BandMemory::Reason::Strongest);
+}
+
+static void test_band_memory_storage_errors() {
+  MemKvStore kv;
+  BandMemory m(kv);
+  m.load();
+  BandMemory::Candidate a = cand(7, -50, "ELK-BLEDDM"), b = cand(8, -50, "ELK-BLEDDM");
+  CHECK(m.remember(a.addr));
+  kv.failWrites = true;
+  CHECK(!m.remember(b.addr)); // Speicherfehler: alter Stand bleibt
+  CHECK(BandMemory::sameAddr(m.addr(), a.addr));
+  kv.failWrites = false;
+
+  // Beschaedigte oder fremde Daten werden nicht als Band uebernommen
+  uint8_t bad[BandMemory::BLOB_LEN] = {2, 0, 1, 2, 3, 4, 5, 6}; // unbekannte Version
+  CHECK(kv.setBlob(BandMemory::KEY, bad, sizeof(bad)));
+  BandMemory m2(kv);
+  m2.load();
+  CHECK(!m2.has());
+  uint8_t shortBlob[3] = {1, 0, 1};
+  CHECK(kv.setBlob(BandMemory::KEY, shortBlob, sizeof(shortBlob)));
+  m2.load();
+  CHECK(!m2.has());
+  BandMemory::Addr out;
+  CHECK(!BandMemory::deserialize(nullptr, 8, out));
+  uint8_t buf[4];
+  CHECK_EQ(BandMemory::serialize(a.addr, buf, sizeof(buf)), (size_t)0);
+}
 
 static void test_pairing_table() {
   MemKvStore kv;
@@ -638,6 +735,8 @@ void tests_gateway(void) {
   RUN(test_calib_defaults_points);
   RUN(test_calib_matches_legacy_core);
   RUN(test_pairing_table);
+  RUN_D(test_band_memory_choose_and_persist, "Gemerktes Band: Auswahl (staerkstes, gemerktes, fehlendes), Speichern, Laden, Vergessen");
+  RUN_D(test_band_memory_storage_errors, "Gemerktes Band: Speicherfehler behalten alten Stand, beschaedigte Daten werden verworfen");
   RUN(test_key_hex);
   RUN(test_handler_discovery_and_pairing_window);
   RUN(test_handler_key_allows_pairing_anytime);

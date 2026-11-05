@@ -79,7 +79,7 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 |---|---|
 | `shared/protocol/` | `leviluma_proto` (Rahmen, Typen, CRC, Kodierung), `leviluma_link` (Wiederholung, Duplikaterkennung), `Kconfig` (Kanal, PMK, Zeiten – für beide Projekte gleich) |
 | `shared/common/` | `KvStore` (NVS bzw. RAM für Tests), `levi_key` (Schlüssel als 32 Hex-Zeichen) |
-| `gateway/components/light_core/` | Hosttestbare Gateway-Logik: `LightModel` (LightState), `BleScheduler` (Befehlsreihenfolge aus Legacy `bleTask`), `CalibStore` (Legacy-Kalibrierung + NVS), `PairingTable`, `GatewayHandler` (Protokoll), Kopien `CalibCore.h`, `ColorMath.h`, `LotusProtocol.h` |
+| `gateway/components/light_core/` | Hosttestbare Gateway-Logik: `LightModel` (LightState), `BleScheduler` (Befehlsreihenfolge aus Legacy `bleTask`), `CalibStore` (Legacy-Kalibrierung + NVS), `PairingTable`, `GatewayHandler` (Protokoll), `BandMemory` (gemerktes Band, Auswahl nach dem Scan), Kopien `CalibCore.h`, `ColorMath.h`, `LotusProtocol.h` |
 | `gateway/main/` | ESP-IDF-Anbindung: ESP-NOW (`espnow_link.cpp`), NimBLE-Central (`ble_link.cpp`), Konsole, BOOT-Taste/LED |
 | `controller/components/controller_core/` | Hosttestbare Controller-Logik: `GatewayRegistry`, `CtrlLink` (Erkennung, Kopplung, Befehle, Abgleich), `ZbMap` (Endpoint-Zuordnung, Farbumrechnung), `TouchCal`, `Palette.h` (Kopie Legacy) |
 | `controller/main/` | Hardware (`board.cpp`), LVGL-Port, Dienst (`app.cpp`), Oberfläche (`ui_*.cpp`), Zigbee (`zigbee_bridge.cpp`, `ui_zigbee.cpp`, nur mit Flag) |
@@ -94,7 +94,7 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 
 ### Nebenläufigkeit
 
-- **Gateway:** `gwLock` schützt LightState, Kalibrierung, Kopplungen und Protokollzustand. Der ESP-NOW-Empfang kopiert nur in eine Queue; der Link-Task verarbeitet. Der BLE-Task arbeitet mit Kopien (`gwSnapshot`, `gwCalibCopy`) und meldet `gwSetBle`/`gwMarkSent`. Ein BLE-Befehl je Zeitfenster mit 200 ms Pause (wie Legacy).
+- **Gateway:** `gwLock` schützt LightState, Kalibrierung, Kopplungen, gemerktes Band und Protokollzustand. Der ESP-NOW-Empfang kopiert nur in eine Queue; der Link-Task verarbeitet. Der BLE-Task arbeitet mit Kopien (`gwSnapshot`, `gwCalibCopy`) und meldet `gwSetBle`/`gwMarkSent`. Ein BLE-Befehl je Zeitfenster mit 200 ms Pause (wie Legacy).
 - **Controller:** `appLock` (rekursiv) schützt Register und Link. LVGL läuft nur im LVGL-Task, der den Zustand alle 100 ms über `appView` liest. Zigbee- und App-Lock werden nie gleichzeitig gehalten (Queue für Zigbee-Befehle, Merkerbits für Rückmeldungen).
 
 ## Hardware
@@ -146,6 +146,7 @@ Die geprüfte, automatisch erzeugte Auswertung (Ergebnisse je Test, getesteter C
 
 ### Bekannte Einschränkungen
 
+- Das Gateway merkt sich nach der ersten erfolgreichen Verbindung sein Band (BLE-Adresse, NVS) und verbindet danach nur noch dieses. Gewählt wird beim ersten Mal das stärkste passende Band in Reichweite: Bei mehreren Bändern das Gateway deshalb dicht an seinem Band einrichten und die Wahl im Log prüfen (`band` in der Konsole). Band tauschen: `band forget`.
 - Nach einem Neustart kennt das Gateway den Bandzustand nicht (Ein/Aus „unbekannt“, wie Legacy); Farbe und Helligkeit werden nicht persistiert.
 - Bis zu 8 gekoppelte Gateways je Controller (ESP-NOW-Grenze für verschlüsselte Peers), bis zu 4 Controller je Gateway.
 - Zigbee-Endpoints werden beim Start angelegt; neue Zuordnungen wirken nach einem Neustart.
