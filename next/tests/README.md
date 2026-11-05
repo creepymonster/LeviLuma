@@ -8,22 +8,22 @@
 
 | Kennzahl | Wert |
 |---|---|
-| Tests ausgeführt | 85 |
-| – bestanden | 85 |
+| Tests ausgeführt | 89 |
+| – bestanden | 89 |
 | – fehlgeschlagen | 0 |
 | – übersprungen (nicht ausgeführt) | 0 |
-| Assertions (Prüfungen) ausgeführt | 10509 |
+| Assertions (Prüfungen) ausgeführt | 10570 |
 | – davon fehlgeschlagen | 0 |
-| Eigene Summenzeile des Testprogramms | 85 Tests, 10509 Assertions, 0 Fehler |
+| Eigene Summenzeile des Testprogramms | 89 Tests, 10570 Assertions, 0 Fehler |
 
 ## Getesteter Stand
 
 | | |
 |---|---|
-| Getesteter Commit | `7ae489a656ba871337fe062da3c042d44b16b844` |
+| Getesteter Commit | `68f8fb62a3750bce5de6941ebd34ae91951b6e59` |
 | Ref | `refs/heads/main` (Auslöser: push) |
-| Testlauf gestartet | 2026-11-05 04:59:23 UTC (2026-11-05 05:59:23 CET) |
-| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/41971107635 |
+| Testlauf gestartet | 2026-11-05 06:00:55 UTC (2026-11-05 07:00:55 CET) |
+| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/41977554030 |
 
 Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `next/tests/README.md` erfolgt in einem **separaten Folge-Commit** (Bot, `[skip ci]`), der nur diese Datei ändert; der Quellstand ist deshalb der genannte Commit, nicht der Berichts-Commit.
 
@@ -73,7 +73,7 @@ _Wiederholung mit Zeitablauf, Zeitueberlauf, Duplikaterkennung beim Empfaenger, 
 | `test_dedup_eviction` | bestanden | 7 |  |
 | `test_online` | bestanden | 4 |  |
 
-### Gateway (18/18 bestanden)
+### Gateway (20/20 bestanden)
 
 _Lichtzustand, BLE-Befehlsreihenfolge, Kalibrierung und Speicher, Kopplungstabelle, Schluessel, Gateway-Handler (Anfragen, Antworten, Ablehnungen)._
 
@@ -89,6 +89,8 @@ _Lichtzustand, BLE-Befehlsreihenfolge, Kalibrierung und Speicher, Kopplungstabel
 | `test_calib_defaults_points` | bestanden | 1 |  |
 | `test_calib_matches_legacy_core` | bestanden | 4 |  |
 | `test_pairing_table` | bestanden | 21 |  |
+| `test_band_memory_choose_and_persist` | bestanden | 27 | Gemerktes Band: Auswahl (staerkstes, gemerktes, fehlendes), Speichern, Laden, Vergessen |
+| `test_band_memory_storage_errors` | bestanden | 9 | Gemerktes Band: Speicherfehler behalten alten Stand, beschaedigte Daten werden verworfen |
 | `test_key_hex` | bestanden | 9 |  |
 | `test_handler_discovery_and_pairing_window` | bestanden | 19 |  |
 | `test_handler_key_allows_pairing_anytime` | bestanden | 5 |  |
@@ -98,7 +100,7 @@ _Lichtzustand, BLE-Befehlsreihenfolge, Kalibrierung und Speicher, Kopplungstabel
 | `test_handler_rejects_garbage_and_responses` | bestanden | 4 |  |
 | `test_state_notify_frame` | bestanden | 4 |  |
 
-### Controller (28/28 bestanden)
+### Controller (30/30 bestanden)
 
 _Gateway-Register, Zigbee-Zuordnung, Touch-Kalibrierung und End-to-End Controller<->Gateway ueber simuliertes ESP-NOW (echter Gateway-Code): Kopplung, Verlust, Wiederholung, Warteregel, Neustart, Kalibrierung._
 
@@ -114,6 +116,8 @@ _Gateway-Register, Zigbee-Zuordnung, Touch-Kalibrierung und End-to-End Controlle
 | `test_e2e_key_required` | bestanden | 13 |  |
 | `test_e2e_pairing_window_closed` | bestanden | 2 |  |
 | `test_e2e_retry_on_loss` | bestanden | 4 |  |
+| `test_e2e_pair_busy_while_pending` | bestanden | 6 | Zweiter Kopplungsversuch waehrend einer laufenden Kopplung wird abgewiesen, kein zweiter PAIR_REQ |
+| `test_e2e_trace_pair_retry_and_timeout` | bestanden | 19 | Diagnose meldet Versuche mit Wartezeit, Antwort und endgueltigen Timeout |
 | `test_e2e_coalescing_latest_wins` | bestanden | 4 | Viele Befehle waehrend einer offenen Anfrage: nur erster (unterwegs) und letzter (wartend) erreichen das Gateway |
 | `test_e2e_waiting_command_replaced_not_merged` | bestanden | 12 | A unterwegs, B/C/D folgen: ausschliesslich D; keine Felder aelterer Befehle uebernommen |
 | `test_e2e_loss_then_query_does_not_overtake` | bestanden | 14 | SET_STATE geht verloren, GET_CALIB/GET_STATE ueberholen die Wiederholung nicht (kein STALE) |
@@ -181,12 +185,12 @@ Gebaut von `.github/workflows/next.yml` (ESP-IDF in Container). Der Status wird 
 
 | Job | Status | Ergebnis |
 |---|---|---|
+| ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
 | ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
 | ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
-| ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
+| ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
 | ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
 | ESP-IDF Diagnose ESP-NOW, alle Optionen (esp32s3) | completed | erfolgreich |
-| ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
 
 ## Hardwaretests
 
