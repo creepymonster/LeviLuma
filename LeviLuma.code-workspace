@@ -13,6 +13,10 @@
       "path": "next/gateway"
     },
     {
+      "name": "Next – XIAO S3 Diagnose",
+      "path": "next/debug"
+    },
+    {
       "name": "Next – Waveshare Round",
       "path": "next/controller-round"
     },
