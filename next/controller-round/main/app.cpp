@@ -63,8 +63,43 @@ struct RxFrame {
   uint8_t data[LVP_MAX_FRAME];
 };
 
+// Diagnose im Log: Anfragen mit Versuch und Wartezeit, Antworten, Timeouts (laeuft im Link-Task unter appLock)
+class LogTrace : public CtrlLink::Trace {
+public:
+  void onSend(const uint8_t peer[LVP_ID_LEN], uint8_t type, uint16_t seq, uint8_t tryNo, uint8_t maxTries, uint32_t waitMs) override {
+    char id[18];
+    lvp_id_to_str(peer, id, sizeof(id));
+    ESP_LOGI(TAG, "%s an %s (Seq %u): Versuch %u/%u, warte %lu ms", lvp_type_name(type), id, seq, tryNo, maxTries, (unsigned long)waitMs);
+  }
+  void onAnswer(const uint8_t peer[LVP_ID_LEN], uint8_t reqType, uint8_t rspType, uint8_t error, uint16_t seq, uint8_t tries,
+                uint32_t elapsedMs) override {
+    char id[18];
+    lvp_id_to_str(peer, id, sizeof(id));
+    if (rspType == LVP_MSG_NACK) {
+      ESP_LOGW(TAG, "%s an %s (Seq %u): abgelehnt (%s) nach %u Versuch(en), %lu ms", lvp_type_name(reqType), id, seq, lvp_err_name(error), tries,
+               (unsigned long)elapsedMs);
+    } else {
+      ESP_LOGI(TAG, "%s an %s (Seq %u): Antwort %s nach %u Versuch(en), %lu ms", lvp_type_name(reqType), id, seq, lvp_type_name(rspType), tries,
+               (unsigned long)elapsedMs);
+    }
+  }
+  void onTimeout(const uint8_t peer[LVP_ID_LEN], uint8_t type, uint16_t seq, uint8_t tries, uint32_t elapsedMs) override {
+    char id[18];
+    lvp_id_to_str(peer, id, sizeof(id));
+    ESP_LOGW(TAG, "%s an %s (Seq %u): keine Antwort nach %u Versuchen, %lu ms", lvp_type_name(type), id, seq, tries, (unsigned long)elapsedMs);
+  }
+};
+
+// Ergebnis der MAC-Bestaetigung eines Unicast-Rahmens (aus dem Sende-Callback, Ausgabe im Link-Task)
+struct TxResult {
+  uint8_t dst[ESP_NOW_ETH_ALEN];
+  bool ok;
+};
+
 static SemaphoreHandle_t lock;
 static QueueHandle_t rxQueue;
+static QueueHandle_t txQueue;
+static LogTrace logTrace;
 static NvsKvStore *kv;
 static GatewayRegistry *reg;
 static EspNowRadio radio;
@@ -94,8 +129,33 @@ static void onRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len
   xQueueSend(rxQueue, &f, 0); // bei voller Queue verwerfen: Wiederholung und Beacons gleichen aus
 }
 
+// Laeuft im WLAN-Task: nur kopieren, keine Ausgabe. Broadcasts haben keine MAC-Bestaetigung.
+static void onSent(const esp_now_send_info_t *info, esp_now_send_status_t status) {
+  if (!info || !info->des_addr || memcmp(info->des_addr, BCAST, ESP_NOW_ETH_ALEN) == 0) {
+    return;
+  }
+  TxResult r;
+  memcpy(r.dst, info->des_addr, ESP_NOW_ETH_ALEN);
+  r.ok = status == ESP_NOW_SEND_SUCCESS;
+  xQueueSend(txQueue, &r, 0); // bei voller Queue verwerfen (nur Diagnose)
+}
+
+static void logTxResults() {
+  TxResult r;
+  while (xQueueReceive(txQueue, &r, 0) == pdTRUE) {
+    char id[18];
+    lvp_id_to_str(r.dst, id, sizeof(id));
+    if (r.ok) {
+      ESP_LOGD(TAG, "Rahmen an %s: MAC-Bestaetigung erhalten", id);
+    } else {
+      ESP_LOGW(TAG, "Rahmen an %s: keine MAC-Bestaetigung (Gateway hat den Rahmen nicht empfangen)", id);
+    }
+  }
+}
+
 static void linkTask(void *) {
   for (;;) {
+    logTxResults();
     RxFrame f;
     bool got = xQueueReceive(rxQueue, &f, pdMS_TO_TICKS(20)) == pdTRUE;
     appLock();
@@ -111,6 +171,7 @@ static void linkTask(void *) {
 void appInit() {
   lock = xSemaphoreCreateRecursiveMutex();
   rxQueue = xQueueCreate(12, sizeof(RxFrame));
+  txQueue = xQueueCreate(8, sizeof(TxResult));
   kv = new NvsKvStore("levirund");
   reg = new GatewayRegistry(*kv);
   reg->load();
@@ -122,6 +183,7 @@ void appInit() {
   c.tries = CONFIG_LEVILUMA_REQUEST_TRIES;
   c.beaconMs = CONFIG_LEVILUMA_BEACON_MS;
   link = new CtrlLink(*reg, radio, c);
+  link->setTrace(&logTrace);
   char idStr[18];
   lvp_id_to_str(c.ownId, idStr, sizeof(idStr));
   ESP_LOGI(TAG, "Controller-ID %s, Gateway %s", idStr, Round::activeGateway(*reg) >= 0 ? "gekoppelt" : "noch nicht gekoppelt");
@@ -141,6 +203,7 @@ void appStart() {
   ESP_ERROR_CHECK(esp_wifi_set_channel(CONFIG_LEVILUMA_ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE));
   ESP_ERROR_CHECK(esp_now_init());
   ESP_ERROR_CHECK(esp_now_register_recv_cb(onRecv));
+  ESP_ERROR_CHECK(esp_now_register_send_cb(onSent));
   static_assert(sizeof(CONFIG_LEVILUMA_ESPNOW_PMK) - 1 == ESP_NOW_KEY_LEN, "LEVILUMA_ESPNOW_PMK muss genau 16 Zeichen haben");
   ESP_ERROR_CHECK(esp_now_set_pmk((const uint8_t *)CONFIG_LEVILUMA_ESPNOW_PMK));
   esp_now_peer_info_t b = {};

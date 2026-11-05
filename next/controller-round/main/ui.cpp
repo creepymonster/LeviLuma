@@ -448,7 +448,25 @@ static void backClicked(lv_event_t *) {
   closeOverlay();
 }
 
+// Eintraege der Suchliste waehrend einer laufenden Kopplung sperren (Darstellung durch das Theme)
+static void searchListSetEnabled(bool on) {
+  if (!searchList) {
+    return;
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_count(searchList); i++) {
+    lv_obj_t *c = lv_obj_get_child(searchList, (int32_t)i);
+    if (on) {
+      lv_obj_remove_state(c, LV_STATE_DISABLED);
+    } else {
+      lv_obj_add_state(c, LV_STATE_DISABLED);
+    }
+  }
+}
+
 static void startPair(int idx, const uint8_t *key) {
+  if (pairingIdx >= 0) {
+    return; // Kopplung laeuft bereits
+  }
   lvp_err_t e = appPair(idx, key);
   if (e != LVP_OK) {
     lv_label_set_text(searchStatus, appErrorText(e, false));
@@ -456,10 +474,17 @@ static void startPair(int idx, const uint8_t *key) {
   }
   pairingIdx = idx;
   pairUsedKey = key != nullptr;
-  lv_label_set_text(searchStatus, "Kopple ...");
+  searchListSetEnabled(false);
+  GatewayView v;
+  char t[48];
+  snprintf(t, sizeof(t), "Kopple mit %s ...", appView(idx, v) ? v.name : "Gateway");
+  lv_label_set_text(searchStatus, t);
 }
 
 static void gatewayPicked(lv_event_t *e) {
+  if (pairingIdx >= 0) {
+    return; // Kopplung laeuft bereits
+  }
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   GatewayView v;
   if (!appView(idx, v)) {
@@ -501,6 +526,9 @@ static void buildSearchList() {
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_size(l, LV_PCT(100), lv_font_get_line_height(lv_obj_get_style_text_font(l, LV_PART_MAIN))); // einzeilig
     lv_obj_add_event_cb(b, gatewayPicked, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+    if (pairingIdx >= 0) {
+      lv_obj_add_state(b, LV_STATE_DISABLED); // Liste neu aufgebaut, waehrend gekoppelt wird
+    }
     n++;
   }
   if (!n) {
@@ -538,6 +566,7 @@ static void refreshSearch() {
     }
     if (v.pairPhase == PairPhase::Failed) {
       pairingIdx = -1;
+      searchListSetEnabled(true);
       lv_label_set_text(searchStatus, v.lastTimeout && !v.lastError ? (pairUsedKey ? "Schluessel falsch?" : "Keine Antwort")
                                                                     : appErrorText(v.lastError, false));
     }
