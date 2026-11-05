@@ -1,5 +1,5 @@
 // Serielle Konsole des Gateways (115200 Baud, Zeilen mit Enter abschliessen).
-// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all
+// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include <string.h>
@@ -9,6 +9,17 @@
 #include "gateway.h"
 
 static const char *TAG = "levi-gw-con";
+
+// Aufruf unter gw.lock
+static void printBand() {
+  if (gw.band->has()) {
+    char a[18];
+    BandMemory::addrToStr(gw.band->addr(), a, sizeof(a));
+    printf("Gemerktes Band %s (nur dieses wird verbunden)\n", a);
+  } else {
+    printf("Kein Band gemerkt (das staerkste passende Band wird verbunden und gemerkt)\n");
+  }
+}
 
 static void printStatus() {
   LightSnapshot s = gwSnapshot();
@@ -23,6 +34,7 @@ static void printStatus() {
     printf("  Controller %s \"%s\"\n", idStr, gw.pairing->at(i).name);
   }
   printf("Kalibrierung %s, Rev. %u\n", gw.calib->custom() ? "gespeichert" : "Standard", (unsigned)gw.calib->revision());
+  printBand();
   xSemaphoreGive(gw.lock);
   printf("Band %s, Power %d, Helligkeit %u%%, Farbe %u,%u,%u%s%s, Revision %lu, gesendet bis %lu\n", s.ble ? "verbunden" : "getrennt", s.power,
          s.brightness, s.r, s.g, s.b, s.raw ? " (roh)" : "", s.music ? ", Musik" : "", (unsigned long)s.revision, (unsigned long)s.sentRevision);
@@ -80,8 +92,20 @@ static void handleLine(char *line) {
     printf("%s Neustart...\n", ok ? "Alle Kopplungen geloescht." : "NVS-Fehler.");
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
+  } else if (!strcmp(line, "band")) {
+    xSemaphoreTake(gw.lock, portMAX_DELAY);
+    printBand();
+    xSemaphoreGive(gw.lock);
+  } else if (!strcmp(line, "band forget")) {
+    xSemaphoreTake(gw.lock, portMAX_DELAY);
+    bool ok = gw.band->forget();
+    xSemaphoreGive(gw.lock);
+    // Neustart trennt eine bestehende Verbindung; danach wird das staerkste passende Band gewaehlt und gemerkt
+    printf("%s Neustart...\n", ok ? "Band vergessen." : "NVS-Fehler.");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
   } else if (line[0]) {
-    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all\n");
+    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget\n");
   }
 }
 

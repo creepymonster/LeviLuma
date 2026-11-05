@@ -1,10 +1,9 @@
 // BLE-Anbindung des Gateways an genau ein Band der ELK-/Lotus-Familie (NimBLE, ESP-IDF).
-// Portiert aus legacy/src/ble.cpp (NimBLE-Arduino): Scan (CONFIG_LEVILUMA_BLE_SCAN_MS, staerkstes passendes Geraet),
-// Verbinden, 1 s warten, Service 0xFFF0 / Characteristic 0xFFF3 suchen, dann Befehle senden
+// Portiert aus legacy/src/ble.cpp (NimBLE-Arduino): Scan (CONFIG_LEVILUMA_BLE_SCAN_MS), Auswahl ueber BandMemory
+// (gemerktes Band, sonst staerkstes passendes Geraet, das nach erfolgreicher Verbindung gemerkt wird), Verbinden, 1 s warten, Service 0xFFF0 / Characteristic 0xFFF3 suchen, dann Befehle senden
 // (ein Befehl pro Zeitfenster, 200 ms Pause nach jedem gesendeten Befehl). Neuer Versuch alle 4 s.
 #include "freertos/FreeRTOS.h"
 #include <string.h>
-#include <string>
 #include "esp_log.h"
 #include "freertos/task.h"
 #include "host/ble_hs.h"
@@ -17,23 +16,11 @@
 
 static const char *TAG = "levi-gw-ble";
 
-// Namen der Lotus-Lantern-/ELK-Familie (gleiches Protokoll, Service 0xFFF0), wie Legacy bleNameMatches()
-static bool bleNameMatches(const std::string &n) {
-  static const char *prefixes[] = {"ELK-BLEDDM", "ELK-BLEDOM", "ELK-BLEDOB", "MELK", "LEDBLE"};
-
-  for (const char *p : prefixes) {
-    if (n.rfind(p, 0) == 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static SemaphoreHandle_t evSem; // ein Ergebnis pro Schritt (Scan, Verbindung, Suche)
 static volatile bool synced = false;
 static uint8_t ownAddrType;
 
-static constexpr int MAX_SEEN = 24;
+static constexpr int MAX_SEEN = 64;
 struct Seen {
   ble_addr_t addr;
   int8_t rssi;
@@ -41,6 +28,8 @@ struct Seen {
 };
 static Seen seen[MAX_SEEN];
 static int seenN = 0;
+static bool scanHasTarget = false; // gemerktes Band: bekommt auch bei voller Liste einen Platz
+static ble_addr_t scanTarget;
 
 static volatile uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE;
 static volatile int connStatus = -1;
@@ -64,7 +53,15 @@ static Seen *seenFind(const ble_addr_t &a) {
     }
   }
   if (seenN >= MAX_SEEN) {
-    return nullptr;
+    if (!scanHasTarget || ble_addr_cmp(&a, &scanTarget) != 0) {
+      return nullptr;
+    }
+    // Liste voll: letzten Eintrag fuer das gemerkte Band ueberschreiben
+    Seen *s = &seen[MAX_SEEN - 1];
+    memset(s, 0, sizeof(*s));
+    s->addr = a;
+    s->rssi = -128;
+    return s;
   }
   Seen *s = &seen[seenN++];
   memset(s, 0, sizeof(*s));
@@ -143,6 +140,11 @@ static bool waitEv(uint32_t ms) {
 
 static bool scanAndConnect() {
   seenN = 0;
+  xSemaphoreTake(gw.lock, portMAX_DELAY);
+  scanHasTarget = gw.band->has();
+  scanTarget.type = gw.band->addr().type;
+  memcpy(scanTarget.val, gw.band->addr().val, sizeof(scanTarget.val));
+  xSemaphoreGive(gw.lock);
   struct ble_gap_disc_params dp = {};
   dp.passive = 0; // aktiver Scan wie Legacy (Namen in der Scan-Antwort)
   // Keine Duplikatfilterung im Controller: Sie kann die Scan-Antwort derselben Adresse verwerfen,
@@ -156,28 +158,60 @@ static bool scanAndConnect() {
     return false;
   }
   waitEv(CONFIG_LEVILUMA_BLE_SCAN_MS + 2000);
-  ESP_LOGI(TAG, "BLE: Scan fertig, %d Geraete gefunden", seenN);
-  int best = -1;
 
+  // Kandidaten fuer die Auswahl (gemerktes Band oder staerkstes passendes Geraet)
+  static BandMemory::Candidate cands[MAX_SEEN];
+  for (int i = 0; i < seenN; i++) {
+    cands[i].addr.type = seen[i].addr.type;
+    memcpy(cands[i].addr.val, seen[i].addr.val, sizeof(cands[i].addr.val));
+    cands[i].rssi = seen[i].rssi;
+    cands[i].name = seen[i].name;
+  }
+  xSemaphoreTake(gw.lock, portMAX_DELAY);
+  bool remembered = gw.band->has();
+  BandMemory::Addr rememberedAddr = gw.band->addr();
+  BandMemory::Choice ch = gw.band->choose(cands, seenN);
+  xSemaphoreGive(gw.lock);
+  char ra[18];
+  BandMemory::addrToStr(rememberedAddr, ra, sizeof(ra));
+
+  // Geraeteliste: ohne gemerktes Band auf Info-Stufe (Einrichtung), danach nur auf Debug-Stufe,
+  // damit ein ausgeschaltetes gemerktes Band das Log nicht alle paar Sekunden mit der ganzen Liste fuellt.
+  esp_log_level_t lvl = remembered ? ESP_LOG_DEBUG : ESP_LOG_INFO;
+  ESP_LOG_LEVEL_LOCAL(lvl, TAG, "BLE: Scan fertig, %d Geraete gefunden", seenN);
   for (int i = 0; i < seenN; i++) {
     char a[18];
-    const uint8_t *v = seen[i].addr.val;
-    snprintf(a, sizeof(a), "%02x:%02x:%02x:%02x:%02x:%02x", v[5], v[4], v[3], v[2], v[1], v[0]);
+    BandMemory::addrToStr(cands[i].addr, a, sizeof(a));
+    const char *mark = i == ch.index ? (remembered ? "  <- gemerktes Band" : "  <- gewaehlt") : "";
     if (seen[i].name[0]) {
-      ESP_LOGI(TAG, "BLE:   %s  RSSI %d  Name \"%s\"", a, seen[i].rssi, seen[i].name);
+      ESP_LOG_LEVEL_LOCAL(lvl, TAG, "BLE:   %s  RSSI %d  Name \"%s\"%s", a, seen[i].rssi, seen[i].name, mark);
     } else {
-      ESP_LOGI(TAG, "BLE:   %s  RSSI %d  (kein Name empfangen)", a, seen[i].rssi);
+      ESP_LOG_LEVEL_LOCAL(lvl, TAG, "BLE:   %s  RSSI %d  (kein Name empfangen)%s", a, seen[i].rssi, mark);
     }
+  }
 
-    if (bleNameMatches(seen[i].name) && (best < 0 || seen[i].rssi > seen[best].rssi)) {
-      best = i;
-    }
-  }
-  if (best < 0) {
-    ESP_LOGI(TAG, "BLE: kein Geraet der ELK/Lotus-Familie gefunden, naechster Versuch in 4 s");
+  switch (ch.reason) {
+  case BandMemory::Reason::None:
+    ESP_LOGI(TAG, "BLE: kein Band gemerkt und kein Geraet der ELK/Lotus-Familie gefunden, naechster Versuch in 4 s");
     return false;
+  case BandMemory::Reason::RememberedMissing:
+    if (ch.ignored) {
+      ESP_LOGI(TAG, "BLE: gemerktes Band %s nicht gefunden (%d andere passende Baender ignoriert), naechster Versuch in 4 s", ra, ch.ignored);
+    } else {
+      ESP_LOGI(TAG, "BLE: gemerktes Band %s nicht gefunden, naechster Versuch in 4 s", ra);
+    }
+    return false;
+  case BandMemory::Reason::Remembered:
+    ESP_LOGI(TAG, "BLE: gemerktes Band %s gefunden (\"%s\", RSSI %d dBm), verbinde erneut", ra, seen[ch.index].name, seen[ch.index].rssi);
+    break;
+  case BandMemory::Reason::Strongest: {
+    char a[18];
+    BandMemory::addrToStr(cands[ch.index].addr, a, sizeof(a));
+    ESP_LOGI(TAG, "BLE: kein Band gemerkt, staerkstes Geraet \"%s\" %s (RSSI %d dBm) gewaehlt", seen[ch.index].name, a, seen[ch.index].rssi);
+    break;
   }
-  ESP_LOGI(TAG, "BLE: staerkstes Geraet \"%s\" (RSSI %d dBm) gewaehlt", seen[best].name, seen[best].rssi);
+  }
+  int best = ch.index;
   connStatus = -1;
   xSemaphoreTake(evSem, 0);
   rc = ble_gap_connect(ownAddrType, &seen[best].addr, 5000, nullptr, gapEvent, nullptr);
@@ -213,6 +247,20 @@ static bool scanAndConnect() {
     return false;
   }
   ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");
+
+  // Erste erfolgreiche Verbindung: Band dauerhaft merken (erst nach gefundenem Service, nicht schon beim Scan)
+  if (!remembered) {
+    xSemaphoreTake(gw.lock, portMAX_DELAY);
+    bool ok = gw.band->remember(cands[best].addr);
+    xSemaphoreGive(gw.lock);
+    char a[18];
+    BandMemory::addrToStr(cands[best].addr, a, sizeof(a));
+    if (ok) {
+      ESP_LOGI(TAG, "BLE: Band %s (\"%s\") dauerhaft gemerkt, kuenftig wird nur dieses Band verbunden", a, seen[best].name);
+    } else {
+      ESP_LOGW(TAG, "BLE: Band %s konnte nicht gemerkt werden (NVS-Fehler), naechste Verbindung waehlt erneut", a);
+    }
+  }
   return true;
 }
 

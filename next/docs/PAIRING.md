@@ -30,7 +30,8 @@ Mit Schlüssel ist kein Kopplungsfenster nötig – der Schlüssel ist der Nachw
 - **Status:** Die Gateway-Seite zeigt ID, Firmware, online/offline (zuletzt gesehen), Band verbunden, Lampenzustand und Schlüssel ja/nein.
 - **Abgleich:** *Abgleich* fragt Zustand und Kalibrierung neu ab (passiert sonst automatisch).
 - **Entkoppeln:** *Entkoppeln* sendet `UNPAIR` an das Gateway und löscht Kopplung, Schlüssel und Zigbee-Zuordnung im Controller sofort (auch wenn das Gateway nicht erreichbar ist). Am Gateway löscht `unpair all` alle Kopplungen.
-- **Konsole des Gateways:** `status` zeigt ID, Name, Schlüssel ja/nein, gekoppelte Controller, Kalibrierung und Bandzustand.
+- **Konsole des Gateways:** `status` zeigt ID, Name, Schlüssel ja/nein, gekoppelte Controller, Kalibrierung, gemerktes Band und Bandzustand.
+- **Band des Gateways:** Jedes Gateway steuert genau ein Band. Ohne gemerktes Band verbindet es sich mit dem stärksten passenden Band (ELK/MELK/LEDBLE) und merkt sich dessen BLE-Adresse dauerhaft, sobald die Verbindung steht (Log: „Band … dauerhaft gemerkt“). Danach verbindet es nur noch dieses Band, auch wenn andere passende Bänder stärker empfangen werden (Log: „gemerktes Band … gefunden, verbinde erneut“ bzw. „… nicht gefunden“). Bei mehreren Bändern das Gateway beim ersten Start dicht an sein Band legen. `band` zeigt das gemerkte Band, `band forget` vergisst es (mit Neustart), danach wird neu gewählt.
 
 ## Grenzen
 
