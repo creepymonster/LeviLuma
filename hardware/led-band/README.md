@@ -28,7 +28,7 @@ Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-G
 
 ## Befehle (Hex)
 
-9-Byte-Pakete, Start `7E`, Ende `EF`. Quelle: Legacy `include/LotusProtocol.h`; die Next-Kopie liegt in `next/gateway/components/light_core/include/LotusProtocol.h`.
+9-Byte-Pakete, Start `7E`, Ende `EF`. Quelle: Legacy `include/LotusProtocol.h`; die Next-Kopie liegt in `gateway/components/light_core/include/LotusProtocol.h`.
 
 | Befehl | Paket | Stand |
 |---|---|---|
@@ -55,7 +55,7 @@ Die Firmware rechnet Farben vor dem Senden mit der Kalibrierung um (`CalibCore.h
 
 ## Ansteuerung durch die Firmware
 
-Gilt für Legacy (`src/ble.cpp`) und Next (`BleScheduler`, `next/gateway/components/light_core/`).
+Gilt für Legacy (`src/ble.cpp`) und Next (`BleScheduler`, `gateway/components/light_core/`).
 
 - **Ein Befehl pro Zeitfenster**, nach jedem gesendeten Befehl 200 ms Pause. Helligkeit und Farbe nie im selben Schritt.
 - **Reihenfolge**: Musikmodus, Mikrofon-EQ, Helligkeit, Ein/Aus, Farbe.
@@ -75,7 +75,7 @@ Gilt für Legacy (`src/ble.cpp`) und Next (`BleScheduler`, `next/gateway/compone
 | Kalibrierung (Kanal-Gains) | `LEVI_CALIB_GR/GG/GB` | `CONFIG_LEVILUMA_CALIB_GAIN_R/G/B` (Promille) | 1,000 / 0,690 / 0,940 (FastLED TypicalSMD5050) |
 | Kalibrierung (10 Zielfarben) | `LEVI_CALIB_POINTS` | `CONFIG_LEVILUMA_CALIB_POINTS` | leer (Gains verwenden) |
 
-Details zur Kalibrierung: `next/docs/KALIBRIERUNG.md`.
+Details zur Kalibrierung: `docs/KALIBRIERUNG.md`.
 
 ## Verbindungsverhalten
 
@@ -84,7 +84,7 @@ Details zur Kalibrierung: `next/docs/KALIBRIERUNG.md`.
 - **Anfragen des Bands müssen beantwortet werden.** Bekommt das Band auf seine Anfrage keine Antwort, nimmt es nach dem ATT-Timeout von **30 s** keine Befehle mehr an. Die Funkverbindung bleibt dabei bestehen (RSSI lesbar, Band weiter unsichtbar).
   - Am Gerät beobachtet mit dem Next-Gateway, solange dessen NimBLE ohne GATT-Server gebaut war (`CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n`).
   - Ohne GATT-Server verwirft NimBLE solche Anfragen stumm (`ble_att.c`).
-  - Abhilfe im Gateway: Peripheral-Rolle und GATT-Server an (`next/gateway/sdkconfig.defaults`). **Am Gerät bestätigt** (Next-Gateway, Stand `f1df579`): Das Gateway beantwortet die MTU-Anfrage des Bands, alle Schreibvorgänge mit Bestätigung wurden über mehr als zwei Minuten Verbindung bestätigt (je etwa 70–350 ms), kein Hängen nach 30 s, keine Trennung.
+  - Abhilfe im Gateway: Peripheral-Rolle und GATT-Server an (`gateway/sdkconfig.defaults`). **Am Gerät bestätigt** (Next-Gateway, Stand `f1df579`): Das Gateway beantwortet die MTU-Anfrage des Bands, alle Schreibvorgänge mit Bestätigung wurden über mehr als zwei Minuten Verbindung bestätigt (je etwa 70–350 ms), kein Hängen nach 30 s, keine Trennung.
   - Legacy hat den GATT-Server eingebaut und hielt die Verbindung am Gerät über 40 s ohne Ausfall.
 - **Pairing:** Das Band verlangt keine Kopplung (kein Pairing-Ereignis im Next-Log).
 - **Verbindungsaufbau bei schwachem Signal:** Bei −97 dBm schlug ein Verbindungsversuch mit Timeout fehl (`Status 13`), der nächste Versuch nach 4 s bei −87 dBm klappte (am Gerät beobachtet).
@@ -99,7 +99,7 @@ Details zur Kalibrierung: `next/docs/KALIBRIERUNG.md`.
 
 | Was | Legacy (Branch `legacy`) | Next-Gateway |
 |---|---|---|
-| Pakete | `include/LotusProtocol.h` | `next/gateway/components/light_core/include/LotusProtocol.h` |
-| Senden, Reihenfolge, Pausen | `src/ble.cpp` (`bleTask`) | `light_core/src/ble_scheduler.cpp`, `next/gateway/main/ble_link.cpp` |
+| Pakete | `include/LotusProtocol.h` | `gateway/components/light_core/include/LotusProtocol.h` |
+| Senden, Reihenfolge, Pausen | `src/ble.cpp` (`bleTask`) | `light_core/src/ble_scheduler.cpp`, `gateway/main/ble_link.cpp` |
 | Bandauswahl | `bleNameMatches()` | `light_core/src/band_memory.cpp` |
 | Diagnose | – | Gateway-Konsole: `status`, `band`, `band forget`, `ble rsp on/off`, `ble off/on`; Log mit Hex-Paketen |

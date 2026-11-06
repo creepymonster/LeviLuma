@@ -2,23 +2,23 @@
   "folders": [
     {
       "name": "Next – RockBase C5",
-      "path": "next/controller"
+      "path": "controller"
     },
     {
       "name": "Next – XIAO S3",
-      "path": "next/gateway"
+      "path": "gateway"
     },
     {
       "name": "Next – XIAO S3 Diagnose",
-      "path": "next/debug"
+      "path": "debug"
     },
     {
       "name": "Next – Waveshare Round",
-      "path": "next/controller-round"
+      "path": "controller-round"
     },
     {
       "name": "Next – LVGL Simulator",
-      "path": "next/simulator"
+      "path": "simulator"
     }
   ],
   "extensions": {

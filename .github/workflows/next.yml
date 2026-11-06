@@ -6,11 +6,31 @@ on:
   push:
     branches: [main]
     paths:
-      - "next/**"
+      - "controller/**"
+      - "controller-round/**"
+      - "debug/**"
+      - "docs/**"
+      - "gateway/**"
+      - "screenshots/**"
+      - "shared/**"
+      - "simulator/**"
+      - "tests/**"
+      - "tools/**"
+      - "README.md"
       - ".github/workflows/next.yml"
   pull_request:
     paths:
-      - "next/**"
+      - "controller/**"
+      - "controller-round/**"
+      - "debug/**"
+      - "docs/**"
+      - "gateway/**"
+      - "screenshots/**"
+      - "shared/**"
+      - "simulator/**"
+      - "tests/**"
+      - "tools/**"
+      - "README.md"
       - ".github/workflows/next.yml"
   workflow_dispatch:
 
@@ -24,29 +44,29 @@ jobs:
       matrix:
         include:
           - name: Gateway (esp32s3)
-            dir: next/gateway
+            dir: gateway
             target: esp32s3
             args: ""
           - name: Controller ohne Zigbee (esp32c5)
-            dir: next/controller
+            dir: controller
             target: esp32c5
             args: ""
           - name: Round Controller (esp32s3)
-            dir: next/controller-round
+            dir: controller-round
             target: esp32s3
             args: ""
           - name: Diagnose ESP-NOW (esp32s3)
-            dir: next/debug
+            dir: debug
             target: esp32s3
             args: ""
             build: build
           - name: Diagnose ESP-NOW, alle Optionen (esp32s3)
-            dir: next/debug
+            dir: debug
             target: esp32s3
             args: '-B build-full -D SDKCONFIG=build-full/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.full"'
             build: build-full
           - name: Controller mit Zigbee (esp32c5)
-            dir: next/controller
+            dir: controller
             target: esp32c5
             args: '-B build-zigbee -D SDKCONFIG=build-zigbee/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.zigbee"'
     steps:
@@ -58,10 +78,10 @@ jobs:
           git config --global --add safe.directory '*'
           cd ${{ matrix.dir }}
           idf.py ${{ matrix.args }} set-target ${{ matrix.target }} build
-          if [ "${{ matrix.dir }}" = "next/controller-round" ]; then
-            python3 ${GITHUB_WORKSPACE}/next/tools/check_round_build.py build
+          if [ "${{ matrix.dir }}" = "controller-round" ]; then
+            python3 ${GITHUB_WORKSPACE}/tools/check_round_build.py build
           fi
           # Diagnosegeraet: passive Arbeitsweise pruefen (keine Sende-, Kopplungs-, NVS-Aufrufe; kein BLE/Zigbee/LVGL)
-          if [ "${{ matrix.dir }}" = "next/debug" ]; then
-            python3 ${GITHUB_WORKSPACE}/next/tools/check_debug_build.py ${{ matrix.build }}
+          if [ "${{ matrix.dir }}" = "debug" ]; then
+            python3 ${GITHUB_WORKSPACE}/tools/check_debug_build.py ${{ matrix.build }}
           fi
