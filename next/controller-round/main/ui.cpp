@@ -133,9 +133,11 @@ static bool lampOn() {
 
 static void toast(const char *t) {
   lv_obj_t *m = lv_msgbox_create(nullptr);
-  lv_msgbox_add_text(m, t);
+  lv_obj_t *text = lv_msgbox_add_text(m, t);
+  lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
   lv_msgbox_add_close_button(m);
   lv_obj_set_width(m, 180);
+  lv_obj_set_height(m, LV_SIZE_CONTENT); // sonst waechst der Inhalt bis zum unteren Rand der runden Anzeige
 }
 
 static void reportError(lvp_err_t e) {

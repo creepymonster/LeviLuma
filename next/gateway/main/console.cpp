@@ -1,5 +1,5 @@
 // Serielle Konsole des Gateways (115200 Baud, Zeilen mit Enter abschliessen).
-// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget
+// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +36,12 @@ static void printStatus() {
   printf("Kalibrierung %s, Rev. %u\n", gw.calib->custom() ? "gespeichert" : "Standard", (unsigned)gw.calib->revision());
   printBand();
   xSemaphoreGive(gw.lock);
+  LinkStats st = linkStats();
+  printf("ESP-NOW seit Start: %lu Rahmen empfangen (%lu verworfen), Unicast %lu bestaetigt / %lu ohne MAC-Bestaetigung\n", (unsigned long)st.rx,
+         (unsigned long)st.rxDropped, (unsigned long)st.txOk, (unsigned long)st.txFail);
+  if (gw.bleOff) {
+    printf("BLE abgeschaltet (Diagnose, \"ble on\" schaltet es wieder ein)\n");
+  }
   printf("Band %s, Power %d, Helligkeit %u%%, Farbe %u,%u,%u%s%s, Revision %lu, gesendet bis %lu\n", s.ble ? "verbunden" : "getrennt", s.power,
          s.brightness, s.r, s.g, s.b, s.raw ? " (roh)" : "", s.music ? ", Musik" : "", (unsigned long)s.revision, (unsigned long)s.sentRevision);
 }
@@ -104,12 +110,21 @@ static void handleLine(char *line) {
     printf("%s Neustart...\n", ok ? "Band vergessen." : "NVS-Fehler.");
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
+  } else if (!strcmp(line, "ble off") || !strcmp(line, "ble on")) {
+    // Diagnose: BLE ganz abschalten, um die Funk-Koexistenz mit ESP-NOW auszuschliessen (bleibt ueber Neustarts)
+    bool off = !strcmp(line, "ble off");
+    uint8_t v = 1;
+    bool ok = off ? gw.kv->setBlob("bleoff", &v, 1) : gw.kv->erase("bleoff");
+    printf("%s Neustart...\n", !ok ? "NVS-Fehler." : off ? "BLE abgeschaltet (Diagnose)." : "BLE eingeschaltet.");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
   } else if (line[0]) {
-    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget\n");
+    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on\n");
   }
 }
 
 static void consoleTask(void *) {
+  setvbuf(stdin, nullptr, _IONBF, 0); // ungepuffert: jedes Zeichen sofort, keine Zeilenpufferung in newlib
   char line[96];
   size_t n = 0;
 
@@ -117,6 +132,9 @@ static void consoleTask(void *) {
     int c = getchar();
 
     if (c == EOF) {
+      // Ohne Eingabe liefert getchar() EOF und setzt das EOF-Merkmal von stdin; newlib liest danach nicht mehr
+      // vom Port, bis es geloescht wird. Ohne clearerr() kaeme nach dem ersten leeren Abruf nie wieder ein Zeichen an.
+      clearerr(stdin);
       vTaskDelay(pdMS_TO_TICKS(50));
       continue;
     }

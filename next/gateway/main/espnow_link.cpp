@@ -23,6 +23,8 @@ struct RxFrame {
 };
 
 static QueueHandle_t rxQueue;
+// Zaehler: nur die WLAN-Callbacks schreiben (ein Task), andere Tasks lesen nur
+static volatile uint32_t statRx = 0, statRxDropped = 0, statTxOk = 0, statTxFail = 0;
 
 // Ergebnis der MAC-Bestaetigung eines Unicast-Rahmens (aus dem Sende-Callback, Ausgabe im Link-Task)
 struct TxResult {
@@ -36,6 +38,7 @@ static void onRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len
   if (!info || !data || len <= 0 || len > LVP_MAX_FRAME) {
     return;
   }
+  statRx = statRx + 1;
   RxFrame f;
   memcpy(f.src, info->src_addr, ESP_NOW_ETH_ALEN);
   f.broadcast = info->des_addr && memcmp(info->des_addr, BCAST, ESP_NOW_ETH_ALEN) == 0;
@@ -43,7 +46,7 @@ static void onRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len
   memcpy(f.data, data, len);
 
   if (xQueueSend(rxQueue, &f, 0) != pdTRUE) {
-    // Queue voll: Rahmen verwerfen, der Controller wiederholt
+    statRxDropped = statRxDropped + 1; // Queue voll: Rahmen verwerfen, der Controller wiederholt
   }
 }
 
@@ -55,6 +58,11 @@ static void onSent(const esp_now_send_info_t *info, esp_now_send_status_t status
   TxResult r;
   memcpy(r.dst, info->des_addr, ESP_NOW_ETH_ALEN);
   r.ok = status == ESP_NOW_SEND_SUCCESS;
+  if (r.ok) {
+    statTxOk = statTxOk + 1;
+  } else {
+    statTxFail = statTxFail + 1;
+  }
   xQueueSend(txQueue, &r, 0); // bei voller Queue verwerfen (nur Diagnose)
 }
 
@@ -203,6 +211,27 @@ static void addPairedPeers() {
   }
 }
 
+LinkStats linkStats() {
+  LinkStats st;
+  st.rx = statRx;
+  st.rxDropped = statRxDropped;
+  st.txOk = statTxOk;
+  st.txFail = statTxFail;
+  return st;
+}
+
+// Alle 30 s eine Zeile: zeigt auch dann etwas, wenn gar nichts empfangen wird (Funkdiagnose)
+static void logStatsPeriodically(uint32_t now) {
+  static uint32_t lastLog = 0;
+  if (now - lastLog < 30000) {
+    return;
+  }
+  lastLog = now;
+  LinkStats st = linkStats();
+  ESP_LOGI(TAG, "ESP-NOW seit Start: %lu Rahmen empfangen (%lu verworfen, Queue voll), Unicast gesendet: %lu bestaetigt, %lu ohne MAC-Bestaetigung",
+           (unsigned long)st.rx, (unsigned long)st.rxDropped, (unsigned long)st.txOk, (unsigned long)st.txFail);
+}
+
 static void linkTask(void *) {
   uint32_t lastBeacon = 0, lastNotify = 0;
   bool notifyPending = false;
@@ -249,6 +278,7 @@ static void linkTask(void *) {
       notifyPending = true;
     }
     uint32_t now = gwMillis();
+    logStatsPeriodically(now);
 
     // Zustandsmeldungen hoechstens alle 100 ms
     if (notifyPending && now - lastNotify >= 100) {

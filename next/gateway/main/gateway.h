@@ -35,7 +35,17 @@ struct GatewayContext {
   GatewayHandler *handler;
   uint8_t key[LEVI_KEY_LEN];
   bool hasKey;
+  bool bleOff; // Diagnose: BLE per Konsole abgeschaltet ("ble off", NVS), Band wird nicht verbunden
 };
+
+// Funkstatistik seit dem Start (Diagnose, Konsole "status" und periodisches Log)
+struct LinkStats {
+  uint32_t rx;        // vom ESP-NOW-Empfangs-Callback gelieferte Rahmen (alle Absender)
+  uint32_t rxDropped; // davon verworfen, weil die Empfangs-Queue voll war
+  uint32_t txOk;      // Unicast-Rahmen mit MAC-Bestaetigung
+  uint32_t txFail;    // Unicast-Rahmen ohne MAC-Bestaetigung
+};
+LinkStats linkStats();
 
 extern GatewayContext gw;
 
