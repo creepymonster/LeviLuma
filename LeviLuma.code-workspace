@@ -1,10 +1,6 @@
 {
   "folders": [
     {
-      "name": "Legacy – Waveshare S3",
-      "path": "legacy"
-    },
-    {
       "name": "Next – RockBase C5",
       "path": "next/controller"
     },
@@ -27,7 +23,6 @@
   ],
   "extensions": {
     "recommendations": [
-      "platformio.platformio-ide",
       "espressif.esp-idf-extension",
       "ms-vscode.cmake-tools",
       "ms-vscode.cpptools"

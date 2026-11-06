@@ -1,6 +1,6 @@
 # Farbkalibrierung
 
-Übernommen aus Legacy (`legacy/include/CalibCore.h`, `legacy/src/state.cpp`, Assistent aus `legacy/include/WebUi.h`). Die Datei `CalibCore.h` liegt unverändert (byte-gleich) in `next/gateway/components/light_core/include/`.
+Übernommen aus Legacy ([Branch `Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy): `include/CalibCore.h`, `src/state.cpp`, Assistent aus `include/WebUi.h`). Die Datei `CalibCore.h` liegt unverändert (byte-gleich) in `next/gateway/components/light_core/include/`.
 
 ## Modell (am Code geprüft)
 

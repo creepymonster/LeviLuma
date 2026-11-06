@@ -1,14 +1,17 @@
 # LeviLuma
 
-Steuerung von BLE-LED-Leisten der ELK-/Lotus-Lantern-Familie (`ELK-BLEDDM` u. a.) mit eigenem Touch-Display.
-Das Repository enthält vier unabhängige Firmware-Projekte:
+Steuerung von BLE-LED-Leisten der ELK-/Lotus-Lantern-Familie (`ELK-BLEDDM` u. a.): Je Leiste ein Gateway, bedient über einen Controller per ESP-NOW, optional über Zigbee (FRITZ!Box).
+
+Die ursprüngliche LeviLuma-Firmware (Waveshare ESP32-S3-Touch-LCD-1.28, steuert eine Leiste direkt per BLE, mit Web-UI) ist im Branch [`Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy) verfügbar.
+
+Das Repository enthält diese unabhängigen Firmware-Projekte:
 
 | Projekt | Ordner | Hardware | Framework | Rolle |
 |---|---|---|---|---|
-| **Legacy** | [`legacy/`](legacy/) | Waveshare ESP32-S3-Touch-LCD-1.28 (rund) | PlatformIO, Arduino | Bisheriges Gerät: Display + Web-UI, steuert eine Leiste direkt per BLE |
 | **Next Controller** | [`next/controller/`](next/controller/) | RockBase NM-CYD-C5 (ESP32-C5, 2,8″) | ESP-IDF 5.5 (nativ) | Zentrale mit LVGL-Oberfläche, steuert Gateways per ESP-NOW, optional Zigbee (FRITZ!Box) |
 | **Next Gateway** | [`next/gateway/`](next/gateway/) | Seeed XIAO ESP32S3 | ESP-IDF 5.5 (nativ) | Je Leiste ein Gateway: BLE zur Leiste, ESP-NOW zum Controller, autoritativer LightState und Kalibrierung |
 | **Next Round** (temporär) | [`next/controller-round/`](next/controller-round/) | Waveshare ESP32-S3-Touch-LCD-1.28 (rund) | ESP-IDF 5.5 (nativ) | Fernbedienung für genau ein Gateway per ESP-NOW, runde LVGL-Oberfläche; Alternative zum C5-Controller |
+| **Next Diagnose** | [`next/debug/`](next/debug/) | Seeed XIAO ESP32S3 | ESP-IDF 5.5 (nativ) | Passiver ESP-NOW-Mitschnitt für den seriellen Monitor |
 
 Die Oberflächen beider Next-Controller laufen auch am PC: [`next/simulator/`](next/simulator/) (Desktop-Simulator mit SDL2, simuliertes Gateway, kein ESP-IDF nötig).
 
@@ -17,30 +20,25 @@ Dokumentation zu Next: [`next/README.md`](next/README.md) und [`next/docs/`](nex
 
 ```
 LeviLuma/
-├── LeviLuma.code-workspace   VS-Code-Workspace (alle drei Projekte)
-├── legacy/                   Waveshare-Projekt (PlatformIO), unverändert verschoben
+├── LeviLuma.code-workspace   VS-Code-Workspace (alle Next-Projekte)
 ├── next/
 │   ├── controller/           RockBase NM-CYD-C5 (ESP-IDF, LVGL, optional Zigbee)
 │   ├── gateway/              XIAO ESP32S3 (ESP-IDF, NimBLE, ESP-NOW)
 │   ├── controller-round/     Waveshare 1,28″ rund (ESP-IDF, LVGL, ESP-NOW), temporär
+│   ├── debug/                XIAO ESP32S3, passiver ESP-NOW-Mitschnitt
+│   ├── simulator/            Desktop-Simulator der Controller-Oberflächen (SDL2)
 │   ├── shared/protocol/      gemeinsames ESP-NOW-Protokoll
 │   ├── shared/common/        NVS-Speicher, Schlüsselformat
 │   ├── tests/                Host-Tests (Protokoll, Gateway, Controller)
 │   ├── tools/                Abhängigkeiten holen, UI-Vorschau
 │   └── docs/                 Protokoll, Kopplung, Kalibrierung, Zigbee, Build/Flash
-└── .github/workflows/        CI (Legacy-Build, Legacy-Screenshots, Next-Firmware, Tests)
+├── hardware/boards/          3D-Modelle der Boards
+└── .github/workflows/        CI (Next-Firmware, Host-Tests)
 ```
 
 ## Schnellstart
 
-**VS Code:** `LeviLuma.code-workspace` öffnen. Empfohlen werden die Erweiterungen *PlatformIO IDE* (für Legacy) und *ESP-IDF* (für Next). Jeder der vier Workspace-Ordner ist ein eigenständiges Projekt.
-
-**Legacy (PlatformIO):**
-```sh
-cp legacy/include/Config.example.h legacy/include/Config.h   # WLAN-Daten eintragen
-pio run -d legacy                 # bauen
-pio run -d legacy -t upload       # flashen
-```
+**VS Code:** `LeviLuma.code-workspace` öffnen. Empfohlen wird die Erweiterung *ESP-IDF*. Jeder Workspace-Ordner ist ein eigenständiges Projekt.
 
 **Next (ESP-IDF 5.5):**
 ```sh

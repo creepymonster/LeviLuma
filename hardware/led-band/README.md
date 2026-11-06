@@ -1,8 +1,8 @@
 # LED-Band (ELK / Lotus Lantern)
 
-Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-Gateway steuern. Jede Angabe nennt ihre Herkunft.
+Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-Gateway steuern. Jede Angabe nennt ihre Herkunft. Legacy liegt im Branch [`Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy); Legacy-Pfade unten sind relativ zu dessen Root.
 
-- **„am Gerät getestet (Legacy)“**: im Legacy-Projekt am Band ausprobiert (laut `legacy/README.md` und `LotusProtocol.h`).
+- **„am Gerät getestet (Legacy)“**: im Legacy-Projekt am Band ausprobiert (laut `README.md` und `include/LotusProtocol.h` im Branch `Legacy`).
 - **„am Gerät beobachtet“**: in Logs des Entwicklers mit dem Band `ELK-BLEDDM 96` gesehen. Das ist kein systematischer Test aller Bänder der Familie.
 - **„ungetestet“**: nur aus Vorlagen oder der Original-App übernommen.
 
@@ -10,7 +10,7 @@ Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-G
 
 | Merkmal | Wert | Herkunft |
 |---|---|---|
-| Gerätenamen | beginnen mit `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK` oder `LEDBLE` | Legacy `bleNameMatches()` (`legacy/src/ble.cpp`), Next `BandMemory::nameMatches()` |
+| Gerätenamen | beginnen mit `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK` oder `LEDBLE` | Legacy `bleNameMatches()` (`src/ble.cpp`), Next `BandMemory::nameMatches()` |
 | Beispiel | `ELK-BLEDDM 96`, Adresse `be:68:78:27:cf:02` (öffentlich) | am Gerät beobachtet |
 | Name in der Werbung | oft erst in der Scan-Antwort, daher aktiver Scan | Legacy und Next scannen aktiv; ohne Antenne fehlten am XIAO die Namen |
 | Sichtbarkeit | Solange ein Gerät verbunden ist, wirbt das Band nicht (verschwindet z. B. aus LightBlue) | am Gerät beobachtet |
@@ -28,7 +28,7 @@ Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-G
 
 ## Befehle (Hex)
 
-9-Byte-Pakete, Start `7E`, Ende `EF`. Quelle: `legacy/include/LotusProtocol.h`; die Next-Kopie liegt in `next/gateway/components/light_core/include/LotusProtocol.h`.
+9-Byte-Pakete, Start `7E`, Ende `EF`. Quelle: Legacy `include/LotusProtocol.h`; die Next-Kopie liegt in `next/gateway/components/light_core/include/LotusProtocol.h`.
 
 | Befehl | Paket | Stand |
 |---|---|---|
@@ -55,7 +55,7 @@ Die Firmware rechnet Farben vor dem Senden mit der Kalibrierung um (`CalibCore.h
 
 ## Ansteuerung durch die Firmware
 
-Gilt für Legacy (`legacy/src/ble.cpp`) und Next (`BleScheduler`, `next/gateway/components/light_core/`).
+Gilt für Legacy (`src/ble.cpp`) und Next (`BleScheduler`, `next/gateway/components/light_core/`).
 
 - **Ein Befehl pro Zeitfenster**, nach jedem gesendeten Befehl 200 ms Pause. Helligkeit und Farbe nie im selben Schritt.
 - **Reihenfolge**: Musikmodus, Mikrofon-EQ, Helligkeit, Ein/Aus, Farbe.
@@ -96,9 +96,9 @@ Details zur Kalibrierung: `next/docs/KALIBRIERUNG.md`.
 
 ## Codestellen
 
-| Was | Legacy | Next-Gateway |
+| Was | Legacy (Branch `Legacy`) | Next-Gateway |
 |---|---|---|
-| Pakete | `legacy/include/LotusProtocol.h` | `next/gateway/components/light_core/include/LotusProtocol.h` |
-| Senden, Reihenfolge, Pausen | `legacy/src/ble.cpp` (`bleTask`) | `light_core/src/ble_scheduler.cpp`, `next/gateway/main/ble_link.cpp` |
+| Pakete | `include/LotusProtocol.h` | `next/gateway/components/light_core/include/LotusProtocol.h` |
+| Senden, Reihenfolge, Pausen | `src/ble.cpp` (`bleTask`) | `light_core/src/ble_scheduler.cpp`, `next/gateway/main/ble_link.cpp` |
 | Bandauswahl | `bleNameMatches()` | `light_core/src/band_memory.cpp` |
 | Diagnose | – | Gateway-Konsole: `status`, `band`, `band forget`, `ble rsp on/off`, `ble off/on`; Log mit Hex-Paketen |
