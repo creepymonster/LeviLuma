@@ -1,8 +1,8 @@
 # LED-Band (ELK / Lotus Lantern)
 
-Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-Gateway steuern. Jede Angabe nennt ihre Herkunft. Legacy liegt im Branch [`Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy); Legacy-Pfade unten sind relativ zu dessen Root.
+Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-Gateway steuern. Jede Angabe nennt ihre Herkunft. Legacy liegt im Branch [`legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy); Legacy-Pfade unten sind relativ zu dessen Root.
 
-- **„am Gerät getestet (Legacy)“**: im Legacy-Projekt am Band ausprobiert (laut `README.md` und `include/LotusProtocol.h` im Branch `Legacy`).
+- **„am Gerät getestet (Legacy)“**: im Legacy-Projekt am Band ausprobiert (laut `README.md` und `include/LotusProtocol.h` im Branch `legacy`).
 - **„am Gerät beobachtet“**: in Logs des Entwicklers mit dem Band `ELK-BLEDDM 96` gesehen. Das ist kein systematischer Test aller Bänder der Familie.
 - **„ungetestet“**: nur aus Vorlagen oder der Original-App übernommen.
 
@@ -97,7 +97,7 @@ Details zur Kalibrierung: `next/docs/KALIBRIERUNG.md`.
 
 ## Codestellen
 
-| Was | Legacy (Branch `Legacy`) | Next-Gateway |
+| Was | Legacy (Branch `legacy`) | Next-Gateway |
 |---|---|---|
 | Pakete | `include/LotusProtocol.h` | `next/gateway/components/light_core/include/LotusProtocol.h` |
 | Senden, Reihenfolge, Pausen | `src/ble.cpp` (`bleTask`) | `light_core/src/ble_scheduler.cpp`, `next/gateway/main/ble_link.cpp` |

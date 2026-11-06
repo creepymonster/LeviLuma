@@ -2,7 +2,7 @@
 
 Steuerung von BLE-LED-Leisten der ELK-/Lotus-Lantern-Familie (`ELK-BLEDDM` u. a.): Je Leiste ein Gateway, bedient über einen Controller per ESP-NOW, optional über Zigbee (FRITZ!Box).
 
-Die ursprüngliche LeviLuma-Firmware (Waveshare ESP32-S3-Touch-LCD-1.28, steuert eine Leiste direkt per BLE, mit Web-UI) ist im Branch [`Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy) verfügbar.
+Die ursprüngliche LeviLuma-Firmware (Waveshare ESP32-S3-Touch-LCD-1.28, steuert eine Leiste direkt per BLE, mit Web-UI) ist im Branch [`legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy) verfügbar.
 
 Das Repository enthält diese unabhängigen Firmware-Projekte:
 
