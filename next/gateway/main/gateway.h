@@ -36,7 +36,7 @@ struct GatewayContext {
   uint8_t key[LEVI_KEY_LEN];
   bool hasKey;
   bool bleOff; // Diagnose: BLE per Konsole abgeschaltet ("ble off", NVS), Band wird nicht verbunden
-  volatile bool bleWriteRsp; // Diagnose: Schreiben MIT Bestaetigung des Bands ("ble rsp on", NVS), Standard aus wie Legacy
+  volatile bool bleWriteRsp; // Schreiben mit Bestaetigung des Bands (Standard an; "ble rsp off" schreibt ohne wie Legacy, NVS)
 };
 
 // Funkstatistik seit dem Start (Diagnose, Konsole "status" und periodisches Log)

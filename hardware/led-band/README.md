@@ -23,7 +23,7 @@ Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-G
 | Service | `0xFFF0` | Legacy, Next |
 | Characteristic | `0xFFF3`, Handle 3 | am Gerät beobachtet (Next-Log) |
 | Eigenschaften von `0xFFF3` | `0x0E`: Read, Write, Write without Response | am Gerät beobachtet (Next-Log) |
-| Schreibart | Legacy und Next schreiben standardmäßig **ohne Antwort**; „Write“ mit Bestätigung funktioniert ebenfalls (Bestätigung nach ca. 60–270 ms) | am Gerät beobachtet (Next-Konsole `ble rsp on`) |
+| Schreibart | Legacy schreibt **ohne Antwort**. Das Next-Gateway schreibt standardmäßig **mit Bestätigung** („Write“, Bestätigung nach ca. 60–350 ms), mit `ble rsp off` ohne Antwort wie Legacy | am Gerät beobachtet (Next-Gateway mit Bestätigung, über mehr als zwei Minuten ohne Ausfall) |
 | Wartezeit | etwa 1 s nach dem Verbinden, bevor die Dienste gelesen werden | Legacy `ble.cpp`, in Next übernommen |
 
 ## Befehle (Hex)

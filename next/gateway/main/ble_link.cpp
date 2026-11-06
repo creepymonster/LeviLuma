@@ -311,6 +311,9 @@ static bool scanAndConnect() {
     }
     return false;
   }
+  if (!(chrProps & BLE_GATT_CHR_PROP_WRITE)) {
+    ESP_LOGW(TAG, "BLE: Band bietet kein Schreiben mit Bestaetigung an, es wird ohne Antwort geschrieben");
+  }
   ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden (Handle %u, Eigenschaften 0x%02X: %s%s%s%s)", chrHandle, chrProps,
            (chrProps & BLE_GATT_CHR_PROP_WRITE_NO_RSP) ? "Write-without-response " : "", (chrProps & BLE_GATT_CHR_PROP_WRITE) ? "Write " : "",
            (chrProps & BLE_GATT_CHR_PROP_READ) ? "Read " : "", (chrProps & BLE_GATT_CHR_PROP_NOTIFY) ? "Notify" : "");
@@ -408,7 +411,7 @@ static void bleTask(void *) {
         }
       }
     } else if (ready) {
-      // Diagnose alle 10 s: lebt die Verbindung noch (RSSI lesbar) und mit welchen Parametern?
+      // Diagnose alle 10 s (Debug-Stufe): lebt die Verbindung noch (RSSI lesbar) und mit welchen Parametern?
       if (gwMillis() - lastLinkLog >= 10000) {
         lastLinkLog = gwMillis();
         int8_t rssi = 0;
@@ -416,7 +419,7 @@ static void bleTask(void *) {
         int rr = ble_gap_conn_rssi(connHandle, &rssi);
         int rf = ble_gap_conn_find(connHandle, &d);
         if (rr == 0 && rf == 0) {
-          ESP_LOGI(TAG, "BLE-Verbindung: RSSI %d dBm, Intervall %.2f ms, Latenz %u, Timeout %u ms", rssi, d.conn_itvl * 1.25f, d.conn_latency,
+          ESP_LOGD(TAG, "BLE-Verbindung: RSSI %d dBm, Intervall %.2f ms, Latenz %u, Timeout %u ms", rssi, d.conn_itvl * 1.25f, d.conn_latency,
                    d.supervision_timeout * 10u);
         } else {
           ESP_LOGW(TAG, "BLE-Verbindung nicht abfragbar (RSSI rc %d, Verbindung rc %d)", rr, rf);
@@ -429,7 +432,7 @@ static void bleTask(void *) {
       if (writePending) {
         // auf die Bestaetigung des vorigen Pakets warten (NimBLE begrenzt offene GATT-Vorgaenge)
       } else if (sched.next(s, cal, now, st)) {
-        // Standard wie Legacy: ohne Antwort. Diagnose ("ble rsp on"): mit Bestaetigung, sofern das Band "Write" anbietet.
+        // Standard: mit Bestaetigung, sofern das Band "Write" anbietet; sonst bzw. mit "ble rsp off" ohne Antwort wie Legacy.
         bool withRsp = gw.bleWriteRsp && (chrProps & BLE_GATT_CHR_PROP_WRITE);
         if (withRsp) {
           writePending = true;
@@ -438,9 +441,6 @@ static void bleTask(void *) {
                          : ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
         if (rc != 0) {
           writePending = false;
-        }
-        if (gw.bleWriteRsp && !withRsp) {
-          ESP_LOGW(TAG, "BLE: Band bietet kein Schreiben mit Bestaetigung an, sende ohne");
         }
         bool ok = rc == 0;
         sched.commit(st, ok, s, now);

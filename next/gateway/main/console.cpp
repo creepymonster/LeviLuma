@@ -111,10 +111,10 @@ static void handleLine(char *line) {
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
   } else if (!strcmp(line, "ble rsp on") || !strcmp(line, "ble rsp off")) {
-    // Diagnose: Pakete mit Schreibbestaetigung des Bands senden (sofort wirksam, bleibt ueber Neustarts)
+    // Schreiben mit (Standard) oder ohne Bestaetigung des Bands (wie Legacy); sofort wirksam, bleibt ueber Neustarts
     bool on = !strcmp(line, "ble rsp on");
-    uint8_t v = 1;
-    bool ok = on ? gw.kv->setBlob("blewrsp", &v, 1) : gw.kv->erase("blewrsp");
+    uint8_t v = on ? 1 : 0;
+    bool ok = gw.kv->setBlob("blewrsp", &v, 1);
     gw.bleWriteRsp = on;
     printf("Schreiben %s Bestaetigung%s\n", on ? "mit" : "ohne", ok ? "" : " (nur bis zum Neustart, NVS-Fehler)");
   } else if (!strcmp(line, "ble off") || !strcmp(line, "ble on")) {
