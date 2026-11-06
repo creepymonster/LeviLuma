@@ -1,5 +1,5 @@
 // Serielle Konsole des Gateways (115200 Baud, Zeilen mit Enter abschliessen).
-// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on
+// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on | ble rsp on | ble rsp off
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include <string.h>
@@ -110,6 +110,13 @@ static void handleLine(char *line) {
     printf("%s Neustart...\n", ok ? "Band vergessen." : "NVS-Fehler.");
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
+  } else if (!strcmp(line, "ble rsp on") || !strcmp(line, "ble rsp off")) {
+    // Diagnose: Pakete mit Schreibbestaetigung des Bands senden (sofort wirksam, bleibt ueber Neustarts)
+    bool on = !strcmp(line, "ble rsp on");
+    uint8_t v = 1;
+    bool ok = on ? gw.kv->setBlob("blewrsp", &v, 1) : gw.kv->erase("blewrsp");
+    gw.bleWriteRsp = on;
+    printf("Schreiben %s Bestaetigung%s\n", on ? "mit" : "ohne", ok ? "" : " (nur bis zum Neustart, NVS-Fehler)");
   } else if (!strcmp(line, "ble off") || !strcmp(line, "ble on")) {
     // Diagnose: BLE ganz abschalten, um die Funk-Koexistenz mit ESP-NOW auszuschliessen (bleibt ueber Neustarts)
     bool off = !strcmp(line, "ble off");
@@ -119,7 +126,7 @@ static void handleLine(char *line) {
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
   } else if (line[0]) {
-    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on\n");
+    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on | ble rsp on | ble rsp off\n");
   }
 }
 

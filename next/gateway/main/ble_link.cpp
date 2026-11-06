@@ -271,7 +271,9 @@ static bool scanAndConnect() {
     }
     return false;
   }
-  ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");
+  ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden (Handle %u, Eigenschaften 0x%02X: %s%s%s%s)", chrHandle, chrProps,
+           (chrProps & BLE_GATT_CHR_PROP_WRITE_NO_RSP) ? "Write-without-response " : "", (chrProps & BLE_GATT_CHR_PROP_WRITE) ? "Write " : "",
+           (chrProps & BLE_GATT_CHR_PROP_READ) ? "Read " : "", (chrProps & BLE_GATT_CHR_PROP_NOTIFY) ? "Notify" : "");
 
   // Erste erfolgreiche Verbindung: Band dauerhaft merken (erst nach gefundenem Service, nicht schon beim Scan)
   if (!remembered) {
@@ -304,6 +306,18 @@ static const char *cmdName(BleScheduler::Cmd c) {
   default:
     return "-";
   }
+}
+
+// Diagnose: Ergebnis eines Schreibens mit Bestaetigung (laeuft im NimBLE-Host-Task)
+static int onWriteRsp(uint16_t, const ble_gatt_error *err, ble_gatt_attr *, void *arg) {
+  uint32_t sentAt = (uint32_t)(uintptr_t)arg;
+  uint32_t ms = gwMillis() - sentAt;
+  if (err && err->status == 0) {
+    ESP_LOGI(TAG, "BLE: Band hat Schreiben bestaetigt (%lu ms)", (unsigned long)ms);
+  } else {
+    ESP_LOGW(TAG, "BLE: Band hat Schreiben NICHT bestaetigt (Status %u nach %lu ms)", err ? err->status : 0xFFFF, (unsigned long)ms);
+  }
+  return 0;
 }
 
 // Paket als Hex ohne Leerzeichen (z. B. 7E0004010000000000EF), direkt in LightBlue o. ae. einfuegbar
@@ -371,7 +385,13 @@ static void bleTask(void *) {
       uint32_t now = gwMillis();
 
       if (sched.next(s, cal, now, st)) {
-        int rc = ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
+        // Standard wie Legacy: ohne Antwort. Diagnose ("ble rsp on"): mit Bestaetigung, sofern das Band "Write" anbietet.
+        bool withRsp = gw.bleWriteRsp && (chrProps & BLE_GATT_CHR_PROP_WRITE);
+        int rc = withRsp ? ble_gattc_write_flat(connHandle, chrHandle, st.packet, sizeof(st.packet), onWriteRsp, (void *)(uintptr_t)now)
+                         : ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
+        if (gw.bleWriteRsp && !withRsp) {
+          ESP_LOGW(TAG, "BLE: Band bietet kein Schreiben mit Bestaetigung an, sende ohne");
+        }
         bool ok = rc == 0;
         sched.commit(st, ok, s, now);
         char hex[2 * sizeof(st.packet) + 1];

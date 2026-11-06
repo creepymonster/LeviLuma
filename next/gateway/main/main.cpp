@@ -175,6 +175,12 @@ extern "C" void app_main(void) {
   uint8_t bleOff = 0;
   size_t bl = sizeof(bleOff);
   gw.bleOff = gw.kv->getBlob("bleoff", &bleOff, &bl) && bl == 1 && bleOff == 1;
+  uint8_t wr = 0;
+  size_t wl = sizeof(wr);
+  gw.bleWriteRsp = gw.kv->getBlob("blewrsp", &wr, &wl) && wl == 1 && wr == 1;
+  if (gw.bleWriteRsp) {
+    ESP_LOGW(TAG, "BLE: Schreiben mit Bestaetigung aktiv (Diagnose, \"ble rsp off\" schaltet zurueck)");
+  }
   statusIoStart();
   linkStart();
   if (gw.bleOff) {
