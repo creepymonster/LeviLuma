@@ -1,6 +1,6 @@
 # AGENTS.md – Hinweise für KI-Agenten
 
-Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten: eine Firmware für einen ESP32-S3 mit rundem Touch-Display, die einen BLE-LED-Strip direkt steuert (PlatformIO, Arduino). Das Projekt liegt im Repository-Root (Branch `Legacy`).
+Dieses Dokument beschreibt das Projekt LeviLuma für KI-Assistenten, die daran arbeiten: eine Firmware für einen ESP32-S3 mit rundem Touch-Display, die einen BLE-LED-Strip direkt steuert (PlatformIO, Arduino). Das Projekt liegt im Repository-Root (Branch `legacy`).
 
 Die `README.md` enthält die Nutzerdokumentation, dieses Dokument enthält das, was man für sicheres Arbeiten im Code wissen muss.
 
@@ -132,14 +132,14 @@ Regeln: Keine Farben für Bedienelemente (Pille, Regler, Text, Hintergrund) übe
 ## Screenshots
 - `tools/screenshots/render.sh`: LCD-UI per Harness (LVGL 9.6.0 mit Theme, Framebuffer), Aufruf `render.sh <repo> <lvgl-src> <theme-src> <out-root>`, Ausgabe `<out-root>/<B>x<H>/`, Dateien `01_off_disconnected`, `02_on_center`, `03_color`, `04_brightness`.
 - `tools/screenshots/webui.py`: Web-UI per Playwright (Chromium) mit gemockter API, Ausgabe `screenshots/web/`: `desktop_1280x800.png`, `mobile_390x844.png`.
-- Beides läuft in `.github/workflows/screenshots.yml` bei Änderungen an `src`, `include` und `tools/screenshots` (Branch `Legacy`). Dateinamen sind englisch.
+- Beides läuft in `.github/workflows/screenshots.yml` bei Änderungen an `src`, `include` und `tools/screenshots` (Branch `legacy`). Dateinamen sind englisch.
 - Die Harness-Szenen sind nicht das Gerät. Touch und Farben auf dem Display können abweichen.
 
 ## Git-Konventionen
 - Commit-Nachrichten auf Deutsch, Betreff im Imperativ oder als kurze Beschreibung, Details im Body.
 - Commits, die ein KI-Agent erstellt, enden mit den Zeilen `Co-Authored-By` und `Claude-Session`, wie in der laufenden Sitzung vorgegeben.
 - Vor dem Push `git pull --rebase`. Kein Force-Push.
-- Änderungen werden in einem eigenen Branch committet und gepusht, **nie direkt auf `Legacy`**. Liegt der Arbeitsstand auf `Legacy`, zuerst einen Branch anlegen (`git switch -c <name>`), dann committen.
+- Änderungen werden in einem eigenen Branch committet und gepusht, **nie direkt auf `legacy`**. Liegt der Arbeitsstand auf `legacy`, zuerst einen Branch anlegen (`git switch -c <name>`), dann committen.
 - Pull Requests nur auf ausdrücklichen Wunsch des Entwicklers erstellen; gemergt wird nicht durch den Agenten.
 
 ## Offene Punkte
