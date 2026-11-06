@@ -20,12 +20,12 @@
 
 | | |
 |---|---|
-| Getesteter Commit | `7cded5a361aae2c9aae6420f02d0ded4512195c9` |
+| Getesteter Commit | `c3d2b5620b7d35d803952dd2a664d9be53ab2de3` |
 | Ref | `refs/heads/main` (Auslöser: push) |
-| Testlauf gestartet | 2026-11-06 23:01:16 UTC (2026-11-07 00:01:16 CET) |
-| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/42308904256 |
+| Testlauf gestartet | 2026-11-06 23:23:39 UTC (2026-11-07 00:23:39 CET) |
+| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/42311567053 |
 
-Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `next/tests/README.md` erfolgt in einem **separaten Folge-Commit** (Bot, `[skip ci]`), der nur diese Datei ändert; der Quellstand ist deshalb der genannte Commit, nicht der Berichts-Commit.
+Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `tests/README.md` erfolgt in einem **separaten Folge-Commit** (Bot, `[skip ci]`), der nur diese Datei ändert; der Quellstand ist deshalb der genannte Commit, nicht der Berichts-Commit.
 
 ## Testumgebung und Prüfverfahren
 
@@ -148,7 +148,7 @@ _Ein-Gateway-Regel und Sendedrossel des runden Controllers._
 
 ### Diagnose (22/22 bestanden)
 
-_ESP-NOW-Diagnosegeraet (next/debug): Rahmenauswertung, LeviLuma-Dekodierung aller Nachrichtentypen, Ausgabe, Filter, Doppelerkennung, Monitorbefehle, Fuzzing. Alle Rahmen sind synthetisch._
+_ESP-NOW-Diagnosegeraet (debug/): Rahmenauswertung, LeviLuma-Dekodierung aller Nachrichtentypen, Ausgabe, Filter, Doppelerkennung, Monitorbefehle, Fuzzing. Alle Rahmen sind synthetisch._
 
 | Test | Ergebnis | Assertions | Abdeckung |
 |---|---|---|---|
@@ -185,16 +185,16 @@ Gebaut von `.github/workflows/next.yml` (ESP-IDF in Container). Der Status wird 
 
 | Job | Status | Ergebnis |
 |---|---|---|
-| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
-| ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
+| ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
 | ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
+| ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
+| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
 | ESP-IDF Diagnose ESP-NOW, alle Optionen (esp32s3) | completed | erfolgreich |
 | ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
-| ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
 
 ## Hardwaretests
 
-**Nicht ausgeführt.** Weder Gateway, Controller noch Diagnosegerät werden in der CI auf Hardware geflasht oder getestet; kein Punkt hier gilt als bestanden. Offene Hardwaretests laut `next/README.md` (Abschnitt „Offene Hardwaretests“, automatisch übernommen):
+**Nicht ausgeführt.** Weder Gateway, Controller noch Diagnosegerät werden in der CI auf Hardware geflasht oder getestet; kein Punkt hier gilt als bestanden. Offene Hardwaretests laut `README.md` (Abschnitt „Offene Hardwaretests“, automatisch übernommen):
 
 1. Display: Ausrichtung/Spiegelung (`LEVILUMA_LCD_ROT_*`), Farben (RGB/BGR, Inversion), SPI-Takt.
 2. Touch: Rohbereiche, Drei-Punkt-Kalibrierung, gemeinsamer SPI-Bus mit dem Display unter Last.
