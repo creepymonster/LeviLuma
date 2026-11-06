@@ -17,6 +17,13 @@
 
 static const char *TAG = "levi-gw-ble";
 
+// Ohne GATT-Server beantwortet NimBLE Anfragen des Bands nicht (ble_att.c verwirft sie stumm); das Band nimmt dann
+// 30 s nach dem Verbinden keine Befehle mehr an. Bestehende sdkconfig-Dateien uebernehmen sdkconfig.defaults nicht,
+// deshalb hier ausdruecklich pruefen.
+#if !CONFIG_BT_NIMBLE_GATT_SERVER
+#error "CONFIG_BT_NIMBLE_GATT_SERVER muss an sein (menuconfig: Bluetooth > NimBLE Options > Roles and Profiles: Peripheral und GATT Server). Siehe sdkconfig.defaults."
+#endif
+
 extern "C" void ble_store_config_init(void); // NimBLE-Schluesselspeicher (ESP-IDF, ohne eigenen Header wie in den Beispielen)
 
 static SemaphoreHandle_t evSem; // ein Ergebnis pro Schritt (Scan, Verbindung, Suche)

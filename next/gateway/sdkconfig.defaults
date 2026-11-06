@@ -13,7 +13,11 @@ CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
 CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
-CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+# Peripheral-Rolle nur, weil davon der GATT-Server abhaengt (BT_NIMBLE_GATT_SERVER). Ohne ihn verwirft NimBLE
+# Anfragen des Bands (z. B. dessen MTU-Anfrage) ohne Antwort; das Band legt nach dem ATT-Timeout von 30 s seinen
+# Protokollkanal still und nimmt keine Befehle mehr an (am Geraet beobachtet). Das Gateway wirbt nicht (Broadcaster aus).
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_GATT_SERVER=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
 CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
 CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y
