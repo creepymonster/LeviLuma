@@ -1,9 +1,0 @@
-# Zusatz fuer den Build mit Zigbee (FRITZ!Box 5690 Pro als Koordinator).
-# Verwendung: -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.zigbee"
-CONFIG_LEVILUMA_ZIGBEE_ENABLED=y
-CONFIG_ZB_ENABLED=y
-# Endgeraet (ZED): von Espressif fuer gleichzeitigen WLAN-Betrieb (hier ESP-NOW) empfohlen, siehe Doku
-CONFIG_ZB_ZED=y
-CONFIG_ZB_RADIO_NATIVE=y
-# Koexistenz WLAN (ESP-NOW) und IEEE 802.15.4
-CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y

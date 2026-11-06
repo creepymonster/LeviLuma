@@ -1,7 +1,0 @@
-# Testvariante: alle optionalen Funktionen aktiv (Kanalsuchlauf, zweiter Empfangsweg, voller Rohrahmen).
-# Dient der CI, um auch die Kconfig-abhaengigen Codepfade zu uebersetzen. Nicht fuer den normalen Betrieb gedacht
-# (der Suchlauf verpasst Nachrichten auf anderen Kanaelen). Bauen: siehe README, Abschnitt "Alle Optionen".
-CONFIG_LEVILUMA_DEBUG_SCAN_ENABLE=y
-CONFIG_LEVILUMA_DEBUG_SCAN_AT_BOOT=y
-CONFIG_LEVILUMA_DEBUG_ESPNOW_CB=y
-CONFIG_LEVILUMA_DEBUG_FULL_FRAME=y

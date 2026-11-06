@@ -61,20 +61,5 @@ tmbootpicker.efi
 # Custom
 .pio/
 .vscode/
-# Ausnahme: Build-/Start-/Debug-Konfiguration des Desktop-Simulators (keine nutzerspezifischen Pfade)
-!next/simulator/.vscode/
 # Echte Konfiguration mit WLAN-Zugangsdaten
 include/Config.h
-
-# Next (ESP-IDF): Build-Ausgaben, erzeugte sdkconfig, heruntergeladene Komponenten
-next/**/build/
-next/**/build-*/
-next/**/sdkconfig
-next/**/sdkconfig.old
-next/**/managed_components/
-next/**/dependencies.lock
-next/shared/protocol/test/build/
-
-# Controller: per Git geholte externe Komponenten (LVGL, Theme, Zigbee-Bibliothek)
-next/controller/third_party/
-next/controller-round/third_party/
