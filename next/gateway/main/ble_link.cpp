@@ -33,6 +33,7 @@ static bool scanHasTarget = false; // gemerktes Band: bekommt auch bei voller Li
 static ble_addr_t scanTarget;
 
 static volatile uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE;
+static volatile bool writePending = false; // Schreiben mit Bestaetigung unterwegs: kein weiteres starten
 static volatile int connStatus = -1;
 static uint16_t svcStart = 0, svcEnd = 0, chrHandle = 0;
 static uint8_t chrProps = 0;
@@ -95,19 +96,37 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
     connStatus = ev->connect.status;
     if (ev->connect.status == 0) {
       connHandle = ev->connect.conn_handle;
+      // Wie NimBLE-Arduino 1.4.3 (Legacy, NimBLEClient::handleGapEvent): MTU-Austausch direkt nach dem Verbinden.
+      int rc = ble_gattc_exchange_mtu(ev->connect.conn_handle, nullptr, nullptr);
+      if (rc != 0) {
+        ESP_LOGW(TAG, "BLE: MTU-Austausch nicht gestartet (%d)", rc);
+      }
     }
     xSemaphoreGive(evSem);
     break;
   // Diagnose: Wuensche des Bands zu den Verbindungsparametern und deren Ergebnis (laeuft im NimBLE-Host-Task)
+  // Wunsch des Bands nach neuen Verbindungsparametern. Wie NimBLE-Arduino 1.4.3 (Legacy): annehmen, beim
+  // Link-Layer-Verfahren aber mit den eigenen Standardparametern antworten (30-50 ms, Latenz 0, Timeout 2,56 s)
+  // statt die Werte des Bands zu uebernehmen (am Geraet: 22,5-47,5 ms, Timeout 1 s). Laeuft im NimBLE-Host-Task.
   case BLE_GAP_EVENT_CONN_UPDATE_REQ:
   case BLE_GAP_EVENT_L2CAP_UPDATE_REQ: {
     const ble_gap_upd_params *p = ev->conn_update_req.peer_params;
-    if (p) {
-      ESP_LOGI(TAG, "BLE: Band moechte neue Verbindungsparameter (%s): Intervall %.2f..%.2f ms, Latenz %u, Timeout %u ms - angenommen",
-               ev->type == BLE_GAP_EVENT_L2CAP_UPDATE_REQ ? "L2CAP" : "LL", p->itvl_min * 1.25f, p->itvl_max * 1.25f, p->latency,
-               p->supervision_timeout * 10u);
+    bool ll = ev->type == BLE_GAP_EVENT_CONN_UPDATE_REQ;
+    if (ll && ev->conn_update_req.self_params) {
+      ble_gap_upd_params *own = ev->conn_update_req.self_params;
+      own->itvl_min = BLE_GAP_INITIAL_CONN_ITVL_MIN;
+      own->itvl_max = BLE_GAP_INITIAL_CONN_ITVL_MAX;
+      own->latency = BLE_GAP_INITIAL_CONN_LATENCY;
+      own->supervision_timeout = BLE_GAP_INITIAL_SUPERVISION_TIMEOUT;
+      own->min_ce_len = BLE_GAP_INITIAL_CONN_MIN_CE_LEN;
+      own->max_ce_len = BLE_GAP_INITIAL_CONN_MAX_CE_LEN;
     }
-    break; // 0 zurueckgeben = annehmen (NimBLE-Standard)
+    if (p) {
+      ESP_LOGI(TAG, "BLE: Band moechte neue Verbindungsparameter (%s): Intervall %.2f..%.2f ms, Latenz %u, Timeout %u ms - %s",
+               ll ? "LL" : "L2CAP", p->itvl_min * 1.25f, p->itvl_max * 1.25f, p->latency, p->supervision_timeout * 10u,
+               ll ? "angenommen mit eigenen Parametern wie Legacy" : "angenommen");
+    }
+    break; // 0 zurueckgeben = annehmen
   }
   case BLE_GAP_EVENT_CONN_UPDATE: {
     ble_gap_conn_desc d;
@@ -126,6 +145,7 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
     ESP_LOGI(TAG, "BLE: Verbindung getrennt (Grund 0x%x)", ev->disconnect.reason);
     connHandle = BLE_HS_CONN_HANDLE_NONE;
     chrHandle = 0;
+    writePending = false;
     gwSetBle(false);
     break;
   default:
@@ -308,8 +328,10 @@ static const char *cmdName(BleScheduler::Cmd c) {
   }
 }
 
+
 // Diagnose: Ergebnis eines Schreibens mit Bestaetigung (laeuft im NimBLE-Host-Task)
 static int onWriteRsp(uint16_t, const ble_gatt_error *err, ble_gatt_attr *, void *arg) {
+  writePending = false;
   uint32_t sentAt = (uint32_t)(uintptr_t)arg;
   uint32_t ms = gwMillis() - sentAt;
   if (err && err->status == 0) {
@@ -384,11 +406,19 @@ static void bleTask(void *) {
       BleScheduler::Step st;
       uint32_t now = gwMillis();
 
-      if (sched.next(s, cal, now, st)) {
+      if (writePending) {
+        // auf die Bestaetigung des vorigen Pakets warten (NimBLE begrenzt offene GATT-Vorgaenge)
+      } else if (sched.next(s, cal, now, st)) {
         // Standard wie Legacy: ohne Antwort. Diagnose ("ble rsp on"): mit Bestaetigung, sofern das Band "Write" anbietet.
         bool withRsp = gw.bleWriteRsp && (chrProps & BLE_GATT_CHR_PROP_WRITE);
+        if (withRsp) {
+          writePending = true;
+        }
         int rc = withRsp ? ble_gattc_write_flat(connHandle, chrHandle, st.packet, sizeof(st.packet), onWriteRsp, (void *)(uintptr_t)now)
                          : ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
+        if (rc != 0) {
+          writePending = false;
+        }
         if (gw.bleWriteRsp && !withRsp) {
           ESP_LOGW(TAG, "BLE: Band bietet kein Schreiben mit Bestaetigung an, sende ohne");
         }
@@ -405,9 +435,8 @@ static void bleTask(void *) {
         } else {
           ESP_LOGI(TAG, "BLE: %s gesendet, Paket %s", cmdName(st.cmd), hex);
         }
-        if (ok) {
-          vTaskDelay(pdMS_TO_TICKS(200));
-        }
+        // Nach jedem Versuch Pause: 200 ms wie Legacy, nach einem Fehler 500 ms (sonst alle 25 ms ein neuer Versuch)
+        vTaskDelay(pdMS_TO_TICKS(ok ? 200 : 500));
       } else if (sched.fadeDone()) {
         gwMarkSent(s.revision); // nichts mehr offen: alles bis zu dieser Revision ist gesendet
       }
