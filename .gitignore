@@ -63,8 +63,8 @@ tmbootpicker.efi
 .vscode/
 # Ausnahme: Build-/Start-/Debug-Konfiguration des Desktop-Simulators (keine nutzerspezifischen Pfade)
 !next/simulator/.vscode/
-# Legacy: echte Konfiguration mit WLAN-Zugangsdaten (nach der Verschiebung unter legacy/)
-legacy/include/Config.h
+# Echte Konfiguration mit WLAN-Zugangsdaten
+include/Config.h
 
 # Next (ESP-IDF): Build-Ausgaben, erzeugte sdkconfig, heruntergeladene Komponenten
 next/**/build/

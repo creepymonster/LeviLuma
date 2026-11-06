@@ -2,11 +2,11 @@ name: LCD-Screenshots
 
 on:
   push:
-    branches: [main]
+    branches: [Legacy]
     paths:
-      - "legacy/src/**"
-      - "legacy/include/**"
-      - "legacy/tools/screenshots/**"
+      - "src/**"
+      - "include/**"
+      - "tools/screenshots/**"
       - ".github/workflows/screenshots.yml"
   workflow_dispatch:
 
@@ -43,16 +43,16 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Screenshots rendern
-        run: legacy/tools/screenshots/render.sh legacy .lvgl .theme legacy/screenshots
+        run: tools/screenshots/render.sh . .lvgl .theme screenshots
 
       - name: Web-UI-Screenshots rendern (Desktop und mobil)
-        run: python3 legacy/tools/screenshots/webui.py legacy legacy/screenshots
+        run: python3 tools/screenshots/webui.py . screenshots
 
       - name: Screenshots ins Repo committen
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add legacy/screenshots
+          git add screenshots
           if git diff --cached --quiet; then
             echo "Keine Änderungen an den Screenshots."
             exit 0
@@ -60,6 +60,6 @@ jobs:
           git commit -m "Screenshots der LCD-UI aktualisiert [skip ci]"
           # Bei Konflikt gewinnen die frisch gerenderten Bilder (theirs = dieser Commit).
           for i in 1 2 3; do
-            git pull --rebase -q -X theirs origin main && git push origin HEAD:main && break
+            git pull --rebase -q -X theirs origin Legacy && git push origin HEAD:Legacy && break
             sleep 5
           done
