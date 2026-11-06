@@ -228,7 +228,7 @@ static void logStatsPeriodically(uint32_t now) {
   }
   lastLog = now;
   LinkStats st = linkStats();
-  ESP_LOGI(TAG, "ESP-NOW seit Start: %lu Rahmen empfangen (%lu verworfen, Queue voll), Unicast gesendet: %lu bestaetigt, %lu ohne MAC-Bestaetigung",
+  ESP_LOGI(TAG, "ESP-NOW seit Start: %lu Rahmen empfangen (davon %lu wegen voller Empfangs-Queue verworfen), Unicast gesendet: %lu bestaetigt, %lu ohne MAC-Bestaetigung",
            (unsigned long)st.rx, (unsigned long)st.rxDropped, (unsigned long)st.txOk, (unsigned long)st.txFail);
 }
 

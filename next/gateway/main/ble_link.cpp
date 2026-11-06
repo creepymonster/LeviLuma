@@ -98,6 +98,30 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
     }
     xSemaphoreGive(evSem);
     break;
+  // Diagnose: Wuensche des Bands zu den Verbindungsparametern und deren Ergebnis (laeuft im NimBLE-Host-Task)
+  case BLE_GAP_EVENT_CONN_UPDATE_REQ:
+  case BLE_GAP_EVENT_L2CAP_UPDATE_REQ: {
+    const ble_gap_upd_params *p = ev->conn_update_req.peer_params;
+    if (p) {
+      ESP_LOGI(TAG, "BLE: Band moechte neue Verbindungsparameter (%s): Intervall %.2f..%.2f ms, Latenz %u, Timeout %u ms - angenommen",
+               ev->type == BLE_GAP_EVENT_L2CAP_UPDATE_REQ ? "L2CAP" : "LL", p->itvl_min * 1.25f, p->itvl_max * 1.25f, p->latency,
+               p->supervision_timeout * 10u);
+    }
+    break; // 0 zurueckgeben = annehmen (NimBLE-Standard)
+  }
+  case BLE_GAP_EVENT_CONN_UPDATE: {
+    ble_gap_conn_desc d;
+    if (ev->conn_update.status == 0 && ble_gap_conn_find(ev->conn_update.conn_handle, &d) == 0) {
+      ESP_LOGI(TAG, "BLE: Verbindungsparameter geaendert: Intervall %.2f ms, Latenz %u, Timeout %u ms", d.conn_itvl * 1.25f, d.conn_latency,
+               d.supervision_timeout * 10u);
+    } else {
+      ESP_LOGW(TAG, "BLE: Aenderung der Verbindungsparameter fehlgeschlagen (Status %d)", ev->conn_update.status);
+    }
+    break;
+  }
+  case BLE_GAP_EVENT_MTU:
+    ESP_LOGI(TAG, "BLE: MTU %u", ev->mtu.value);
+    break;
   case BLE_GAP_EVENT_DISCONNECT:
     ESP_LOGI(TAG, "BLE: Verbindung getrennt (Grund 0x%x)", ev->disconnect.reason);
     connHandle = BLE_HS_CONN_HANDLE_NONE;
@@ -300,6 +324,7 @@ static void bleTask(void *) {
   uint32_t lastAttempt = 0;
   bool ready = false;
   uint32_t colorHintRev = gwSnapshot().colorRev; // Startfarbe nicht als Aenderung melden
+  uint32_t lastLinkLog = 0;
 
   while (!synced) {
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -327,6 +352,20 @@ static void bleTask(void *) {
         }
       }
     } else if (ready) {
+      // Diagnose alle 10 s: lebt die Verbindung noch (RSSI lesbar) und mit welchen Parametern?
+      if (gwMillis() - lastLinkLog >= 10000) {
+        lastLinkLog = gwMillis();
+        int8_t rssi = 0;
+        ble_gap_conn_desc d;
+        int rr = ble_gap_conn_rssi(connHandle, &rssi);
+        int rf = ble_gap_conn_find(connHandle, &d);
+        if (rr == 0 && rf == 0) {
+          ESP_LOGI(TAG, "BLE-Verbindung: RSSI %d dBm, Intervall %.2f ms, Latenz %u, Timeout %u ms", rssi, d.conn_itvl * 1.25f, d.conn_latency,
+                   d.supervision_timeout * 10u);
+        } else {
+          ESP_LOGW(TAG, "BLE-Verbindung nicht abfragbar (RSSI rc %d, Verbindung rc %d)", rr, rf);
+        }
+      }
       LeviCal::Model cal = gwCalibCopy();
       BleScheduler::Step st;
       uint32_t now = gwMillis();

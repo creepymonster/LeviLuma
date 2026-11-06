@@ -37,7 +37,7 @@ static void printStatus() {
   printBand();
   xSemaphoreGive(gw.lock);
   LinkStats st = linkStats();
-  printf("ESP-NOW seit Start: %lu Rahmen empfangen (%lu verworfen), Unicast %lu bestaetigt / %lu ohne MAC-Bestaetigung\n", (unsigned long)st.rx,
+  printf("ESP-NOW seit Start: %lu Rahmen empfangen (davon %lu wegen voller Empfangs-Queue verworfen), Unicast %lu bestaetigt / %lu ohne MAC-Bestaetigung\n", (unsigned long)st.rx,
          (unsigned long)st.rxDropped, (unsigned long)st.txOk, (unsigned long)st.txFail);
   if (gw.bleOff) {
     printf("BLE abgeschaltet (Diagnose, \"ble on\" schaltet es wieder ein)\n");
