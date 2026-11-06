@@ -16,11 +16,11 @@ Sammlung. XIAO Sense und Plus sind ebenfalls andere Hardwarevarianten.
 
 ## Hardware im Überblick
 
-Die Angaben stammen aus den Projektquellen (Legacy-Konfiguration `include/LGFX_Board.h` im [Branch `Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy), [Next-Hardwaredaten](../../next/README.md#hardware)) und den verlinkten Herstellerseiten. Nicht am Gerät nachgemessen; für Next gilt: nicht getestet.
+Die Angaben stammen aus den Projektquellen (Legacy-Konfiguration `include/LGFX_Board.h` im [Branch `legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy), [Next-Hardwaredaten](../../next/README.md#hardware)) und den verlinkten Herstellerseiten. Nicht am Gerät nachgemessen; für Next gilt: nicht getestet.
 
 ### Waveshare ESP32-S3-Touch-LCD-1.28 (rund)
 
-Einsatz: [Legacy](https://github.com/creepymonster/LeviLuma/tree/Legacy) (steuert die Leiste direkt per BLE, mit Web-UI) und [Next Round](../../next/controller-round/) (Fernbedienung per ESP-NOW).
+Einsatz: [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy) (steuert die Leiste direkt per BLE, mit Web-UI) und [Next Round](../../next/controller-round/) (Fernbedienung per ESP-NOW).
 
 | Merkmal | Wert |
 |---|---|
@@ -92,7 +92,7 @@ Das RockBase-Wiki nennt teils „kapazitiver Touch“; README, Beispiele und Sch
 - [LovyanGFX](https://github.com/lovyan03/LovyanGFX), [LVGL](https://lvgl.io/), [lvgl_theme_shadcn](https://github.com/AlixANNERAUD/lvgl_theme_shadcn)
 
 **Im Projekt**
-- [Projektübersicht](../../README.md), [Legacy](https://github.com/creepymonster/LeviLuma/tree/Legacy), [Next](../../next/README.md)
+- [Projektübersicht](../../README.md), [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy), [Next](../../next/README.md)
 - [Bauen und Flashen](../../next/docs/BUILD_FLASH.md), [ESP-NOW-Protokoll](../../next/docs/ESP_NOW_PROTOKOLL.md), [Kopplung](../../next/docs/PAIRING.md), [Zigbee](../../next/docs/ZIGBEE.md)
 
 ## Quellen und Modellstand

@@ -1,5 +1,5 @@
 // Serielle Konsole des Gateways (115200 Baud, Zeilen mit Enter abschliessen).
-// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on
+// Befehle: help | status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on | ble rsp on | ble rsp off
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include <string.h>
@@ -37,7 +37,7 @@ static void printStatus() {
   printBand();
   xSemaphoreGive(gw.lock);
   LinkStats st = linkStats();
-  printf("ESP-NOW seit Start: %lu Rahmen empfangen (%lu verworfen), Unicast %lu bestaetigt / %lu ohne MAC-Bestaetigung\n", (unsigned long)st.rx,
+  printf("ESP-NOW seit Start: %lu Rahmen empfangen (davon %lu wegen voller Empfangs-Queue verworfen), Unicast %lu bestaetigt / %lu ohne MAC-Bestaetigung\n", (unsigned long)st.rx,
          (unsigned long)st.rxDropped, (unsigned long)st.txOk, (unsigned long)st.txFail);
   if (gw.bleOff) {
     printf("BLE abgeschaltet (Diagnose, \"ble on\" schaltet es wieder ein)\n");
@@ -110,6 +110,13 @@ static void handleLine(char *line) {
     printf("%s Neustart...\n", ok ? "Band vergessen." : "NVS-Fehler.");
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
+  } else if (!strcmp(line, "ble rsp on") || !strcmp(line, "ble rsp off")) {
+    // Schreiben mit (Standard) oder ohne Bestaetigung des Bands (wie Legacy); sofort wirksam, bleibt ueber Neustarts
+    bool on = !strcmp(line, "ble rsp on");
+    uint8_t v = on ? 1 : 0;
+    bool ok = gw.kv->setBlob("blewrsp", &v, 1);
+    gw.bleWriteRsp = on;
+    printf("Schreiben %s Bestaetigung%s\n", on ? "mit" : "ohne", ok ? "" : " (nur bis zum Neustart, NVS-Fehler)");
   } else if (!strcmp(line, "ble off") || !strcmp(line, "ble on")) {
     // Diagnose: BLE ganz abschalten, um die Funk-Koexistenz mit ESP-NOW auszuschliessen (bleibt ueber Neustarts)
     bool off = !strcmp(line, "ble off");
@@ -119,7 +126,7 @@ static void handleLine(char *line) {
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
   } else if (line[0]) {
-    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on\n");
+    printf("Befehle: status | key <32 hex> | key off | name <text> | pair | unpair all | band | band forget | ble off | ble on | ble rsp on | ble rsp off\n");
   }
 }
 

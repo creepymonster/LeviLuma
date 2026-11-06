@@ -175,6 +175,11 @@ extern "C" void app_main(void) {
   uint8_t bleOff = 0;
   size_t bl = sizeof(bleOff);
   gw.bleOff = gw.kv->getBlob("bleoff", &bleOff, &bl) && bl == 1 && bleOff == 1;
+  uint8_t wr = 0;
+  size_t wl = sizeof(wr);
+  // Standard: mit Bestaetigung (am Geraet bewaehrt, Fehler werden sichtbar). "ble rsp off" speichert 0.
+  gw.bleWriteRsp = !(gw.kv->getBlob("blewrsp", &wr, &wl) && wl == 1 && wr == 0);
+  ESP_LOGI(TAG, "BLE: Schreiben %s Bestaetigung des Bands (Konsole \"ble rsp on/off\")", gw.bleWriteRsp ? "mit" : "ohne");
   statusIoStart();
   linkStart();
   if (gw.bleOff) {

@@ -3,6 +3,7 @@
 // (gemerktes Band, sonst staerkstes passendes Geraet, das nach erfolgreicher Verbindung gemerkt wird), Verbinden, 1 s warten, Service 0xFFF0 / Characteristic 0xFFF3 suchen, dann Befehle senden
 // (ein Befehl pro Zeitfenster, 200 ms Pause nach jedem gesendeten Befehl). Neuer Versuch alle 4 s.
 #include "freertos/FreeRTOS.h"
+#include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
 #include "freertos/task.h"
@@ -15,6 +16,15 @@
 #include "gateway.h"
 
 static const char *TAG = "levi-gw-ble";
+
+// Ohne GATT-Server beantwortet NimBLE Anfragen des Bands nicht (ble_att.c verwirft sie stumm); das Band nimmt dann
+// 30 s nach dem Verbinden keine Befehle mehr an. Bestehende sdkconfig-Dateien uebernehmen sdkconfig.defaults nicht,
+// deshalb hier ausdruecklich pruefen.
+#if !CONFIG_BT_NIMBLE_GATT_SERVER
+#error "CONFIG_BT_NIMBLE_GATT_SERVER muss an sein (menuconfig: Bluetooth > NimBLE Options > Roles and Profiles: Peripheral und GATT Server). Siehe sdkconfig.defaults."
+#endif
+
+extern "C" void ble_store_config_init(void); // NimBLE-Schluesselspeicher (ESP-IDF, ohne eigenen Header wie in den Beispielen)
 
 static SemaphoreHandle_t evSem; // ein Ergebnis pro Schritt (Scan, Verbindung, Suche)
 static volatile bool synced = false;
@@ -32,6 +42,7 @@ static bool scanHasTarget = false; // gemerktes Band: bekommt auch bei voller Li
 static ble_addr_t scanTarget;
 
 static volatile uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE;
+static volatile bool writePending = false; // Schreiben mit Bestaetigung unterwegs: kein weiteres starten
 static volatile int connStatus = -1;
 static uint16_t svcStart = 0, svcEnd = 0, chrHandle = 0;
 static uint8_t chrProps = 0;
@@ -94,13 +105,67 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
     connStatus = ev->connect.status;
     if (ev->connect.status == 0) {
       connHandle = ev->connect.conn_handle;
+      // Wie NimBLE-Arduino 1.4.3 (Legacy, NimBLEClient::handleGapEvent): MTU-Austausch direkt nach dem Verbinden.
+      int rc = ble_gattc_exchange_mtu(ev->connect.conn_handle, nullptr, nullptr);
+      if (rc != 0) {
+        ESP_LOGW(TAG, "BLE: MTU-Austausch nicht gestartet (%d)", rc);
+      }
     }
     xSemaphoreGive(evSem);
+    break;
+  // Diagnose: Wuensche des Bands zu den Verbindungsparametern und deren Ergebnis (laeuft im NimBLE-Host-Task)
+  // Wunsch des Bands nach neuen Verbindungsparametern. Wie NimBLE-Arduino 1.4.3 (Legacy): annehmen, beim
+  // Link-Layer-Verfahren aber mit den eigenen Standardparametern antworten (30-50 ms, Latenz 0, Timeout 2,56 s)
+  // statt die Werte des Bands zu uebernehmen (am Geraet: 22,5-47,5 ms, Timeout 1 s). Laeuft im NimBLE-Host-Task.
+  case BLE_GAP_EVENT_CONN_UPDATE_REQ:
+  case BLE_GAP_EVENT_L2CAP_UPDATE_REQ: {
+    const ble_gap_upd_params *p = ev->conn_update_req.peer_params;
+    bool ll = ev->type == BLE_GAP_EVENT_CONN_UPDATE_REQ;
+    if (ll && ev->conn_update_req.self_params) {
+      ble_gap_upd_params *own = ev->conn_update_req.self_params;
+      own->itvl_min = BLE_GAP_INITIAL_CONN_ITVL_MIN;
+      own->itvl_max = BLE_GAP_INITIAL_CONN_ITVL_MAX;
+      own->latency = BLE_GAP_INITIAL_CONN_LATENCY;
+      own->supervision_timeout = BLE_GAP_INITIAL_SUPERVISION_TIMEOUT;
+      own->min_ce_len = BLE_GAP_INITIAL_CONN_MIN_CE_LEN;
+      own->max_ce_len = BLE_GAP_INITIAL_CONN_MAX_CE_LEN;
+    }
+    if (p) {
+      ESP_LOGI(TAG, "BLE: Band moechte neue Verbindungsparameter (%s): Intervall %.2f..%.2f ms, Latenz %u, Timeout %u ms - %s",
+               ll ? "LL" : "L2CAP", p->itvl_min * 1.25f, p->itvl_max * 1.25f, p->latency, p->supervision_timeout * 10u,
+               ll ? "angenommen mit eigenen Parametern wie Legacy" : "angenommen");
+    }
+    break; // 0 zurueckgeben = annehmen
+  }
+  case BLE_GAP_EVENT_CONN_UPDATE: {
+    ble_gap_conn_desc d;
+    if (ev->conn_update.status == 0 && ble_gap_conn_find(ev->conn_update.conn_handle, &d) == 0) {
+      ESP_LOGI(TAG, "BLE: Verbindungsparameter geaendert: Intervall %.2f ms, Latenz %u, Timeout %u ms", d.conn_itvl * 1.25f, d.conn_latency,
+               d.supervision_timeout * 10u);
+    } else {
+      ESP_LOGW(TAG, "BLE: Aenderung der Verbindungsparameter fehlgeschlagen (Status %d)", ev->conn_update.status);
+    }
+    break;
+  }
+  // Diagnose: Pairing/Verschluesselung (wuenscht das Band eine Kopplung, erscheint das hier)
+  case BLE_GAP_EVENT_ENC_CHANGE:
+    if (ev->enc_change.status == 0) {
+      ESP_LOGI(TAG, "BLE: Verbindung verschluesselt (Pairing mit dem Band abgeschlossen)");
+    } else {
+      ESP_LOGW(TAG, "BLE: Pairing/Verschluesselung fehlgeschlagen (Status %d)", ev->enc_change.status);
+    }
+    break;
+  case BLE_GAP_EVENT_PASSKEY_ACTION:
+    ESP_LOGW(TAG, "BLE: Band verlangt Passkey-Aktion %u (nicht unterstuetzt)", ev->passkey.params.action);
+    break;
+  case BLE_GAP_EVENT_MTU:
+    ESP_LOGI(TAG, "BLE: MTU %u", ev->mtu.value);
     break;
   case BLE_GAP_EVENT_DISCONNECT:
     ESP_LOGI(TAG, "BLE: Verbindung getrennt (Grund 0x%x)", ev->disconnect.reason);
     connHandle = BLE_HS_CONN_HANDLE_NONE;
     chrHandle = 0;
+    writePending = false;
     gwSetBle(false);
     break;
   default:
@@ -246,7 +311,12 @@ static bool scanAndConnect() {
     }
     return false;
   }
-  ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden");
+  if (!(chrProps & BLE_GATT_CHR_PROP_WRITE)) {
+    ESP_LOGW(TAG, "BLE: Band bietet kein Schreiben mit Bestaetigung an, es wird ohne Antwort geschrieben");
+  }
+  ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden (Handle %u, Eigenschaften 0x%02X: %s%s%s%s)", chrHandle, chrProps,
+           (chrProps & BLE_GATT_CHR_PROP_WRITE_NO_RSP) ? "Write-without-response " : "", (chrProps & BLE_GATT_CHR_PROP_WRITE) ? "Write " : "",
+           (chrProps & BLE_GATT_CHR_PROP_READ) ? "Read " : "", (chrProps & BLE_GATT_CHR_PROP_NOTIFY) ? "Notify" : "");
 
   // Erste erfolgreiche Verbindung: Band dauerhaft merken (erst nach gefundenem Service, nicht schon beim Scan)
   if (!remembered) {
@@ -281,6 +351,29 @@ static const char *cmdName(BleScheduler::Cmd c) {
   }
 }
 
+
+// Diagnose: Ergebnis eines Schreibens mit Bestaetigung (laeuft im NimBLE-Host-Task)
+static int onWriteRsp(uint16_t, const ble_gatt_error *err, ble_gatt_attr *, void *arg) {
+  writePending = false;
+  uint32_t sentAt = (uint32_t)(uintptr_t)arg;
+  uint32_t ms = gwMillis() - sentAt;
+  if (err && err->status == 0) {
+    ESP_LOGI(TAG, "BLE: Band hat Schreiben bestaetigt (%lu ms)", (unsigned long)ms);
+  } else {
+    ESP_LOGW(TAG, "BLE: Band hat Schreiben NICHT bestaetigt (Status %u nach %lu ms)", err ? err->status : 0xFFFF, (unsigned long)ms);
+  }
+  return 0;
+}
+
+// Paket als Hex ohne Leerzeichen (z. B. 7E0004010000000000EF), direkt in LightBlue o. ae. einfuegbar
+static void packetHex(const uint8_t *p, size_t n, char *out, size_t cap) {
+  size_t o = 0;
+  for (size_t i = 0; i < n && o + 2 < cap; i++) {
+    o += snprintf(out + o, cap - o, "%02X", p[i]);
+  }
+  out[o < cap ? o : cap - 1] = 0;
+}
+
 static void bleTask(void *) {
   BleScheduler::Config cfg;
   cfg.brightnessMax = CONFIG_LEVILUMA_BRIGHTNESS_MAX == 255 ? 255 : 100;
@@ -289,6 +382,8 @@ static void bleTask(void *) {
   BleScheduler sched(cfg);
   uint32_t lastAttempt = 0;
   bool ready = false;
+  uint32_t colorHintRev = gwSnapshot().colorRev; // Startfarbe nicht als Aenderung melden
+  uint32_t lastLinkLog = 0;
 
   while (!synced) {
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -316,28 +411,60 @@ static void bleTask(void *) {
         }
       }
     } else if (ready) {
+      // Diagnose alle 10 s (Debug-Stufe): lebt die Verbindung noch (RSSI lesbar) und mit welchen Parametern?
+      if (gwMillis() - lastLinkLog >= 10000) {
+        lastLinkLog = gwMillis();
+        int8_t rssi = 0;
+        ble_gap_conn_desc d;
+        int rr = ble_gap_conn_rssi(connHandle, &rssi);
+        int rf = ble_gap_conn_find(connHandle, &d);
+        if (rr == 0 && rf == 0) {
+          ESP_LOGD(TAG, "BLE-Verbindung: RSSI %d dBm, Intervall %.2f ms, Latenz %u, Timeout %u ms", rssi, d.conn_itvl * 1.25f, d.conn_latency,
+                   d.supervision_timeout * 10u);
+        } else {
+          ESP_LOGW(TAG, "BLE-Verbindung nicht abfragbar (RSSI rc %d, Verbindung rc %d)", rr, rf);
+        }
+      }
       LeviCal::Model cal = gwCalibCopy();
       BleScheduler::Step st;
       uint32_t now = gwMillis();
 
-      if (sched.next(s, cal, now, st)) {
-        int rc = ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
+      if (writePending) {
+        // auf die Bestaetigung des vorigen Pakets warten (NimBLE begrenzt offene GATT-Vorgaenge)
+      } else if (sched.next(s, cal, now, st)) {
+        // Standard: mit Bestaetigung, sofern das Band "Write" anbietet; sonst bzw. mit "ble rsp off" ohne Antwort wie Legacy.
+        bool withRsp = gw.bleWriteRsp && (chrProps & BLE_GATT_CHR_PROP_WRITE);
+        if (withRsp) {
+          writePending = true;
+        }
+        int rc = withRsp ? ble_gattc_write_flat(connHandle, chrHandle, st.packet, sizeof(st.packet), onWriteRsp, (void *)(uintptr_t)now)
+                         : ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
+        if (rc != 0) {
+          writePending = false;
+        }
         bool ok = rc == 0;
         sched.commit(st, ok, s, now);
+        char hex[2 * sizeof(st.packet) + 1];
+        packetHex(st.packet, sizeof(st.packet), hex, sizeof(hex));
 
         if (!ok) {
-          ESP_LOGW(TAG, "BLE: Schreiben fehlgeschlagen (%d)", rc);
+          ESP_LOGW(TAG, "BLE: %s schreiben fehlgeschlagen (%d), Paket %s", cmdName(st.cmd), rc, hex);
         } else if (st.cmd == BleScheduler::Cmd::Color) {
-          ESP_LOGI(TAG, "BLE: Farbe Schritt %d/%d -> %u,%u,%u%s", st.fadeStep, st.fadeN, st.packet[4], st.packet[5], st.packet[6],
-                   st.raw ? " (raw)" : "");
+          ESP_LOGI(TAG, "BLE: Farbe Schritt %d/%d -> %u,%u,%u%s, Paket %s", st.fadeStep, st.fadeN, st.packet[4], st.packet[5], st.packet[6],
+                   st.raw ? " (raw)" : "", hex);
         } else {
-          ESP_LOGI(TAG, "BLE: %s gesendet", cmdName(st.cmd));
+          ESP_LOGI(TAG, "BLE: %s gesendet, Paket %s", cmdName(st.cmd), hex);
         }
-        if (ok) {
-          vTaskDelay(pdMS_TO_TICKS(200));
-        }
+        // Nach jedem Versuch Pause: 200 ms wie Legacy, nach einem Fehler 500 ms (sonst alle 25 ms ein neuer Versuch)
+        vTaskDelay(pdMS_TO_TICKS(ok ? 200 : 500));
       } else if (sched.fadeDone()) {
         gwMarkSent(s.revision); // nichts mehr offen: alles bis zu dieser Revision ist gesendet
+      }
+      // Wie Legacy: Farben gehen nur ans Band, wenn das Licht als "an" gilt. Einmal je Farbaenderung erklaeren,
+      // damit eine gewaehlte, aber nicht gesendete Farbe im Log nicht wie ein Funkfehler aussieht.
+      if (s.power != 1 && s.colorRev != colorHintRev) {
+        colorHintRev = s.colorRev;
+        ESP_LOGI(TAG, "BLE: Farbe gespeichert, aber nicht gesendet: Licht ist %s (erst einschalten)", s.power == 0 ? "aus" : "im Zustand unbekannt");
       }
     }
     vTaskDelay(pdMS_TO_TICKS(25));
@@ -347,6 +474,16 @@ static void bleTask(void *) {
 void bleStart() {
   evSem = xSemaphoreCreateBinary();
   ESP_ERROR_CHECK(nimble_port_init());
+  // Sicherheit wie NimBLE-Arduino 1.4.3 (Legacy, NimBLEDevice::init): ohne Ein-/Ausgabe, kein Bonding, kein MITM,
+  // Secure Connections, Schluesselspeicher. Ohne diese Einstellungen kann ein Pairing-Wunsch des Bands haengen.
+  ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
+  ble_hs_cfg.sm_bonding = 0;
+  ble_hs_cfg.sm_mitm = 0;
+  ble_hs_cfg.sm_sc = 1;
+  ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+  ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+  ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+  ble_store_config_init();
   ble_hs_cfg.sync_cb = onSync;
   ble_hs_cfg.reset_cb = onReset;
   nimble_port_freertos_init(hostTask);
