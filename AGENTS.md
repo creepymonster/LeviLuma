@@ -33,7 +33,7 @@ Gesteuert werden: Ein/Aus, Helligkeit (1–100 %, Standard beim Einschalten 100 
 - Der CST816S braucht eine verdrahtete Reset-Leitung, sonst antwortet er nicht.
 
 ### LED-Strip (ELK / Lotus Lantern)
-- BLE, Namen beginnen mit `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK` oder `LEDBLE` (`bleNameMatches()` in `src/ble.cpp`).
+- BLE, Namen beginnen mit `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK` oder `LEDBLE` (`bleNameMatches()` in `src/ble.cpp`). Gesammelte Erkenntnisse zum Band: `hardware/led-band/README.md`.
 - Befehle in `include/LotusProtocol.h`: Ein/Aus, Farbe, Helligkeit, Musikmodus, Mikrofon-EQ.
 - Laut README sind Ein/Aus, RGB und Helligkeit am Gerät getestet. Musikmodus und Mikrofon-EQ sind nicht als getestet markiert.
 - Das Band braucht nach dem Verbinden etwa 1 s, bevor die Services gelesen werden. Das ist im BLE-Task berücksichtigt.
@@ -151,6 +151,7 @@ Zwei ESP-IDF-Projekte (ESP-IDF 5.5.6, kein Arduino), gemeinsamer Code in `next/s
 - **Hosttestbare Logik** liegt in `gateway/components/light_core/` und `controller/components/controller_core/` (ohne ESP-IDF-Abhängigkeit, NVS über `KvStore`). Neue Logik dorthin, Plattformcode in `main/`. Tests: `next/tests/run_tests.sh` (muss grün sein); Auswertung siehe „Testauswertung“ unten.
 - **Kopien aus Legacy:** `CalibCore.h`, `ColorMath.h` (Gateway) und `Palette.h` (Controller) sind byte-gleiche Kopien; `LotusProtocol.h` nur ohne `<Arduino.h>`. Änderungen an der Kalibrierung in beiden Projekten konsistent halten.
 - **Nebenläufigkeit Gateway:** `gwLock` für Modell/Kalibrierung/Kopplungen/Handler/gemerktes Band (`BandMemory`); BLE-Task nur mit Kopien; ESP-NOW-Callback kopiert nur in eine Queue.
+- **NimBLE im Gateway:** Peripheral-Rolle und GATT-Server bleiben an (`sdkconfig.defaults`, `#error` in `ble_link.cpp`), obwohl das Gateway nur als Central arbeitet. Ohne GATT-Server verwirft NimBLE Anfragen des Bands ohne Antwort, und das Band nimmt nach 30 s keine Befehle mehr an. Erkenntnisse zum Band (Namen, GATT, Pakete, Verhalten): `hardware/led-band/README.md`.
 - **Nebenläufigkeit Controller:** `appLock` (rekursiv) für Register und Link; LVGL nur im LVGL-Task; Zigbee-Lock und App-Lock nie gleichzeitig halten.
 - **Zigbee:** nur mit `CONFIG_LEVILUMA_ZIGBEE_ENABLED` (Standard aus). Ohne Flag kein Zigbee-Code im Build (`main/CMakeLists.txt` über die Build-Eigenschaft `LEVI_WITH_ZIGBEE`). Endpoint-IDs sind stabil und persistent (`ZbMap`); nie umnummerieren.
 - **Sicherheit:** nur ESP-NOW-Bordmittel (PMK/LMK, CCMP). Keine eigene Kryptografie, Schlüssel nie übertragen.
