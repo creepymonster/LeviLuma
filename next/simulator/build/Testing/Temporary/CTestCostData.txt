@@ -1,0 +1,10 @@
+sim_controller_basic 2 2.47526
+sim_controller_gateway_states 2 4.48988
+sim_controller_pairing 2 6.06154
+sim_controller_calibration 2 2.71724
+sim_controller_first_boot 2 0.719662
+sim_round_basic 2 4.25728
+sim_round_gateway_states 2 4.89696
+sim_round_pairing 2 12.599
+sim_no_idf 2 0.0106203
+---

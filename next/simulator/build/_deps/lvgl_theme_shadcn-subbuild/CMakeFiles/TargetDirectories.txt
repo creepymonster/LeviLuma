@@ -1,0 +1,3 @@
+/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/lvgl_theme_shadcn-populate.dir
+/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/edit_cache.dir
+/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/rebuild_cache.dir

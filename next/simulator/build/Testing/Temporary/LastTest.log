@@ -1,0 +1,224 @@
+Start testing: Nov 06 21:50 UTC
+----------------------------------------------------------
+1/9 Testing: sim_controller_basic
+1/9 Test: sim_controller_basic
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-controller" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/controller_basic.sim"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_controller_basic" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: RockBase NM-CYD-C5 320x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+[skript] RockBase: Start und Uebersicht
+[skript] Ein/Aus ueber den Schalter der Uebersicht
+[skript] Detailansicht: Farbrad und Helligkeit
+[skript] Bild controller_detail.bmp
+[skript] Navigation: zurueck, Einstellungen, Info
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/controller_basic.sim
+<end of output>
+Test time =   4.95 sec
+----------------------------------------------------------
+Test Passed.
+"sim_controller_basic" end time: Nov 06 21:50 UTC
+"sim_controller_basic" time elapsed: 00:00:04
+----------------------------------------------------------
+
+2/9 Testing: sim_controller_gateway_states
+2/9 Test: sim_controller_gateway_states
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-controller" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/controller_gateway_states.sim"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_controller_gateway_states" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: RockBase NM-CYD-C5 320x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+[skript] Band getrennt / verbunden
+[sim-gw SIM Wohnzimmer] Band getrennt
+[sim-gw SIM Wohnzimmer] Band verbunden
+[skript] Zustandsaenderung am Gateway (z. B. anderer Controller)
+[skript] Musikmodus: im Gateway-Zustand, eine Farbwahl beendet ihn (wie Legacy setRGB)
+[skript] Gateway offline / online (Erkennung ueber ausbleibende Beacons, ca. 6,5 s)
+[sim-gw SIM Wohnzimmer] offline (empfaengt und sendet nichts)
+[sim-gw SIM Wohnzimmer] online
+[skript] Paketverlust 30 %: Befehl kommt durch Wiederholungen an
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/controller_gateway_states.sim
+<end of output>
+Test time =   8.98 sec
+----------------------------------------------------------
+Test Passed.
+"sim_controller_gateway_states" end time: Nov 06 21:50 UTC
+"sim_controller_gateway_states" time elapsed: 00:00:08
+----------------------------------------------------------
+
+3/9 Testing: sim_controller_pairing
+3/9 Test: sim_controller_pairing
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-controller" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/controller_pairing.sim" "--gateways" "3"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_controller_pairing" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: RockBase NM-CYD-C5 320x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+[skript] Ohne Schluessel, Fenster geschlossen: Ablehnung
+[skript] BOOT-Taste am simulierten Gateway, dann koppeln
+[sim-gw SIM Flur] Kopplungsfenster offen
+[sim-gw SIM Flur] Controller gekoppelt
+[skript] Gateway mit Schluessel: Eingabe ueber die Bildschirmtastatur der Firmware
+[sim-gw SIM Kueche] Controller gekoppelt
+[skript] Entkoppeln mit Rueckfrage (Inhalt nach oben ziehen, der Knopf liegt unterhalb)
+[sim-gw SIM Kueche] Controller entkoppelt
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/controller_pairing.sim
+<end of output>
+Test time =  12.12 sec
+----------------------------------------------------------
+Test Passed.
+"sim_controller_pairing" end time: Nov 06 21:50 UTC
+"sim_controller_pairing" time elapsed: 00:00:12
+----------------------------------------------------------
+
+4/9 Testing: sim_controller_calibration
+4/9 Test: sim_controller_calibration
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-controller" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/controller_calibration.sim"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_controller_calibration" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: RockBase NM-CYD-C5 320x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/controller_calibration.sim
+<end of output>
+Test time =   5.43 sec
+----------------------------------------------------------
+Test Passed.
+"sim_controller_calibration" end time: Nov 06 21:50 UTC
+"sim_controller_calibration" time elapsed: 00:00:05
+----------------------------------------------------------
+
+5/9 Testing: sim_controller_first_boot
+5/9 Test: sim_controller_first_boot
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-controller" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/controller_first_boot.sim" "--first-boot"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_controller_first_boot" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: RockBase NM-CYD-C5 320x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/controller_first_boot.sim
+<end of output>
+Test time =   1.44 sec
+----------------------------------------------------------
+Test Passed.
+"sim_controller_first_boot" end time: Nov 06 21:50 UTC
+"sim_controller_first_boot" time elapsed: 00:00:01
+----------------------------------------------------------
+
+6/9 Testing: sim_round_basic
+6/9 Test: sim_round_basic
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-round" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/round_basic.sim"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_round_basic" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: Waveshare Round (ESP32-S3) 240x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+[skript] Round: Seite Ein/Aus
+[skript] Wischen nach oben: Helligkeit
+[skript] Wischen nach oben: Farbe (rechts naechste, links vorige)
+[skript] Bild round_color.bmp
+[skript] Wischen nach oben: Gateway
+[skript] Zurueck nach unten bis Ein/Aus
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/round_basic.sim
+<end of output>
+Test time =   8.51 sec
+----------------------------------------------------------
+Test Passed.
+"sim_round_basic" end time: Nov 06 21:50 UTC
+"sim_round_basic" time elapsed: 00:00:08
+----------------------------------------------------------
+
+7/9 Testing: sim_round_gateway_states
+7/9 Test: sim_round_gateway_states
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-round" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/round_gateway_states.sim"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_round_gateway_states" start time: Nov 06 21:50 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: Waveshare Round (ESP32-S3) 240x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+[skript] Band getrennt: Schalter gesperrt
+[sim-gw SIM Wohnzimmer] Band getrennt
+[sim-gw SIM Wohnzimmer] Band verbunden
+[skript] Zustandsaenderung am Gateway
+[skript] Musikmodus im Gateway, Farbwahl beendet ihn
+[skript] Gateway offline / online (Gateway-Seite)
+[sim-gw SIM Wohnzimmer] offline (empfaengt und sendet nichts)
+[sim-gw SIM Wohnzimmer] online
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/round_gateway_states.sim
+<end of output>
+Test time =   9.79 sec
+----------------------------------------------------------
+Test Passed.
+"sim_round_gateway_states" end time: Nov 06 21:51 UTC
+"sim_round_gateway_states" time elapsed: 00:00:09
+----------------------------------------------------------
+
+8/9 Testing: sim_round_pairing
+8/9 Test: sim_round_pairing
+Command: "/home/user/LeviLuma/next/simulator/build/bin/leviluma-sim-round" "--no-dim" "--script" "/home/user/LeviLuma/next/simulator/tests/round_pairing.sim"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_round_pairing" start time: Nov 06 21:51 UTC
+Output:
+----------------------------------------------------------
+LeviLuma Desktop-Simulator: Waveshare Round (ESP32-S3) 240x240 - SIMULATION, keine Hardware angeschlossen
+LVGL 9.6.0
+[sim] Simulierter Vorzustand: koppele mit "SIM Wohnzimmer" (gestartet)
+[sim-gw SIM Wohnzimmer] Controller gekoppelt
+[skript] Entkoppeln
+[sim-gw SIM Wohnzimmer] Controller entkoppelt
+[skript] Suchen, Gateway mit Schluessel waehlen, falscher Schluessel
+[skript] Richtiger Schluessel
+[sim-gw SIM Kueche] Controller gekoppelt
+[skript] Nur ein Gateway: Seite Gateway zeigt das gekoppelte, keine Suche
+Skript bestanden: /home/user/LeviLuma/next/simulator/tests/round_pairing.sim
+<end of output>
+Test time =  25.20 sec
+----------------------------------------------------------
+Test Passed.
+"sim_round_pairing" end time: Nov 06 21:51 UTC
+"sim_round_pairing" time elapsed: 00:00:25
+----------------------------------------------------------
+
+9/9 Testing: sim_no_idf
+9/9 Test: sim_no_idf
+Command: "/usr/bin/cmake" "-DLIST=/home/user/LeviLuma/next/simulator/build/tests/check_no_idf_input.txt" "-DSIM_DIR=/home/user/LeviLuma/next/simulator" "-DBUILD_DIR=/home/user/LeviLuma/next/simulator/build" "-P" "/home/user/LeviLuma/next/simulator/cmake/check_no_idf.cmake"
+Directory: /home/user/LeviLuma/next/simulator/build/tests
+"sim_no_idf" start time: Nov 06 21:51 UTC
+Output:
+----------------------------------------------------------
+-- Keine ESP-IDF-/FreeRTOS-Abhaengigkeit: 33 Quelldateien, 0 Compiler-Abhaengigkeitsdateien geprueft.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"sim_no_idf" end time: Nov 06 21:51 UTC
+"sim_no_idf" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 06 21:51 UTC
+
+simulator =  76.45 sec*proc
+

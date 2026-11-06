@@ -1,0 +1,21 @@
+# ninja log v5
+1	15	1794001641986959327	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-mkdir	115cdf4a4aab737d
+1	15	1794001641986959327	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-mkdir	115cdf4a4aab737d
+15	36751	1794001678722961511	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-download	a08e72b0894524be
+15	36751	1794001678722961511	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-download	a08e72b0894524be
+36751	36775	0	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-update	9b7d544c27fa798a
+36751	36775	0	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-update	9b7d544c27fa798a
+36775	36792	1794001678762961513	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-patch	152af6bbd9b7981c
+36775	36792	1794001678762961513	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-patch	152af6bbd9b7981c
+36792	36807	1794001678778961514	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-configure	4c97126588fe50fe
+36792	36807	1794001678778961514	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-configure	4c97126588fe50fe
+36807	36820	1794001678790961515	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-build	4bd286a8a7a59317
+36807	36820	1794001678790961515	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-build	4bd286a8a7a59317
+36820	36833	1794001678802961515	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-install	59ce03697f558266
+36820	36833	1794001678802961515	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-install	59ce03697f558266
+36833	36853	1794001678822961516	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-test	51b209c45b6f252a
+36833	36853	1794001678822961516	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-test	51b209c45b6f252a
+36853	36871	1794001678842961518	CMakeFiles/lvgl-populate-complete	4c85438f61a457dd
+36853	36871	1794001678842961518	lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-done	4c85438f61a457dd
+36853	36871	1794001678842961518	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/CMakeFiles/lvgl-populate-complete	4c85438f61a457dd
+36853	36871	1794001678842961518	/home/user/LeviLuma/next/simulator/build/_deps/lvgl-subbuild/lvgl-populate-prefix/src/lvgl-populate-stamp/lvgl-populate-done	4c85438f61a457dd
