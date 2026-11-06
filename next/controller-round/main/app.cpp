@@ -200,6 +200,10 @@ void appStart() {
   ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
   ESP_ERROR_CHECK(esp_wifi_start());
+  ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(CONFIG_LEVILUMA_WIFI_TX_POWER));
+  int8_t txPower = 0;
+  ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&txPower));
+  ESP_LOGI(TAG, "WLAN: max. Sendeleistung %.2f dBm (angefordert %.2f dBm)", txPower / 4.0f, CONFIG_LEVILUMA_WIFI_TX_POWER / 4.0f);
   ESP_ERROR_CHECK(esp_wifi_set_channel(CONFIG_LEVILUMA_ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE));
   ESP_ERROR_CHECK(esp_now_init());
   ESP_ERROR_CHECK(esp_now_register_recv_cb(onRecv));

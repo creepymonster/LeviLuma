@@ -6,6 +6,14 @@ menu "LeviLuma Round Controller"
         help
             Wird beim Koppeln an das Gateway gemeldet. Hoechstens 24 Zeichen.
 
+    config LEVILUMA_WIFI_TX_POWER
+        int "Maximale WLAN-Sendeleistung (0,25 dBm pro Schritt)"
+        range 8 84
+        default 34
+        help
+            Standard 34 = 8,5 dBm wie LEVI_WIFI_TX_POWER im Legacy-Projekt.
+            Gilt auch fuer ESP-NOW; der Funktreiber kann den Wert abstufen.
+
     menu "Display und Touch (wie Legacy Config.h)"
         config LEVILUMA_DISPLAY_SPI_MHZ
             int "SPI-Takt Display (MHz), Legacy LEVI_DISPLAY_SPI_MHZ"

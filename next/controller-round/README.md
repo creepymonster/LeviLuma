@@ -58,8 +58,10 @@ In VS Code ist das Projekt der Workspace-Ordner **„Next – Waveshare Round“
 | `LEVILUMA_DIM_MS` / `LEVILUMA_HOME_MS` | 20000 / 60000 | Abschaltung / `LEVI_RECENTER_MS` |
 | `LEVILUMA_INPUT_SEND_MS` | 120 | – (Sendedrossel für den Helligkeitsregler) |
 | `LEVILUMA_CTRL_NAME` | „LeviLuma Rund“ | – |
+| `LEVILUMA_WIFI_TX_POWER` | 34 (8,5 dBm) | `LEVI_WIFI_TX_POWER` (Sendeleistung, Legacy-Standard 8,5 dBm) |
 
 Kanal, PMK und Zeiten unter „LeviLuma ESP-NOW“ müssen wie bei Gateway und RockBase-Controller eingestellt sein.
+Die WLAN-Sendeleistung wird nach dem Start des Funkteils begrenzt und der tatsächlich übernommene Wert protokolliert. Der ESP-IDF-Wert hat die Einheit 0,25 dBm pro Schritt; die Begrenzung betrifft auch ESP-NOW.
 
 ## Aufbau
 
