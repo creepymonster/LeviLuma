@@ -80,13 +80,14 @@ Details zur Kalibrierung: `next/docs/KALIBRIERUNG.md`.
 ## Verbindungsverhalten
 
 - **Parameterwunsch:** Etwa 1,5 s nach dem Verbinden verlangt das Band per Link-Layer-Verfahren Intervall 22,5–47,5 ms, Latenz 0, Supervision-Timeout 1 s. Legacy (NimBLE-Arduino) und Next antworten mit eigenen Werten (30–50 ms, Timeout 2,56 s). Herkunft: Next-Log, NimBLE-Arduino 1.4.3 `NimBLEClient.cpp`.
-- **MTU:** Legacy handelt 255 aus, Next 256. Das Band stellt nach dem Verbinden **selbst** eine MTU-Anfrage (im Legacy-Log zweites `mtu update event`).
+- **MTU:** Legacy handelt 255 aus, Next 256. Das Band stellt nach dem Verbinden **selbst** eine MTU-Anfrage (im Legacy-Log zweites `mtu update event`, im Next-Log mit GATT-Server zweite Zeile `BLE: MTU 256`).
 - **Anfragen des Bands müssen beantwortet werden.** Bekommt das Band auf seine Anfrage keine Antwort, nimmt es nach dem ATT-Timeout von **30 s** keine Befehle mehr an. Die Funkverbindung bleibt dabei bestehen (RSSI lesbar, Band weiter unsichtbar).
   - Am Gerät beobachtet mit dem Next-Gateway, solange dessen NimBLE ohne GATT-Server gebaut war (`CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n`).
   - Ohne GATT-Server verwirft NimBLE solche Anfragen stumm (`ble_att.c`).
-  - Abhilfe im Gateway: Peripheral-Rolle und GATT-Server an (`next/gateway/sdkconfig.defaults`). **Ob das das Hängen am Gerät behebt, ist noch nicht getestet.**
+  - Abhilfe im Gateway: Peripheral-Rolle und GATT-Server an (`next/gateway/sdkconfig.defaults`). **Am Gerät bestätigt** (Next-Gateway, Stand `f1df579`): Das Gateway beantwortet die MTU-Anfrage des Bands, alle Schreibvorgänge mit Bestätigung wurden über mehr als zwei Minuten Verbindung bestätigt (je etwa 70–350 ms), kein Hängen nach 30 s, keine Trennung.
   - Legacy hat den GATT-Server eingebaut und hielt die Verbindung am Gerät über 40 s ohne Ausfall.
 - **Pairing:** Das Band verlangt keine Kopplung (kein Pairing-Ereignis im Next-Log).
+- **Verbindungsaufbau bei schwachem Signal:** Bei −97 dBm schlug ein Verbindungsversuch mit Timeout fehl (`Status 13`), der nächste Versuch nach 4 s bei −87 dBm klappte (am Gerät beobachtet).
 - **Wiederverbinden:** Legacy und Next versuchen es alle 4 s neu. Das Next-Gateway merkt sich nach der ersten erfolgreichen Verbindung die Adresse des Bands und verbindet danach nur noch dieses (`BandMemory`, Konsole `band forget`).
 
 ## Funk
