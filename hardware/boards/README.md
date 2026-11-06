@@ -16,11 +16,11 @@ Sammlung. XIAO Sense und Plus sind ebenfalls andere Hardwarevarianten.
 
 ## Hardware im Überblick
 
-Die Angaben stammen aus den Projektquellen (Legacy-Konfiguration `include/LGFX_Board.h` im [Branch `legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy), [Next-Hardwaredaten](../../next/README.md#hardware)) und den verlinkten Herstellerseiten. Nicht am Gerät nachgemessen; für Next gilt: nicht getestet.
+Die Angaben stammen aus den Projektquellen (Legacy-Konfiguration `include/LGFX_Board.h` im [Branch `legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy), [Next-Hardwaredaten](../../README.md#hardware)) und den verlinkten Herstellerseiten. Nicht am Gerät nachgemessen; für Next gilt: nicht getestet.
 
 ### Waveshare ESP32-S3-Touch-LCD-1.28 (rund)
 
-Einsatz: [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy) (steuert die Leiste direkt per BLE, mit Web-UI) und [Next Round](../../next/controller-round/) (Fernbedienung per ESP-NOW).
+Einsatz: [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy) (steuert die Leiste direkt per BLE, mit Web-UI) und [Next Round](../../controller-round/) (Fernbedienung per ESP-NOW).
 
 | Merkmal | Wert |
 |---|---|
@@ -35,7 +35,7 @@ Einsatz: [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy) (steuer
 
 ### Seeed Studio XIAO ESP32S3
 
-Einsatz: [Next Gateway](../../next/gateway/). Ein Gateway je LED-Leiste: BLE zur Leiste, ESP-NOW zum Controller. Keine Oberfläche.
+Einsatz: [Next Gateway](../../gateway/). Ein Gateway je LED-Leiste: BLE zur Leiste, ESP-NOW zum Controller. Keine Oberfläche.
 
 | Merkmal | Wert |
 |---|---|
@@ -47,7 +47,7 @@ Einsatz: [Next Gateway](../../next/gateway/). Ein Gateway je LED-Leiste: BLE zur
 
 ### RockBase NM-CYD-C5
 
-Einsatz: [Next Controller](../../next/controller/) (LVGL-Oberfläche, ESP-NOW, optional Zigbee).
+Einsatz: [Next Controller](../../controller/) (LVGL-Oberfläche, ESP-NOW, optional Zigbee).
 
 | Merkmal | Wert |
 |---|---|
@@ -92,13 +92,13 @@ Das RockBase-Wiki nennt teils „kapazitiver Touch“; README, Beispiele und Sch
 - [LovyanGFX](https://github.com/lovyan03/LovyanGFX), [LVGL](https://lvgl.io/), [lvgl_theme_shadcn](https://github.com/AlixANNERAUD/lvgl_theme_shadcn)
 
 **Im Projekt**
-- [Projektübersicht](../../README.md), [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy), [Next](../../next/README.md)
-- [Bauen und Flashen](../../next/docs/BUILD_FLASH.md), [ESP-NOW-Protokoll](../../next/docs/ESP_NOW_PROTOKOLL.md), [Kopplung](../../next/docs/PAIRING.md), [Zigbee](../../next/docs/ZIGBEE.md)
+- [Projektübersicht](../../README.md), [Legacy](https://github.com/creepymonster/LeviLuma/tree/legacy)
+- [Bauen und Flashen](../../docs/BUILD_FLASH.md), [ESP-NOW-Protokoll](../../docs/ESP_NOW_PROTOKOLL.md), [Kopplung](../../docs/PAIRING.md), [Zigbee](../../docs/ZIGBEE.md)
 
 ## Quellen und Modellstand
 
 Abruf: **3. November 2026**. Die Zuordnung zu den verwendeten Boards stammt aus
-der [Projektübersicht](../../README.md) und [Next-Dokumentation](../../next/README.md).
+der [Projektübersicht](../../README.md).
 
 - **Waveshare:** [Hersteller-Ressourcen](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.28/Resources-And-Documents),
   [3D-Archiv](https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.28/ESP32-S3-Touch-LCD-1.28.zip).
