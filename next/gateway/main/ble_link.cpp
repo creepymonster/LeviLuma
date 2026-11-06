@@ -17,6 +17,8 @@
 
 static const char *TAG = "levi-gw-ble";
 
+extern "C" void ble_store_config_init(void); // NimBLE-Schluesselspeicher (ESP-IDF, ohne eigenen Header wie in den Beispielen)
+
 static SemaphoreHandle_t evSem; // ein Ergebnis pro Schritt (Scan, Verbindung, Suche)
 static volatile bool synced = false;
 static uint8_t ownAddrType;
@@ -138,6 +140,17 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
     }
     break;
   }
+  // Diagnose: Pairing/Verschluesselung (wuenscht das Band eine Kopplung, erscheint das hier)
+  case BLE_GAP_EVENT_ENC_CHANGE:
+    if (ev->enc_change.status == 0) {
+      ESP_LOGI(TAG, "BLE: Verbindung verschluesselt (Pairing mit dem Band abgeschlossen)");
+    } else {
+      ESP_LOGW(TAG, "BLE: Pairing/Verschluesselung fehlgeschlagen (Status %d)", ev->enc_change.status);
+    }
+    break;
+  case BLE_GAP_EVENT_PASSKEY_ACTION:
+    ESP_LOGW(TAG, "BLE: Band verlangt Passkey-Aktion %u (nicht unterstuetzt)", ev->passkey.params.action);
+    break;
   case BLE_GAP_EVENT_MTU:
     ESP_LOGI(TAG, "BLE: MTU %u", ev->mtu.value);
     break;
@@ -454,6 +467,16 @@ static void bleTask(void *) {
 void bleStart() {
   evSem = xSemaphoreCreateBinary();
   ESP_ERROR_CHECK(nimble_port_init());
+  // Sicherheit wie NimBLE-Arduino 1.4.3 (Legacy, NimBLEDevice::init): ohne Ein-/Ausgabe, kein Bonding, kein MITM,
+  // Secure Connections, Schluesselspeicher. Ohne diese Einstellungen kann ein Pairing-Wunsch des Bands haengen.
+  ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
+  ble_hs_cfg.sm_bonding = 0;
+  ble_hs_cfg.sm_mitm = 0;
+  ble_hs_cfg.sm_sc = 1;
+  ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+  ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+  ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+  ble_store_config_init();
   ble_hs_cfg.sync_cb = onSync;
   ble_hs_cfg.reset_cb = onReset;
   nimble_port_freertos_init(hostTask);
