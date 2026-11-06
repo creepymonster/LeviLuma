@@ -17,7 +17,7 @@ Die Bilder stammen aus der Host-Vorschau (`tools/preview/render.sh`: echtes `mai
 
 ## Hardware
 
-Waveshare ESP32-S3-Touch-LCD-1.28. Alle Werte stammen aus dem Legacy-Projekt (`legacy/include/LGFX_Board.h`, `legacy/src/main.cpp`, `legacy/README.md`), dort am Gerät im Einsatz:
+Waveshare ESP32-S3-Touch-LCD-1.28. Alle Werte stammen aus dem Legacy-Projekt ([Branch `Legacy`](https://github.com/creepymonster/LeviLuma/tree/Legacy): `include/LGFX_Board.h`, `src/main.cpp`, `README.md`), dort am Gerät im Einsatz:
 
 | Teil | Wert |
 |---|---|

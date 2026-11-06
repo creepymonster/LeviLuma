@@ -4,7 +4,6 @@
 
 | Projekt | Werkzeug | Version |
 |---|---|---|
-| Legacy | PlatformIO, Plattform `espressif32@6.10.0` (Arduino 2.0.17) | wie `legacy/platformio.ini` |
 | Gateway, Controller | ESP-IDF | **v5.5.6** (getestet; ESP32-C5 wird ab 5.5 offiziell unterstützt) |
 | Host-Tests | gcc/g++, CMake ≥ 3.16 | – |
 
@@ -13,9 +12,8 @@ Zigbee nutzt esp-zigbee-lib 2.0.5 (Commit `e2fdf4a` von `espressif/esp-zigbee-sd
 ## VS Code
 
 1. `LeviLuma.code-workspace` im Repository-Wurzelordner öffnen („Datei → Arbeitsbereich aus Datei öffnen“).
-2. Empfohlene Erweiterungen installieren: **PlatformIO IDE** und **ESP-IDF** (Espressif).
-3. **Legacy:** PlatformIO erkennt `legacy/platformio.ini`; Build/Upload/Monitor über die PlatformIO-Leiste. Vorher `legacy/include/Config.h` aus der Vorlage anlegen.
-4. **Next:** Die ESP-IDF-Erweiterung einmal einrichten („ESP-IDF: Configure ESP-IDF Extension“, Version 5.5.6). Dann im Workspace-Ordner *Next – XIAO S3* bzw. *Next – RockBase C5* über die Statusleiste Ziel (`esp32s3` / `esp32c5`), Port und Flash-Methode (UART) wählen und *Build*, *Flash*, *Monitor* ausführen. `menuconfig` öffnet die Projekteinstellungen (Menüs „LeviLuma …“).
+2. Empfohlene Erweiterung installieren: **ESP-IDF** (Espressif).
+3. **Next:** Die ESP-IDF-Erweiterung einmal einrichten („ESP-IDF: Configure ESP-IDF Extension“, Version 5.5.6). Dann im Workspace-Ordner *Next – XIAO S3* bzw. *Next – RockBase C5* über die Statusleiste Ziel (`esp32s3` / `esp32c5`), Port und Flash-Methode (UART) wählen und *Build*, *Flash*, *Monitor* ausführen. `menuconfig` öffnet die Projekteinstellungen (Menüs „LeviLuma …“).
 
 Für den Zigbee-Build in VS Code: in den Ordnereinstellungen des Controllers `idf.sdkconfigDefaults` auf `["sdkconfig.defaults","sdkconfig.defaults.zigbee"]` setzen und einen eigenen Build-Ordner wählen – oder die Kommandozeile unten nutzen.
 
