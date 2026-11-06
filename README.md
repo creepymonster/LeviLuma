@@ -56,19 +56,3 @@ next/tests/run_tests.sh
 ```
 
 Details: [`next/docs/BUILD_FLASH.md`](next/docs/BUILD_FLASH.md).
-
-## Legacy-Migration
-
-Das Waveshare-Projekt wurde vollständig per `git mv` nach `legacy/` verschoben (`platformio.ini`, `src/`, `include/`, `tools/screenshots/`, `screenshots/`, `README.md`). Die interne Struktur ist unverändert, am Code wurde nichts geändert.
-Nötige Pfadanpassungen außerhalb von `legacy/`:
-
-- `.gitignore`: `include/Config.h` → `legacy/include/Config.h` (die echte Konfiguration mit WLAN-Daten bleibt ausgeschlossen).
-- `.github/workflows/build.yml`: Pfadfilter auf `legacy/…`, Build mit `pio run -d legacy`, Config-Vorlage aus `legacy/include/`.
-- `.github/workflows/screenshots.yml`: Pfadfilter und Aufrufe auf `legacy/…`, Ausgabe nach `legacy/screenshots/`.
-
-Die `platformio.ini` selbst ist unverändert (`-I include` ist relativ zum Projektordner).
-
-## Hinweise
-
-- Die Legacy-Web-API hat keine Authentifizierung (nur vertrauenswürdige Netze). Next hat keine Weboberfläche.
-- Was am Gerät getestet ist und was nicht, steht in `legacy/README.md` und `next/README.md` (Abschnitt „Teststand“).
