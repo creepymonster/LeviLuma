@@ -1,9 +1,12 @@
 # Round Controller: Entkoppeln, Suchen, Kopplung mit falschem und richtigem Schluessel (Simulationsschluessel),
 # dann Kopplung ohne Schluessel. Genau ein Gateway darf gekoppelt sein.
 expect-switch 0 on 10000
-drag 120 205 120 40 300
-drag 120 205 120 40 300
-drag 120 205 120 40 300
+echo Gateway-Seite ueber den geheimen Weg (5x auf den Namen tippen)
+click-text "SIM Wohnzimmer"
+click-text "SIM Wohnzimmer"
+click-text "SIM Wohnzimmer"
+click-text "SIM Wohnzimmer"
+click-text "SIM Wohnzimmer"
 expect-text "online, vor"
 
 echo Entkoppeln
@@ -15,9 +18,11 @@ expect-text "Kein Gateway"
 
 echo Suchen, Gateway mit Schluessel waehlen, falscher Schluessel
 click-text "Suchen"
-expect-text "Gateway waehlen"
+expect-text "=Gateway"
 expect-text "SIM Kueche" 8000
 expect-text "SIM Wohnz" 8000
+# Liste baut sich neu auf, sobald alle Gateways ihre Daten gemeldet haben; erst danach waehlen
+wait 1500
 click-text "SIM Kueche"
 expect-text "0/32"
 click-button 1
@@ -100,9 +105,11 @@ expect-text "SIM Kueche"
 expect-switch 0 on
 
 echo Nur ein Gateway: Seite Gateway zeigt das gekoppelte, keine Suche
-drag 120 205 120 40 300
-drag 120 205 120 40 300
-drag 120 205 120 40 300
+click-text "SIM Kueche"
+click-text "SIM Kueche"
+click-text "SIM Kueche"
+click-text "SIM Kueche"
+click-text "SIM Kueche"
 expect-text "verschluesselt"
 expect-no-text "Suchen"
 quit

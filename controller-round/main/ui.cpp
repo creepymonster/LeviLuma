@@ -5,6 +5,9 @@
 //   2 Farbe: Farbpunkte des Farbsets (LeviPalette) auf einem Kreis, Name und Hex in der Mitte,
 //     Tipp rechts = naechste, links = vorige Farbe (wie die Legacy-LCD-UI)
 //   3 Gateway: Name, Status, Abgleich, Entkoppeln bzw. Suchen und Koppeln
+//     Ist ein Gateway gekoppelt, ist diese Seite versteckt (Kinder sollen nicht versehentlich entkoppeln).
+//     Geheimer Weg: 5x schnell (innerhalb von 3 s) auf den Gateway-Namen der Seite Ein/Aus tippen.
+//     Beim Verlassen der Seite und nach langer Pause ist sie wieder versteckt.
 // Der Musikmodus hat bewusst kein Bedienelement, solange er am Band nicht getestet ist
 // (die ESP-NOW-Befehle im gemeinsamen Protokoll bleiben bestehen).
 // Dazu eigene Bildschirme fuer die Gateway-Suche und die Schluesseleingabe.
@@ -43,7 +46,15 @@ static lv_obj_t *bright, *brightTitle, *brightLbl;
 static lv_obj_t *colorTile, *palDots[LeviPalette::N], *colorName, *colorHex;
 static int colorSel = -1; // Index der bestaetigten Farbe im Farbset, -1 = eigene Farbe
 // Gateway
-static lv_obj_t *gwTitle, *gwInfo, *gwPaired, *gwUnpaired;
+static lv_obj_t *gwTile, *gwTitle, *gwInfo, *gwPaired, *gwUnpaired;
+// Geheimer Zugang zur Gateway-Seite, solange ein Gateway gekoppelt ist
+static constexpr int SECRET_TAPS = 5;
+static constexpr uint32_t SECRET_WINDOW_MS = 3000;
+static bool gwUnlocked = false;
+static int secretTaps = 0;
+static uint32_t secretFirstMs = 0;
+static void applyGatewayLock();
+static void tileChanged(lv_event_t *);
 
 static bool brightActive = false;
 static Round::Throttle brightThrottle(CONFIG_LEVILUMA_INPUT_SEND_MS);
@@ -156,6 +167,24 @@ static void powerChanged(lv_event_t *) {
   reportError(appSetPower(lv_obj_has_state(powerSw, LV_STATE_CHECKED)));
 }
 
+// 5x schnell auf den Gateway-Namen tippen: Gateway-Seite freigeben und anzeigen
+static void gwNameClicked(lv_event_t *) {
+  uint32_t now = appMillis();
+  if (secretTaps == 0 || now - secretFirstMs > SECRET_WINDOW_MS) {
+    secretTaps = 0;
+    secretFirstMs = now;
+  }
+  if (++secretTaps < SECRET_TAPS) {
+    return;
+  }
+  secretTaps = 0;
+  gwUnlocked = true;
+  applyGatewayLock();
+  // Ohne Animation: Die Seite ist sofort bedienbar (ein Tipp waehrend des Gleitens wuerde als Wischen gelten)
+  lv_tileview_set_tile_by_index(tv, 0, PAGE_GATEWAY, LV_ANIM_OFF);
+  tileChanged(nullptr);
+}
+
 static void setupClicked(lv_event_t *) {
   lv_tileview_set_tile_by_index(tv, 0, PAGE_GATEWAY, LV_ANIM_ON);
 }
@@ -177,6 +206,9 @@ static void buildPower(lv_obj_t *tile) {
   lv_label_set_long_mode(gwName, LV_LABEL_LONG_MODE_DOTS);
   lv_obj_set_width(gwName, 150);
   lv_obj_align(gwName, LV_ALIGN_TOP_MID, 0, 42);
+  lv_obj_set_clickable(gwName, true); // geheimer Weg zur Gateway-Seite (gwNameClicked)
+  lv_obj_set_ext_click_area(gwName, 8);
+  lv_obj_add_event_cb(gwName, gwNameClicked, LV_EVENT_CLICKED, nullptr);
 
   // Ein/Aus-Schalter (Theme-Schalter, gross fuer den Finger)
   powerSw = lv_switch_create(tile);
@@ -410,7 +442,26 @@ static void buildGateway(lv_obj_t *tile) {
   button(gwUnpaired, LV_SYMBOL_REFRESH " Suchen", searchClicked);
 }
 
+// Gateway-Seite verstecken, solange ein Gateway gekoppelt und die Seite nicht freigegeben ist. Eine versteckte
+// Kachel zaehlt in LVGL nicht zur Scroll-Ausdehnung, die Farbseite ist dann die letzte erreichbare Seite.
+static void applyGatewayLock() {
+  bool locked = haveView && view.paired && !gwUnlocked;
+  if (lv_obj_is_hidden(gwTile) == locked) {
+    return;
+  }
+  if (locked && lv_tileview_get_tile_active(tv) == gwTile) {
+    lv_tileview_set_tile_by_index(tv, 0, PAGE_COLOR, LV_ANIM_OFF);
+  }
+  lv_obj_set_hidden(gwTile, locked);
+  lv_obj_set_hidden(pager[PAGE_GATEWAY], locked);
+  int n = locked ? PAGES - 1 : PAGES; // Seitenpunkte senkrecht zentriert halten
+  for (int i = 0; i < n; i++) {
+    lv_obj_align(pager[i], LV_ALIGN_RIGHT_MID, -8, -(n - 1) * 5 + i * 10);
+  }
+}
+
 static void refreshGateway() {
+  applyGatewayLock();
   bool paired = haveView && view.paired;
   lv_obj_set_hidden(gwPaired, !paired);
   lv_obj_set_hidden(gwUnpaired, paired);
@@ -579,7 +630,7 @@ static void showSearch() {
   if (!appMayPair()) {
     return;
   }
-  lv_obj_t *scr = overlayScreen("Gateway waehlen");
+  lv_obj_t *scr = overlayScreen("Gateway");
   searchList = lv_obj_create(scr);
   lv_obj_set_size(searchList, 170, 120);
   lv_obj_align(searchList, LV_ALIGN_CENTER, 0, -4);
@@ -674,6 +725,10 @@ static void showKey(int idx) {
 static void tileChanged(lv_event_t *) {
   lv_obj_t *t = lv_tileview_get_tile_active(tv);
   int idx = (int)lv_obj_get_y(t) / LCD_H_PX;
+  if (gwUnlocked && idx != PAGE_GATEWAY) { // Gateway-Seite verlassen: wieder verstecken
+    gwUnlocked = false;
+    applyGatewayLock();
+  }
   for (int i = 0; i < PAGES; i++) {
     lv_obj_set_style_bg_opa(pager[i], i == idx ? LV_OPA_COVER : LV_OPA_40, 0);
   }
@@ -708,6 +763,9 @@ static void refreshTimer(lv_timer_t *) {
       closeOverlay();
     }
     lv_tileview_set_tile_by_index(tv, 0, PAGE_POWER, LV_ANIM_OFF);
+    gwUnlocked = false;
+    applyGatewayLock();
+    tileChanged(nullptr);
   }
   homeReturned = idle;
 }
@@ -734,7 +792,7 @@ void uiBuild() {
   lv_obj_t *t0 = lv_tileview_add_tile(tv, 0, PAGE_POWER, LV_DIR_BOTTOM);
   lv_obj_t *t1 = lv_tileview_add_tile(tv, 0, PAGE_BRIGHT, (lv_dir_t)(LV_DIR_TOP | LV_DIR_BOTTOM));
   lv_obj_t *t2 = lv_tileview_add_tile(tv, 0, PAGE_COLOR, (lv_dir_t)(LV_DIR_TOP | LV_DIR_BOTTOM));
-  lv_obj_t *t3 = lv_tileview_add_tile(tv, 0, PAGE_GATEWAY, LV_DIR_TOP);
+  lv_obj_t *t3 = gwTile = lv_tileview_add_tile(tv, 0, PAGE_GATEWAY, LV_DIR_TOP);
   lv_obj_t *tiles[PAGES] = {t0, t1, t2, t3};
   for (lv_obj_t *t : tiles) {
     lv_obj_set_style_pad_all(t, 0, 0);
@@ -759,6 +817,8 @@ void uiBuild() {
 
 // Fuer die Host-Vorschau: Seite direkt waehlen
 void uiShowTile(int idx) {
+  gwUnlocked = idx == PAGE_GATEWAY; // Vorschau zeigt die Gateway-Seite auch bei Kopplung
+  applyGatewayLock();
   lv_tileview_set_tile_by_index(tv, 0, idx, LV_ANIM_OFF);
   tileChanged(nullptr);
 }
