@@ -128,7 +128,7 @@ Die geprüfte, automatisch erzeugte Auswertung (Ergebnisse je Test, getesteter C
 
 | Art | Stand |
 |---|---|
-| **Builds** | Gateway (ESP-IDF 5.5.6, esp32s3), Controller ohne Zigbee und mit Zigbee (esp32c5) in dieser Umgebung gebaut, ohne Warnungen im eigenen Code. Legacy mit PlatformIO gebaut. |
+| **Builds** | Gateway (ESP-IDF 5.5.6, esp32s3), Controller ohne Zigbee und mit Zigbee (esp32c5) in dieser Umgebung gebaut, ohne Warnungen im eigenen Code. |
 | **Automatisierte Tests** | `tests/run_tests.sh`: Protokoll (Kodierung, Fehlerfälle, Fuzz), Wiederholung/Duplikate, LightState, BLE-Befehlsreihenfolge, Kalibrierung + NVS-Ersatz, Kopplung, Gateway-Register, Zigbee-Zuordnung und Umrechnung, Touch-Kalibrierung, End-to-End Controller↔Gateway über simuliertes ESP-NOW (mit echtem Gateway-Code, Verlust, Neustart, Schlüssel). |
 | **Hardwaretests** | **Keine.** Weder Controller noch Gateway wurden auf Hardware geflasht oder getestet. |
 

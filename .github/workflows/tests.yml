@@ -1,7 +1,7 @@
 name: Tests
 
 # Host-Tests von LeviLuma Next (ohne Hardware, ohne ESP-IDF) und Pruefung der aus Legacy
-# kopierten Dateien. Laeuft auf jedem Branch, damit Fehler vor dem Merge auffallen.
+# (Branch Legacy) kopierten Dateien. Laeuft auf jedem Branch, damit Fehler vor dem Merge auffallen.
 #
 # Testauswertung (next/tests/README.md):
 #  - Jeder Lauf erzeugt den Bericht aus den tatsaechlichen Ergebnissen und legt ihn als Artefakt ab
@@ -16,17 +16,11 @@ on:
     paths:
       - "next/**"
       - "!next/tests/README.md"
-      - "legacy/include/CalibCore.h"
-      - "legacy/include/ColorMath.h"
-      - "legacy/include/Palette.h"
       - ".github/workflows/tests.yml"
   pull_request:
     paths:
       - "next/**"
       - "!next/tests/README.md"
-      - "legacy/include/CalibCore.h"
-      - "legacy/include/ColorMath.h"
-      - "legacy/include/Palette.h"
       - ".github/workflows/tests.yml"
   workflow_dispatch:
 
@@ -55,14 +49,17 @@ jobs:
           set -o pipefail
           LEVI_TEST_RESULTS="$RUNNER_TEMP/report/results.jsonl" next/tests/run_tests.sh run 2>&1 | tee "$RUNNER_TEMP/report/console.log"
 
-      # CalibCore.h, ColorMath.h und Palette.h sind byte-gleiche Kopien aus Legacy (siehe AGENTS.md)
+      # CalibCore.h, ColorMath.h und Palette.h sind byte-gleiche Kopien aus Legacy (siehe AGENTS.md).
+      # Die Legacy-Firmware liegt im Branch Legacy (Projekt im Root); verglichen wird mit dessen aktuellem Stand.
       - name: Kopien aus Legacy pruefen
         id: copies
         if: always()
+        shell: bash
         run: |
-          cmp legacy/include/CalibCore.h next/gateway/components/light_core/include/CalibCore.h
-          cmp legacy/include/ColorMath.h next/gateway/components/light_core/include/ColorMath.h
-          cmp legacy/include/Palette.h   next/controller/components/controller_core/include/Palette.h
+          git fetch --no-tags --depth=1 origin Legacy
+          cmp <(git show FETCH_HEAD:include/CalibCore.h) next/gateway/components/light_core/include/CalibCore.h
+          cmp <(git show FETCH_HEAD:include/ColorMath.h) next/gateway/components/light_core/include/ColorMath.h
+          cmp <(git show FETCH_HEAD:include/Palette.h)   next/controller/components/controller_core/include/Palette.h
           echo "Kopien sind byte-gleich."
 
       # Immer ausfuehren, auch nach Fehlern. Der Generator endet mit 0; der Status der Schritte oben bleibt massgeblich.
