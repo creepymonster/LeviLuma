@@ -52,7 +52,7 @@ Die Bilder erzeugt die GitHub Action `screenshots.yml` bei jeder Änderung an Fi
 
 ## Installation
 
-1. Repository klonen und den Branch `Legacy` auschecken.
+1. Repository klonen und den Branch `legacy` auschecken.
 2. `include/Config.example.h` nach `include/Config.h` kopieren und die WLAN-Zugangsdaten eintragen. `Config.h` ist per `.gitignore` ausgeschlossen und darf nicht committet werden.
 3. In VS Code den Repository-Ordner öffnen. PlatformIO erkennt das Projekt an der `platformio.ini`.
 
