@@ -20,10 +20,10 @@
 
 | | |
 |---|---|
-| Getesteter Commit | `68f8fb62a3750bce5de6941ebd34ae91951b6e59` |
+| Getesteter Commit | `d28c23e331aebc929a906ccc4d22fdb8394c4c53` |
 | Ref | `refs/heads/main` (Auslöser: push) |
-| Testlauf gestartet | 2026-11-05 06:00:55 UTC (2026-11-05 07:00:55 CET) |
-| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/41977554030 |
+| Testlauf gestartet | 2026-11-06 14:23:03 UTC (2026-11-06 15:23:03 CET) |
+| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/42233373422 |
 
 Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `next/tests/README.md` erfolgt in einem **separaten Folge-Commit** (Bot, `[skip ci]`), der nur diese Datei ändert; der Quellstand ist deshalb der genannte Commit, nicht der Berichts-Commit.
 
@@ -31,7 +31,7 @@ Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `next/test
 
 | | |
 |---|---|
-| Betriebssystem | Linux-7.0.0-1017-azure-x86_64-with-glibc2.39, Runner-Image 20261026.354.1 |
+| Betriebssystem | Linux-7.0.0-1017-azure-x86_64-with-glibc2.39, Runner-Image 20261101.360.1 |
 | CMake | cmake version 3.31.6 |
 | Compiler (g++) | 13.3.0 |
 | Sanitizer (im Testprogramm aktiv) | AddressSanitizer,UndefinedBehaviorSanitizer (no-recover) |
@@ -185,12 +185,12 @@ Gebaut von `.github/workflows/next.yml` (ESP-IDF in Container). Der Status wird 
 
 | Job | Status | Ergebnis |
 |---|---|---|
+| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
+| ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
 | ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
 | ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
-| ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
-| ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
-| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
 | ESP-IDF Diagnose ESP-NOW, alle Optionen (esp32s3) | completed | erfolgreich |
+| ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
 
 ## Hardwaretests
 
