@@ -2,7 +2,7 @@ name: LCD-Screenshots
 
 on:
   push:
-    branches: [Legacy]
+    branches: [legacy]
     paths:
       - "src/**"
       - "include/**"
@@ -60,6 +60,6 @@ jobs:
           git commit -m "Screenshots der LCD-UI aktualisiert [skip ci]"
           # Bei Konflikt gewinnen die frisch gerenderten Bilder (theirs = dieser Commit).
           for i in 1 2 3; do
-            git pull --rebase -q -X theirs origin Legacy && git push origin HEAD:Legacy && break
+            git pull --rebase -q -X theirs origin legacy && git push origin HEAD:legacy && break
             sleep 5
           done

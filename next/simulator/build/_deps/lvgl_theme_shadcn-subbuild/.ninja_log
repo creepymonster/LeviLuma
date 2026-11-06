@@ -1,0 +1,21 @@
+# ninja log v5
+1	17	1794001678910961522	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-mkdir	6ab1a8aecffb37ef
+1	17	1794001678910961522	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-mkdir	6ab1a8aecffb37ef
+17	773	1794001679666961567	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-download	cec064fb87bbc5e5
+17	773	1794001679666961567	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-download	cec064fb87bbc5e5
+774	789	0	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-update	da5cc2638304f510
+774	789	0	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-update	da5cc2638304f510
+789	804	1794001679698961569	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-patch	3fd84c9930da3781
+789	804	1794001679698961569	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-patch	3fd84c9930da3781
+804	820	1794001679714961570	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-configure	18c359dc2014f6bf
+804	820	1794001679714961570	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-configure	18c359dc2014f6bf
+821	834	1794001679726961570	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-build	e3f8247af42b9525
+821	834	1794001679726961570	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-build	e3f8247af42b9525
+834	847	1794001679742961571	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-install	f4788a7a2a5da25
+834	847	1794001679742961571	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-install	f4788a7a2a5da25
+847	858	1794001679754961572	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-test	4a56f9e913b9f6fe
+847	858	1794001679754961572	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-test	4a56f9e913b9f6fe
+858	880	1794001679774961573	CMakeFiles/lvgl_theme_shadcn-populate-complete	5d76c020c16a7aa8
+858	880	1794001679774961573	lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-done	5d76c020c16a7aa8
+858	880	1794001679774961573	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/lvgl_theme_shadcn-populate-complete	5d76c020c16a7aa8
+858	880	1794001679774961573	/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-done	5d76c020c16a7aa8

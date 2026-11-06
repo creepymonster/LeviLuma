@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/lvgl_theme_shadcn-populate"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/lvgl_theme_shadcn-populate.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/CMakeFiles/lvgl_theme_shadcn-populate-complete.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-build.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-configure.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-download.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-install.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-patch.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-test.rule"
+		},
+		{
+			"file" : "/home/user/LeviLuma/next/simulator/build/_deps/lvgl_theme_shadcn-subbuild/lvgl_theme_shadcn-populate-prefix/src/lvgl_theme_shadcn-populate-stamp/lvgl_theme_shadcn-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"lvgl_theme_shadcn-populate"
+		],
+		"name" : "lvgl_theme_shadcn-populate"
+	}
+}

@@ -1,0 +1,21 @@
+# ninja log v5
+1	17	1794001679866961579	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-mkdir	170e926f2c692d8f
+1	17	1794001679866961579	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-mkdir	170e926f2c692d8f
+17	4642	1794001684490961853	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-download	52d137fab47bcdc
+17	4642	1794001684490961853	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-download	52d137fab47bcdc
+4642	4659	0	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-update	c3876e8f83148e91
+4642	4659	0	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-update	c3876e8f83148e91
+4659	4678	1794001684526961856	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-patch	fcab02c815ec2c51
+4659	4678	1794001684526961856	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-patch	fcab02c815ec2c51
+4678	4694	1794001684542961857	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-configure	21cec6f8a52bd75d
+4678	4694	1794001684542961857	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-configure	21cec6f8a52bd75d
+4695	4708	1794001684558961857	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-build	80cf03bd18b1e806
+4695	4708	1794001684558961857	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-build	80cf03bd18b1e806
+4708	4722	1794001684570961858	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-install	e47bf592e6a4a327
+4708	4722	1794001684570961858	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-install	e47bf592e6a4a327
+4722	4736	1794001684586961859	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-test	c7f92b441aa4b65c
+4722	4736	1794001684586961859	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-test	c7f92b441aa4b65c
+4736	4758	1794001684606961860	CMakeFiles/sdl2-populate-complete	f66daaab242227ef
+4736	4758	1794001684606961860	sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-done	f66daaab242227ef
+4736	4758	1794001684606961860	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/CMakeFiles/sdl2-populate-complete	f66daaab242227ef
+4736	4758	1794001684606961860	/home/user/LeviLuma/next/simulator/build/_deps/sdl2-subbuild/sdl2-populate-prefix/src/sdl2-populate-stamp/sdl2-populate-done	f66daaab242227ef
