@@ -124,6 +124,7 @@ static void handleLine(char *line) {
 }
 
 static void consoleTask(void *) {
+  setvbuf(stdin, nullptr, _IONBF, 0); // ungepuffert: jedes Zeichen sofort, keine Zeilenpufferung in newlib
   char line[96];
   size_t n = 0;
 
@@ -131,6 +132,9 @@ static void consoleTask(void *) {
     int c = getchar();
 
     if (c == EOF) {
+      // Ohne Eingabe liefert getchar() EOF und setzt das EOF-Merkmal von stdin; newlib liest danach nicht mehr
+      // vom Port, bis es geloescht wird. Ohne clearerr() kaeme nach dem ersten leeren Abruf nie wieder ein Zeichen an.
+      clearerr(stdin);
       vTaskDelay(pdMS_TO_TICKS(50));
       continue;
     }
