@@ -3,6 +3,7 @@
 // (gemerktes Band, sonst staerkstes passendes Geraet, das nach erfolgreicher Verbindung gemerkt wird), Verbinden, 1 s warten, Service 0xFFF0 / Characteristic 0xFFF3 suchen, dann Befehle senden
 // (ein Befehl pro Zeitfenster, 200 ms Pause nach jedem gesendeten Befehl). Neuer Versuch alle 4 s.
 #include "freertos/FreeRTOS.h"
+#include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
 #include "freertos/task.h"
@@ -281,6 +282,15 @@ static const char *cmdName(BleScheduler::Cmd c) {
   }
 }
 
+// Paket als Hex ohne Leerzeichen (z. B. 7E0004010000000000EF), direkt in LightBlue o. ae. einfuegbar
+static void packetHex(const uint8_t *p, size_t n, char *out, size_t cap) {
+  size_t o = 0;
+  for (size_t i = 0; i < n && o + 2 < cap; i++) {
+    o += snprintf(out + o, cap - o, "%02X", p[i]);
+  }
+  out[o < cap ? o : cap - 1] = 0;
+}
+
 static void bleTask(void *) {
   BleScheduler::Config cfg;
   cfg.brightnessMax = CONFIG_LEVILUMA_BRIGHTNESS_MAX == 255 ? 255 : 100;
@@ -289,6 +299,7 @@ static void bleTask(void *) {
   BleScheduler sched(cfg);
   uint32_t lastAttempt = 0;
   bool ready = false;
+  uint32_t colorHintRev = gwSnapshot().colorRev; // Startfarbe nicht als Aenderung melden
 
   while (!synced) {
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -324,20 +335,28 @@ static void bleTask(void *) {
         int rc = ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
         bool ok = rc == 0;
         sched.commit(st, ok, s, now);
+        char hex[2 * sizeof(st.packet) + 1];
+        packetHex(st.packet, sizeof(st.packet), hex, sizeof(hex));
 
         if (!ok) {
-          ESP_LOGW(TAG, "BLE: Schreiben fehlgeschlagen (%d)", rc);
+          ESP_LOGW(TAG, "BLE: %s schreiben fehlgeschlagen (%d), Paket %s", cmdName(st.cmd), rc, hex);
         } else if (st.cmd == BleScheduler::Cmd::Color) {
-          ESP_LOGI(TAG, "BLE: Farbe Schritt %d/%d -> %u,%u,%u%s", st.fadeStep, st.fadeN, st.packet[4], st.packet[5], st.packet[6],
-                   st.raw ? " (raw)" : "");
+          ESP_LOGI(TAG, "BLE: Farbe Schritt %d/%d -> %u,%u,%u%s, Paket %s", st.fadeStep, st.fadeN, st.packet[4], st.packet[5], st.packet[6],
+                   st.raw ? " (raw)" : "", hex);
         } else {
-          ESP_LOGI(TAG, "BLE: %s gesendet", cmdName(st.cmd));
+          ESP_LOGI(TAG, "BLE: %s gesendet, Paket %s", cmdName(st.cmd), hex);
         }
         if (ok) {
           vTaskDelay(pdMS_TO_TICKS(200));
         }
       } else if (sched.fadeDone()) {
         gwMarkSent(s.revision); // nichts mehr offen: alles bis zu dieser Revision ist gesendet
+      }
+      // Wie Legacy: Farben gehen nur ans Band, wenn das Licht als "an" gilt. Einmal je Farbaenderung erklaeren,
+      // damit eine gewaehlte, aber nicht gesendete Farbe im Log nicht wie ein Funkfehler aussieht.
+      if (s.power != 1 && s.colorRev != colorHintRev) {
+        colorHintRev = s.colorRev;
+        ESP_LOGI(TAG, "BLE: Farbe gespeichert, aber nicht gesendet: Licht ist %s (erst einschalten)", s.power == 0 ? "aus" : "im Zustand unbekannt");
       }
     }
     vTaskDelay(pdMS_TO_TICKS(25));
