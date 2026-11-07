@@ -19,6 +19,9 @@ static void printBand() {
   } else {
     printf("Kein Band gemerkt (das staerkste passende Band wird verbunden und gemerkt)\n");
   }
+  if (gw.bandInfo[0]) {
+    printf("Bandfamilie (letzte Verbindung): %s\n", gw.bandInfo);
+  }
 }
 
 static void printStatus() {

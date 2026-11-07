@@ -1,6 +1,9 @@
 // Host-Tests: Gateway-Logik (LightState, BLE-Befehlsreihenfolge, Kalibrierung mit NVS-Ersatz,
 // Kopplungstabelle und vollstaendiger Protokollablauf Controller -> Gateway).
 #include "band_memory.h"
+#include "band_driver.h"
+#include "band_family.h"
+#include <initializer_list>
 #include <math.h>
 #include "test_util.h"
 #include "ble_scheduler.h"
@@ -724,6 +727,248 @@ static void test_state_notify_frame() {
   CHECK(m.u.state.flags & LVP_STATE_BLE);
 }
 
+// ---- Bandfamilien (Erkennung und Pakete; Erwartungswerte aus den Quellen in hardware/led-band/) ----
+
+static bool sameBytes(const uint8_t *a, size_t n, std::initializer_list<uint8_t> b) {
+  if (n != b.size()) {
+    return false;
+  }
+  size_t i = 0;
+  for (uint8_t v : b) {
+    if (a[i++] != v) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static void test_band_family_names() {
+  CHECK(BandFam::fromName("ELK-BLEDDM 96") == BandFamily::Elk);
+  CHECK(BandFam::fromName("MELK-OA10") == BandFamily::Elk);
+  CHECK(BandFam::fromName("LEDBLE-1") == BandFamily::Elk); // wie Legacy; GATT kann auf Triones umentscheiden
+  CHECK(BandFam::fromName("Triones:B30200000459C") == BandFamily::Triones);
+  CHECK(BandFam::fromName("LEDBlue-C2AF4BD5") == BandFamily::Triones);
+  CHECK(BandFam::fromName("Dream~ABCD") == BandFamily::Triones);
+  CHECK(BandFam::fromName("QHM-1234") == BandFamily::Triones);
+  CHECK(BandFam::fromName("LEDnetWF02001D0CDA81") == BandFamily::Zengge);
+  CHECK(BandFam::fromName("IOTWF0123") == BandFamily::Zengge);
+  CHECK(BandFam::fromName("IOTBT1234") == BandFamily::Unknown); // anderes Protokoll, nicht unterstuetzt
+  CHECK(BandFam::fromName("BJ_LED") == BandFamily::BjLed);
+  CHECK(BandFam::fromName("Fridge") == BandFamily::Unknown);
+  CHECK(BandFam::fromName("") == BandFamily::Unknown);
+  CHECK(BandFam::fromName(nullptr) == BandFamily::Unknown);
+  CHECK(BandMemory::nameMatches("Triones:B30200000459C"));
+  CHECK(BandMemory::nameMatches("BJ_LED"));
+  CHECK(!BandMemory::nameMatches("IOTBT1234"));
+}
+
+static void test_band_family_gatt_match() {
+  using BandFam::GattChr;
+  BandFam::Match m;
+  // ELK-Band wie am Geraet beobachtet: Service FFF0, Characteristic FFF3, Eigenschaften 0x0E
+  GattChr elk[] = {{0x1800, 0x2A00, 3, 0x02}, {0xFFF0, 0xFFF4, 5, 0x10}, {0xFFF0, 0xFFF3, 7, 0x0E}};
+  CHECK(BandFam::matchGatt(BandFamily::Elk, elk, 3, m));
+  CHECK(m.family == BandFamily::Elk);
+  CHECK_EQ(m.index, 2);
+  CHECK(BandFam::matchGatt(BandFamily::Unknown, elk, 3, m)); // gemerktes Band ohne empfangenen Namen
+  CHECK(m.family == BandFamily::Elk);
+  // ELK verlangt wie Legacy "Write without Response"
+  GattChr elkNoWnr[] = {{0xFFF0, 0xFFF3, 7, 0x08}};
+  CHECK(!BandFam::matchGatt(BandFamily::Elk, elkNoWnr, 1, m));
+  // Name "LEDBLE" deutet auf ELK, GATT zeigt Triones: GATT gewinnt
+  GattChr tri[] = {{0xFFD0, 0xFFD4, 4, 0x10}, {0xFFD5, 0xFFD9, 8, 0x0C}};
+  CHECK(BandFam::matchGatt(BandFamily::Elk, tri, 2, m));
+  CHECK(m.family == BandFamily::Triones);
+  CHECK_EQ(m.index, 1);
+  GattChr tri2[] = {{0xFFE5, 0xFFE9, 8, 0x04}};
+  CHECK(BandFam::matchGatt(BandFamily::Unknown, tri2, 1, m));
+  CHECK(m.family == BandFamily::Triones);
+  // Beide Schreibziele vorhanden: Namensfamilie zuerst
+  GattChr both[] = {{0xFFF0, 0xFFF3, 7, 0x0E}, {0xFFE5, 0xFFE9, 9, 0x0C}};
+  CHECK(BandFam::matchGatt(BandFamily::Triones, both, 2, m));
+  CHECK(m.family == BandFamily::Triones);
+  CHECK(BandFam::matchGatt(BandFamily::Elk, both, 2, m));
+  CHECK(m.family == BandFamily::Elk);
+  // Zengge FFFF/FF01, BJ_LED EE01 in beliebigem Service
+  GattChr zg[] = {{0xFFFF, 0xFF02, 10, 0x10}, {0xFFFF, 0xFF01, 12, 0x0C}};
+  CHECK(BandFam::matchGatt(BandFamily::Zengge, zg, 2, m));
+  CHECK(m.family == BandFamily::Zengge);
+  CHECK_EQ(m.index, 1);
+  GattChr bj[] = {{0xEE00, 0xEE01, 14, 0x0C}};
+  CHECK(BandFam::matchGatt(BandFamily::BjLed, bj, 1, m));
+  CHECK(m.family == BandFamily::BjLed);
+  // Nur lesbar: kein Schreibziel
+  GattChr ro[] = {{0xFFF0, 0xFFF3, 7, 0x02}, {0xFFD5, 0xFFD9, 8, 0x02}};
+  CHECK(!BandFam::matchGatt(BandFamily::Elk, ro, 2, m));
+  CHECK(m.family == BandFamily::Unknown);
+  CHECK(!BandFam::matchGatt(BandFamily::Elk, nullptr, 0, m));
+}
+
+static void test_band_family_zengge_info() {
+  BandFam::ZenggeInfo zi;
+  // Herstellerdaten mit Company-ID 0x5A51 (Little Endian), sta, BLE v5, MAC, Produkt 0x0033
+  const uint8_t mfg[] = {0x51, 0x5A, 0x00, 0x05, 1, 2, 3, 4, 5, 6, 0x00, 0x33, 0x01};
+  CHECK(BandFam::parseZenggeMfg(mfg, sizeof(mfg), zi));
+  CHECK_EQ(zi.bleVersion, 5);
+  CHECK_EQ(zi.productId, 0x33);
+  const uint8_t other[] = {0x51, 0x4C, 0x00, 0x05, 1, 2, 3, 4, 5, 6, 0x00, 0x33};
+  CHECK(!BandFam::parseZenggeMfg(other, sizeof(other), zi)); // andere Company-ID
+  CHECK(!BandFam::parseZenggeMfg(mfg, 11, zi));               // zu kurz
+  CHECK(BandFam::parseZenggeName("LEDnetWF02001D0CDA81", zi)); // Beispiel aus lednetwf_ble
+  CHECK_EQ(zi.bleVersion, 2);
+  CHECK_EQ(zi.productId, 0x1D);
+  CHECK(!BandFam::parseZenggeName("LEDnetWF02", zi));
+  CHECK(!BandFam::parseZenggeName("LEDnetWF02001X0CDA81", zi));
+
+  BandFam::ZenggeInfo p;
+  p.valid = true;
+  p.bleVersion = 5;
+  p.productId = 0x33;
+  CHECK(BandDriver::zenggeColorFor(p) == BandDriver::ZgColor::Rgb31);
+  p.productId = 0xA1;
+  CHECK(BandDriver::zenggeColorFor(p) == BandDriver::ZgColor::Hsv3B);
+  p.productId = 0x27;
+  CHECK(BandDriver::zenggeColorFor(p) == BandDriver::ZgColor::Hsv3BV2);
+  p.bleVersion = 4;
+  CHECK(BandDriver::zenggeColorFor(p) == BandDriver::ZgColor::Rgb31);
+  p.productId = 0x00; // IOTBT
+  CHECK(BandDriver::zenggeColorFor(p) == BandDriver::ZgColor::None);
+  p.productId = 0x52; // CCT-Birne
+  CHECK(BandDriver::zenggeColorFor(p) == BandDriver::ZgColor::None);
+  CHECK(!BandDriver(BandFamily::Zengge, p).supported());
+  CHECK(BandDriver::zenggeColorFor(BandFam::ZenggeInfo()) == BandDriver::ZgColor::Hsv3B); // unbekannt
+}
+
+static void test_band_driver_packets() {
+  uint8_t b[BandDriver::MAX_PACKET];
+  size_t n;
+  // ELK unveraendert (LotusProtocol.h)
+  BandDriver elk;
+  CHECK(elk.family() == BandFamily::Elk);
+  CHECK(elk.caps().nativeBrightness && elk.caps().music && elk.caps().micEq);
+  n = elk.power(true, b);
+  CHECK(sameBytes(b, n, {0x7E, 0x04, 0x04, 0xF0, 0x00, 0x01, 0xFF, 0x00, 0xEF}));
+  n = elk.color(255, 0, 0, 50, b); // Helligkeit hat bei ELK ein eigenes Paket
+  CHECK(sameBytes(b, n, {0x7E, 0x07, 0x05, 0x03, 0xFF, 0x00, 0x00, 0x10, 0xEF}));
+  n = elk.brightness(100, b);
+  CHECK(sameBytes(b, n, {0x7E, 0x04, 0x01, 0x64, 0xFF, 0xFF, 0xFF, 0x00, 0xEF}));
+
+  // Triones (madhead/saberlight, ha-triones)
+  BandDriver tri(BandFamily::Triones);
+  CHECK(!tri.caps().nativeBrightness && !tri.caps().music);
+  n = tri.power(true, b);
+  CHECK(sameBytes(b, n, {0xCC, 0x23, 0x33}));
+  n = tri.power(false, b);
+  CHECK(sameBytes(b, n, {0xCC, 0x24, 0x33}));
+  n = tri.color(255, 0, 0, 100, b);
+  CHECK(sameBytes(b, n, {0x56, 0xFF, 0x00, 0x00, 0x00, 0xF0, 0xAA}));
+  n = tri.color(255, 100, 0, 50, b); // Helligkeit in RGB eingerechnet
+  CHECK(sameBytes(b, n, {0x56, 0x80, 0x32, 0x00, 0x00, 0xF0, 0xAA}));
+  CHECK_EQ(tri.brightness(50, b), 0u);
+  CHECK_EQ(tri.music(true, b), 0u);
+
+  // BJ_LED (8none1/bj_led)
+  BandDriver bj(BandFamily::BjLed);
+  n = bj.power(true, b);
+  CHECK(sameBytes(b, n, {0x69, 0x96, 0x02, 0x01, 0x01}));
+  n = bj.power(false, b);
+  CHECK(sameBytes(b, n, {0x69, 0x96, 0x02, 0x01, 0x00}));
+  n = bj.color(0, 255, 0, 100, b);
+  CHECK(sameBytes(b, n, {0x69, 0x96, 0x05, 0x02, 0x00, 0xFF, 0x00}));
+
+  // Zengge (8none1/lednetwf_ble): Transportschicht, Pruefsumme, Folgenummer
+  BandFam::ZenggeInfo zi;
+  zi.valid = true;
+  zi.bleVersion = 5;
+  zi.productId = 0x33;
+  BandDriver zg(BandFamily::Zengge, zi);
+  CHECK(zg.supported());
+  n = zg.power(true, b);
+  CHECK(sameBytes(b, n, {0x00, 0x00, 0x80, 0x00, 0x00, 0x0D, 0x0E, 0x0B, 0x3B, 0x23, 0, 0, 0, 0, 0, 0x00, 0x00, 0x32, 0, 0, 0x90}));
+  n = zg.color(255, 0, 0, 100, b); // 0x31, Folgenummer 1
+  CHECK(sameBytes(b, n, {0x00, 0x01, 0x80, 0x00, 0x00, 0x09, 0x0A, 0x0B, 0x31, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x0F, 0x2F}));
+  // Beispiel der Quelle: Statusabfrage 81 8A 8B 40 mit Folgenummer 1 (dort cmdId 0x0A); Aufbau der Kopfzeile identisch
+  const uint8_t q[] = {0x81, 0x8A, 0x8B, 0x40};
+  n = BandDriver::zenggeWrap(q, sizeof(q), 1, b);
+  CHECK(sameBytes(b, n, {0x00, 0x01, 0x80, 0x00, 0x00, 0x04, 0x05, 0x0B, 0x81, 0x8A, 0x8B, 0x40}));
+
+  zi.productId = 0xA1; // Symphony: 0x3B A1 mit HSV
+  BandDriver zs(BandFamily::Zengge, zi);
+  n = zs.color(255, 0, 0, 100, b);
+  CHECK(sameBytes(b, n, {0x00, 0x00, 0x80, 0x00, 0x00, 0x0D, 0x0E, 0x0B, 0x3B, 0xA1, 0x00, 0x64, 0x64, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xA3}));
+  n = zs.color(0, 0, 255, 50, b); // Blau: Farbton 240 -> (240 << 7) | 100 = 0x7864, Helligkeit 50
+  CHECK_EQ(n, 21u);
+  CHECK_EQ(b[10], 0x78);
+  CHECK_EQ(b[11], 0x64);
+  CHECK_EQ(b[12], 50);
+  CHECK_EQ(b[17], 0xFF);
+  zi.productId = 0x27; // colour_data_v2: Bytes 7-11 null
+  BandDriver zv(BandFamily::Zengge, zi);
+  n = zv.color(255, 0, 0, 100, b);
+  CHECK(sameBytes(b, n, {0x00, 0x00, 0x80, 0x00, 0x00, 0x0D, 0x0E, 0x0B, 0x3B, 0xA1, 0x00, 0x64, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xA4}));
+  CHECK_EQ(BandDriver::scale(255, 0), 0);
+  CHECK_EQ(BandDriver::scale(255, 200), 255);
+}
+
+static void test_scheduler_family_brightness_in_color() {
+  LeviCal::Model cm = defaultModel();
+  BleScheduler s;
+  s.setDriver(BandDriver(BandFamily::Triones));
+  LightSnapshot st;
+  st.power = 1;
+  st.colorRev = 1;
+  st.music = true; // Triones hat keinen Musikmodus: kein Musikpaket, Farbe trotzdem
+  s.onConnected(st);
+  BleScheduler::Step step;
+  uint32_t t = 1000;
+  BleScheduler::Cmd expected[] = {BleScheduler::Cmd::Power, BleScheduler::Cmd::Color};
+  for (BleScheduler::Cmd e : expected) {
+    CHECK(s.next(st, cm, t, step));
+    CHECK(step.cmd == e);
+    s.commit(step, true, st, t);
+    t += 225;
+  }
+  CHECK_EQ(step.len, 7u);
+  CHECK_EQ(step.packet[0], 0x56);
+  CHECK_EQ(step.packet[1], step.r); // 100 %
+  uint8_t r = step.r, g = step.g, b = step.b;
+  CHECK(!s.next(st, cm, t, step));
+  CHECK(s.fadeDone());
+
+  // Helligkeit 50 %: kein Helligkeitspaket, sondern dieselbe Farbe neu, eingerechnet
+  st.brightness = 50;
+  CHECK(s.next(st, cm, t, step));
+  CHECK(step.cmd == BleScheduler::Cmd::Color);
+  CHECK_EQ(step.r, r);
+  CHECK_EQ(step.g, g);
+  CHECK_EQ(step.b, b);
+  CHECK_EQ(step.packet[1], BandDriver::scale(r, 50));
+  CHECK_EQ(step.packet[2], BandDriver::scale(g, 50));
+  CHECK_EQ(step.packet[3], BandDriver::scale(b, 50));
+  s.commit(step, false, st, t); // Schreibfehler: erneut
+  CHECK(s.next(st, cm, t, step));
+  CHECK(step.cmd == BleScheduler::Cmd::Color);
+  s.commit(step, true, st, t);
+  CHECK(!s.next(st, cm, t, step));
+
+  // Licht aus: Helligkeit wartet, nach dem Einschalten geht die Farbe mit neuer Helligkeit raus
+  st.power = 0;
+  CHECK(s.next(st, cm, t, step));
+  CHECK(step.cmd == BleScheduler::Cmd::Power);
+  s.commit(step, true, st, t);
+  st.brightness = 20;
+  CHECK(!s.next(st, cm, t, step));
+  st.power = 1;
+  CHECK(s.next(st, cm, t, step));
+  CHECK(step.cmd == BleScheduler::Cmd::Power);
+  s.commit(step, true, st, t);
+  CHECK(s.next(st, cm, t, step));
+  CHECK(step.cmd == BleScheduler::Cmd::Color);
+  CHECK_EQ(step.packet[1], BandDriver::scale(r, 20));
+  s.commit(step, true, st, t);
+  CHECK(!s.next(st, cm, t, step));
+}
+
 void tests_gateway(void) {
   RUN(test_light_model_semantics);
   RUN(test_scheduler_order_after_connect);
@@ -731,6 +976,11 @@ void tests_gateway(void) {
   RUN(test_scheduler_color_calibrated_and_raw_throttle);
   RUN(test_scheduler_music_eq_and_power_off);
   RUN(test_scheduler_fade);
+  RUN_D(test_scheduler_family_brightness_in_color, "Bandfamilie ohne Helligkeitspaket (Triones): Helligkeit im Farbpaket, kein Musikpaket");
+  RUN_D(test_band_family_names, "Bandfamilien: Erkennung am Geraetenamen (ELK, Triones, Zengge, BJ_LED; IOTBT ausgeschlossen)");
+  RUN_D(test_band_family_gatt_match, "Bandfamilien: Schreibziel aus der GATT-Struktur, GATT gewinnt gegen den Namen");
+  RUN_D(test_band_family_zengge_info, "Zengge: Produkt-ID und BLE-Version aus Herstellerdaten bzw. Name, Wahl des Farbpakets");
+  RUN_D(test_band_driver_packets, "Bandfamilien: Pakete fuer Ein/Aus, Farbe, Helligkeit (ELK, Triones, BJ_LED, Zengge mit Transportschicht)");
   RUN(test_calib_store_persistence);
   RUN(test_calib_defaults_points);
   RUN(test_calib_matches_legacy_core);

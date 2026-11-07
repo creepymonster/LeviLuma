@@ -1,6 +1,42 @@
-# LED-Band (ELK / Lotus Lantern)
+# LED-Bänder
 
-Alles, was das Projekt über die BLE-LED-Leiste weiß, die Legacy und das Next-Gateway steuern. Jede Angabe nennt ihre Herkunft. Legacy liegt im Branch [`legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy); Legacy-Pfade unten sind relativ zu dessen Root.
+Alles, was das Projekt über die BLE-LED-Leisten weiß, die Legacy und das Next-Gateway steuern. Jede Angabe nennt ihre Herkunft. Legacy liegt im Branch [`legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy); Legacy-Pfade unten sind relativ zu dessen Root.
+
+## Bandfamilien
+
+Das Next-Gateway kann mehrere Familien von BLE-Bändern ansteuern. Legacy kennt nur ELK.
+
+| Familie | Namen (Beispiele) | Schreibziel (Service / Characteristic) | Im Gateway genutzt | Stand | Befehle |
+|---|---|---|---|---|---|
+| **ELK / Lotus Lantern** | `ELK-BLEDDM`, `ELK-BLEDOM`, `ELK-BLEDOB`, `MELK`, `LEDBLE` | `FFF0` / `FFF3` | Ein/Aus, Farbe, Helligkeit, Musik, Mikrofon-EQ | Ein/Aus, Farbe, Helligkeit **am Gerät getestet (Legacy)** | dieses Dokument, unten |
+| **Triones / HappyLighting** | `Triones`, `LEDBlue`, `LEDBLE`, `Dream~`, `QHM-` | `FFD5` / `FFD9` oder `FFE5` / `FFE9` | Ein/Aus, Farbe (Helligkeit eingerechnet) | **ungetestet** | [triones.md](triones.md) |
+| **Zengge / LEDnetWF** | `LEDnetWF…`, `IOTWF…` | `FFFF` / `FF01` | Ein/Aus, Farbe (Helligkeit im Farbpaket) | **ungetestet** | [zengge.md](zengge.md) |
+| **BJ_LED (MohuanLED)** | `BJ_LED` | beliebiger Service / `EE01` | Ein/Aus, Farbe (Helligkeit eingerechnet) | **ungetestet** | [bjled.md](bjled.md) |
+
+### Wie das Gateway die Familie bestimmt
+
+1. **Scan:** Kandidaten sind Geräte, deren Name zu einer Familie passt (`BandFam::fromName`). Ohne gemerktes Band wird das stärkste davon gewählt, mit gemerktem Band nur dieses (`BandMemory`, unverändert). Der Name ist nur ein **Hinweis**: `LEDBLE` z. B. nutzen ELK- und Triones-Geräte.
+2. **Nach dem Verbinden** liest das Gateway alle Services und Characteristics und sucht das erste bekannte, beschreibbare Schreibziel (`BandFam::matchGatt`). Die Profile der Namensfamilie werden zuerst geprüft, danach die übrigen. **Die GATT-Struktur entscheidet.** Wird nichts gefunden, trennt das Gateway und versucht es nach 4 s erneut.
+3. **Zengge** braucht zusätzlich Produkt-ID und BLE-Version aus den Herstellerdaten der Werbung (ersatzweise aus dem langen Namen), um das richtige Farbpaket zu wählen. Nicht unterstützte Zengge-Varianten (IOTBT, nur Weiß, Dimmer, Schalter) werden nach dem Erkennen getrennt.
+4. Die Familie wird **nicht gespeichert**, sondern bei jeder Verbindung neu bestimmt. Gemerkt wird wie bisher nur die Adresse. Konsole `band` zeigt die Familie der letzten Verbindung, das Log die gefundene Familie und alle Characteristics (Debug-Stufe).
+
+### Aufbau im Code
+
+| Teil | Datei | Aufgabe |
+|---|---|---|
+| Erkennung | `gateway/components/light_core/include/band_family.h` | Namen, Profile (Service/Characteristic), GATT-Abgleich, Zengge-Herstellerdaten. Hosttestbar. |
+| Paketbau | `gateway/components/light_core/include/band_driver.h` | Ein Paketbauer für alle Familien (`BandDriver`), Fähigkeiten je Familie (`BandCaps`: eigenes Helligkeitspaket, Musik, Mikrofon-EQ). Hosttestbar. |
+| Reihenfolge | `gateway/components/light_core/src/ble_scheduler.cpp` | Unverändert: Musik, Mikrofon-EQ, Helligkeit, Ein/Aus, Farbe. Ohne eigenes Helligkeitspaket sendet eine Helligkeitsänderung die Farbe neu; Musik/EQ werden bei Familien ohne diese Funktion übergangen. |
+| Funk | `gateway/main/ble_link.cpp` | Scan (mit Herstellerdaten), GATT-Suche, Schreiben mit variabler Paketlänge. |
+| Tests | `tests/test_gateway.cpp` | Namen, GATT-Abgleich, Zengge-Angaben, Pakete aller Familien (Erwartungswerte aus den Quellen), Scheduler mit eingerechneter Helligkeit. |
+
+**Neue Familie hinzufügen:** Namen und Profil in `band_family.cpp`, Pakete in `band_driver.cpp` (`power`, `color`, ggf. `brightness`/`music`/`micEq` und `caps`), Tests in `tests/test_gateway.cpp`, Doku hier als eigene Datei. Die Kalibrierung gilt für alle Familien gleich (auf die Farbe vor dem Paketbau).
+
+**Neue Funktion (z. B. Effekte):** Die Befehle aller Familien stehen in den Familiendateien. Dafür braucht es zuerst eine Erweiterung des ESP-NOW-Protokolls (`shared/protocol/`) und des LightState; erst dann ein weiterer Schritt im `BleScheduler` und eine Methode im `BandDriver`.
+
+# ELK / Lotus Lantern
+
+Bisher einzige Familie, die Legacy und Next am Gerät gesteuert haben. Kennzeichnung der Angaben:
 
 - **„am Gerät getestet (Legacy)“**: im Legacy-Projekt am Band ausprobiert (laut `README.md` und `include/LotusProtocol.h` im Branch `legacy`).
 - **„am Gerät beobachtet“**: in Logs des Entwicklers mit dem Band `ELK-BLEDDM 96` gesehen. Das ist kein systematischer Test aller Bänder der Familie.
@@ -49,6 +85,37 @@ Beispiele zum Abtippen:
 | Blau 0,0,255 | `7E0705030000FF10EF` |
 | Weiß 255,255,255 | `7E070503FFFFFF10EF` |
 
+### Weitere Befehle (nicht genutzt, ungetestet)
+
+Aus dem Rust-Projekt [TheSylex/ELK-BLEDOM-bluetooth-led-strip-controller](https://github.com/TheSylex/ELK-BLEDOM-bluetooth-led-strip-controller) (`src/device.rs`, keine Lizenzdatei; nur Fakten übernommen). Dort ist **Byte 1 immer `00`**, bei uns `04`/`05`/`07` wie in der Original-App. Ob das Band Byte 1 auswertet, ist nicht geprüft.
+
+| Befehl | Paket | Hinweis |
+|---|---|---|
+| Ein / Aus | `7E0004F00001FF00EF` / `7E0004000000FF00EF` | wie unsere Pakete, nur Byte 1 = `00` |
+| Farbe | `7E000503` **RR GG BB** `00EF` | Byte 7 = `00` statt `10` |
+| Helligkeit | `7E0001` **BB** `00000000EF` (0–100) | Füllbytes `00` statt `FF` |
+| Effekt | `7E0003` **EE** `03000000EF` | EE siehe Tabelle unten |
+| Effektgeschwindigkeit | `7E0002` **SS** `00000000EF` (0–100) | |
+| Uhrzeit setzen | `7E0083` **hh mm ss WT** `00EF` | WT = Wochentag 1–7, Montag = 1 |
+| Zeitplan Ein | `7E0082` **hh mm** `0000` **TT** `EF` | TT = Wochentage als Bitmaske (Mo `01`, Di `02`, Mi `04`, Do `08`, Fr `10`, Sa `20`, So `40`), `+80` = aktiv |
+| Zeitplan Aus | `7E0082` **hh mm** `0001` **TT** `EF` | wie oben |
+
+Befehl `03` wählt einen Modus, Byte 4 den Typ: `03` = eingebauter Effekt (oben), `04` = Mikrofon-EQ (unser `Lotus::micEq`, Byte 3 = `80`–`83`). Das ist aus dem Vergleich beider Quellen geschlossen, nicht am Band geprüft.
+
+| EE | Effekt | EE | Effekt |
+|---|---|---|---|
+| `87` | Springen Rot/Grün/Blau | `92` | Überblenden Rot/Grün |
+| `88` | Springen sieben Farben | `93` | Überblenden Rot/Blau |
+| `89` | Überblenden Rot/Grün/Blau | `94` | Überblenden Grün/Blau |
+| `8A` | Überblenden sieben Farben | `95` | Blinken sieben Farben |
+| `8B` | Überblenden Rot | `96` | Blinken Rot |
+| `8C` | Überblenden Grün | `97` | Blinken Grün |
+| `8D` | Überblenden Blau | `98` | Blinken Blau |
+| `8E` | Überblenden Gelb | `99` | Blinken Gelb |
+| `8F` | Überblenden Cyan | `9A` | Blinken Cyan |
+| `90` | Überblenden Magenta | `9B` | Blinken Magenta |
+| `91` | Überblenden Weiß | `9C` | Blinken Weiß |
+
 Die Firmware rechnet Farben vor dem Senden mit der Kalibrierung um (`CalibCore.h`). Das Gateway-Log (`BLE: Farbe … Paket …`) zeigt deshalb das tatsächlich gesendete Paket, nicht die gewählte Farbe.
 
 **Mit LightBlue senden:** Gateway bzw. Legacy-Gerät vom Strom nehmen (sonst ist das Band belegt), mit dem Band verbinden, Service `FFF0` → Characteristic `FFF3` → Hex ohne Leerzeichen, „Write without response“.
@@ -56,6 +123,7 @@ Die Firmware rechnet Farben vor dem Senden mit der Kalibrierung um (`CalibCore.h
 ## Ansteuerung durch die Firmware
 
 Gilt für Legacy (`src/ble.cpp`) und Next (`BleScheduler`, `gateway/components/light_core/`).
+Im Next-Gateway gilt das für alle Familien. Abweichungen bei Familien ohne eigenes Helligkeitspaket oder ohne Musikmodus: siehe [Aufbau im Code](#aufbau-im-code).
 
 - **Ein Befehl pro Zeitfenster**, nach jedem gesendeten Befehl 200 ms Pause. Helligkeit und Farbe nie im selben Schritt.
 - **Reihenfolge**: Musikmodus, Mikrofon-EQ, Helligkeit, Ein/Aus, Farbe.
@@ -101,5 +169,6 @@ Details zur Kalibrierung: `docs/KALIBRIERUNG.md`.
 |---|---|---|
 | Pakete | `include/LotusProtocol.h` | `gateway/components/light_core/include/LotusProtocol.h` |
 | Senden, Reihenfolge, Pausen | `src/ble.cpp` (`bleTask`) | `light_core/src/ble_scheduler.cpp`, `gateway/main/ble_link.cpp` |
-| Bandauswahl | `bleNameMatches()` | `light_core/src/band_memory.cpp` |
-| Diagnose | – | Gateway-Konsole: `status`, `band`, `band forget`, `ble rsp on/off`, `ble off/on`; Log mit Hex-Paketen |
+| Bandauswahl | `bleNameMatches()` | `light_core/src/band_memory.cpp`, Namen in `light_core/src/band_family.cpp` |
+| Familienerkennung, Paketbau | – (nur ELK) | `light_core/src/band_family.cpp`, `light_core/src/band_driver.cpp` |
+| Diagnose | – | Gateway-Konsole: `status`, `band` (mit Familie der letzten Verbindung), `band forget`, `ble rsp on/off`, `ble off/on`; Log mit Hex-Paketen |

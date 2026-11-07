@@ -23,6 +23,8 @@ add_executable(levi_tests
   ${NEXT}/gateway/components/light_core/src/pairing_table.cpp
   ${NEXT}/gateway/components/light_core/src/gateway_handler.cpp
   ${NEXT}/gateway/components/light_core/src/band_memory.cpp
+  ${NEXT}/gateway/components/light_core/src/band_family.cpp
+  ${NEXT}/gateway/components/light_core/src/band_driver.cpp
   ${NEXT}/controller/components/controller_core/src/gateway_registry.cpp
   ${NEXT}/controller/components/controller_core/src/ctrl_link.cpp
   ${NEXT}/controller/components/controller_core/src/zb_mapping.cpp

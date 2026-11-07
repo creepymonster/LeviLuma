@@ -1,7 +1,7 @@
 #pragma once
 // Gemeinsame Objekte der Gateway-Firmware.
 // Nebenlaeufigkeit:
-//  - gwLock schuetzt LightModel, CalibStore, PairingTable, GatewayHandler und BandMemory.
+//  - gwLock schuetzt LightModel, CalibStore, PairingTable, GatewayHandler, BandMemory und bandInfo.
 //  - Der BLE-Task liest nur Kopien (gwSnapshot, gwCalibCopy) und meldet ueber gwSetBle/gwMarkSent.
 //  - Der Link-Task (ESP-NOW) ist der einzige, der Rahmen verarbeitet und sendet.
 #include <stdint.h>
@@ -32,6 +32,7 @@ struct GatewayContext {
   CalibStore *calib;
   PairingTable *pairing;
   BandMemory *band; // gemerktes Band (BLE-Adresse)
+  char bandInfo[64]; // Familie/Variante des zuletzt verbundenen Bands (BLE-Task schreibt, Konsole liest, beides unter lock)
   GatewayHandler *handler;
   uint8_t key[LEVI_KEY_LEN];
   bool hasKey;
