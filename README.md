@@ -1,6 +1,6 @@
 # LeviLuma Next
 
-Steuerung von BLE-LED-Leisten der ELK-/Lotus-Lantern-Familie (`ELK-BLEDDM` u. a.): Je Leiste ein Gateway, bedient über einen Controller per ESP-NOW, optional über Zigbee (FRITZ!Box). Die ursprüngliche LeviLuma-Firmware (Waveshare ESP32-S3-Touch-LCD-1.28, steuert eine Leiste direkt per BLE, mit Web-UI) ist im Branch [`legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy) verfügbar.
+Steuerung von BLE-LED-Leisten der ELK-/Lotus-Lantern-Familie (`ELK-BLEDDM` u. a.; vorbereitet und ungetestet: Triones, Zengge LEDnetWF, BJ_LED, siehe [`hardware/led-band/`](hardware/led-band/README.md)): Je Leiste ein Gateway, bedient über einen Controller per ESP-NOW, optional über Zigbee (FRITZ!Box). Die ursprüngliche LeviLuma-Firmware (Waveshare ESP32-S3-Touch-LCD-1.28, steuert eine Leiste direkt per BLE, mit Web-UI) ist im Branch [`legacy`](https://github.com/creepymonster/LeviLuma/tree/legacy) verfügbar.
 
 Zwei zusammengehörige ESP-IDF-Firmware-Projekte (kein Arduino):
 
@@ -83,7 +83,7 @@ Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises t
 |---|---|
 | `shared/protocol/` | `leviluma_proto` (Rahmen, Typen, CRC, Kodierung), `leviluma_link` (Wiederholung, Duplikaterkennung), `Kconfig` (Kanal, PMK, Zeiten – für beide Projekte gleich) |
 | `shared/common/` | `KvStore` (NVS bzw. RAM für Tests), `levi_key` (Schlüssel als 32 Hex-Zeichen) |
-| `gateway/components/light_core/` | Hosttestbare Gateway-Logik: `LightModel` (LightState), `BleScheduler` (Befehlsreihenfolge aus Legacy `bleTask`), `CalibStore` (Legacy-Kalibrierung + NVS), `PairingTable`, `GatewayHandler` (Protokoll), `BandMemory` (gemerktes Band, Auswahl nach dem Scan), Kopien `CalibCore.h`, `ColorMath.h`, `LotusProtocol.h` |
+| `gateway/components/light_core/` | Hosttestbare Gateway-Logik: `LightModel` (LightState), `BleScheduler` (Befehlsreihenfolge aus Legacy `bleTask`), `CalibStore` (Legacy-Kalibrierung + NVS), `PairingTable`, `GatewayHandler` (Protokoll), `BandMemory` (gemerktes Band, Auswahl nach dem Scan), `BandFam`/`BandDriver` (Bandfamilien, Paketbau), Kopien `CalibCore.h`, `ColorMath.h`, `LotusProtocol.h` |
 | `gateway/main/` | ESP-IDF-Anbindung: ESP-NOW (`espnow_link.cpp`), NimBLE-Central (`ble_link.cpp`), Konsole, BOOT-Taste/LED |
 | `controller/components/controller_core/` | Hosttestbare Controller-Logik: `GatewayRegistry`, `CtrlLink` (Erkennung, Kopplung, Befehle, Abgleich), `ZbMap` (Endpoint-Zuordnung, Farbumrechnung), `TouchCal`, `Palette.h` (Kopie Legacy) |
 | `controller/main/` | Hardware (`board.cpp`), LVGL-Port, Dienst (`app.cpp`), Oberfläche (`ui_*.cpp`), Zigbee (`zigbee_bridge.cpp`, `ui_zigbee.cpp`, nur mit Flag) |
@@ -147,6 +147,7 @@ Die geprüfte, automatisch erzeugte Auswertung (Ergebnisse je Test, getesteter C
 7. Zigbee: Beitritt zur FRITZ!Box 5690 Pro, Darstellung mehrerer Endpoints, Farbbefehle (xy/Hue/Farbtemperatur), Koexistenz Zigbee + ESP-NOW auf dem C5.
 8. Kalibrierassistent am Band (Vorschau-Drosselung 400 ms).
 9. XIAO: LED-Polarität, BOOT-Taste als Kopplungstaste im Betrieb.
+10. Weitere Bandfamilien (Triones, Zengge LEDnetWF, BJ_LED): Erkennung über Name und GATT, Ein/Aus, Farbe, Helligkeit im Farbpaket. Pakete stammen aus Fremdquellen (`hardware/led-band/`), kein Gerät vorhanden.
 
 ### Bekannte Einschränkungen
 

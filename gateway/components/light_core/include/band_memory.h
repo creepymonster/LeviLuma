@@ -1,8 +1,10 @@
 #pragma once
 // Gemerktes Band des Gateways (persistent, NVS ueber KvStore) und Auswahl nach dem BLE-Scan.
 // Regeln:
-//  - Ohne gemerktes Band: das staerkste Geraet mit passendem Namen der ELK-/Lotus-Familie (wie Legacy).
-//    Nach der ersten erfolgreichen Verbindung (Service 0xFFF0 / Characteristic 0xFFF3 gefunden) wird es gemerkt.
+//  - Ohne gemerktes Band: das staerkste Geraet, dessen Name zu einer unterstuetzten Bandfamilie passt
+//    (BandFam::fromName: ELK wie Legacy, dazu Triones, Zengge, BJ_LED). Nach der ersten erfolgreichen Verbindung
+//    (bekanntes Schreibziel gefunden, siehe BandFam::matchGatt) wird es gemerkt.
+//  - Die Familie wird nicht gespeichert, sondern nach jedem Verbinden aus der GATT-Struktur bestimmt.
 //  - Mit gemerktem Band: nur dieses Band (Adresse und Adresstyp), unabhaengig von Name und Signalstaerke.
 //    Andere passende Baender werden ignoriert, damit ein Gateway nie das Band eines anderen Gateways uebernimmt.
 //  - Vergessen nur ausdruecklich (Konsole "band forget").
@@ -50,7 +52,7 @@ public:
 
   Choice choose(const Candidate *c, int n) const;
 
-  // Namen der Lotus-Lantern-/ELK-Familie (gleiches Protokoll, Service 0xFFF0), wie Legacy bleNameMatches()
+  // Name passt zu einer unterstuetzten Bandfamilie (BandFam::fromName; ELK-Namen wie Legacy bleNameMatches())
   static bool nameMatches(const char *name);
   static bool sameAddr(const Addr &a, const Addr &b);
   // "aa:bb:cc:dd:ee:ff" (hoechstwertiges Byte zuerst, wie NimBLE-Ausgaben und Handy-Apps)

@@ -1,7 +1,10 @@
-// BLE-Anbindung des Gateways an genau ein Band der ELK-/Lotus-Familie (NimBLE, ESP-IDF).
+// BLE-Anbindung des Gateways an genau ein Band (NimBLE, ESP-IDF).
 // Portiert aus legacy/src/ble.cpp (NimBLE-Arduino): Scan (CONFIG_LEVILUMA_BLE_SCAN_MS), Auswahl ueber BandMemory
-// (gemerktes Band, sonst staerkstes passendes Geraet, das nach erfolgreicher Verbindung gemerkt wird), Verbinden, 1 s warten, Service 0xFFF0 / Characteristic 0xFFF3 suchen, dann Befehle senden
+// (gemerktes Band, sonst staerkstes Geraet mit Namen einer unterstuetzten Familie, das nach erfolgreicher Verbindung
+// gemerkt wird), Verbinden, 1 s warten, alle Services/Characteristics lesen und daraus die Bandfamilie bestimmen
+// (BandFam::matchGatt, z. B. ELK: Service 0xFFF0 / Characteristic 0xFFF3), dann Befehle senden
 // (ein Befehl pro Zeitfenster, 200 ms Pause nach jedem gesendeten Befehl). Neuer Versuch alle 4 s.
+// Familien und Pakete: light_core (band_family.h, band_driver.h), Doku hardware/led-band/.
 #include "freertos/FreeRTOS.h"
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +15,8 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "sdkconfig.h"
+#include "band_driver.h"
+#include "band_family.h"
 #include "ble_scheduler.h"
 #include "gateway.h"
 
@@ -35,6 +40,8 @@ struct Seen {
   ble_addr_t addr;
   int8_t rssi;
   char name[32];
+  uint8_t mfg[32]; // Herstellerdaten (AD 0xFF, mit Company-ID), fuer Zengge-Produkt-ID und BLE-Version
+  uint8_t mfgLen;
 };
 static Seen seen[MAX_SEEN];
 static int seenN = 0;
@@ -44,8 +51,20 @@ static ble_addr_t scanTarget;
 static volatile uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE;
 static volatile bool writePending = false; // Schreiben mit Bestaetigung unterwegs: kein weiteres starten
 static volatile int connStatus = -1;
-static uint16_t svcStart = 0, svcEnd = 0, chrHandle = 0;
+static uint16_t chrHandle = 0;
 static uint8_t chrProps = 0;
+
+// GATT-Suche nach dem Verbinden: alle Services, dann alle Characteristics je Service
+static constexpr int MAX_SVCS = 16;
+static constexpr int MAX_CHRS = 48;
+struct SvcRange {
+  uint16_t start, end, uuid16;
+};
+static SvcRange svcs[MAX_SVCS];
+static int svcN = 0;
+static BandFam::GattChr chrs[MAX_CHRS];
+static int chrN = 0;
+static BandDriver connDriver; // Familie des verbundenen Bands, uebernimmt bleTask nach scanAndConnect()
 
 static void onSync() {
   ble_hs_id_infer_auto(0, &ownAddrType);
@@ -91,10 +110,17 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
     s->rssi = ev->disc.rssi;
     struct ble_hs_adv_fields f;
 
-    if (ble_hs_adv_parse_fields(&f, ev->disc.data, ev->disc.length_data) == 0 && f.name && f.name_len) {
-      size_t n = f.name_len < sizeof(s->name) - 1 ? f.name_len : sizeof(s->name) - 1;
-      memcpy(s->name, f.name, n);
-      s->name[n] = 0;
+    if (ble_hs_adv_parse_fields(&f, ev->disc.data, ev->disc.length_data) == 0) {
+      if (f.name && f.name_len) {
+        size_t n = f.name_len < sizeof(s->name) - 1 ? f.name_len : sizeof(s->name) - 1;
+        memcpy(s->name, f.name, n);
+        s->name[n] = 0;
+      }
+      if (f.mfg_data && f.mfg_data_len) {
+        size_t n = f.mfg_data_len < sizeof(s->mfg) ? f.mfg_data_len : sizeof(s->mfg);
+        memcpy(s->mfg, f.mfg_data, n);
+        s->mfgLen = (uint8_t)n;
+      }
     }
     break;
   }
@@ -176,18 +202,27 @@ static int gapEvent(struct ble_gap_event *ev, void *) {
 
 static int onSvc(uint16_t, const struct ble_gatt_error *err, const struct ble_gatt_svc *svc, void *) {
   if (err->status == 0 && svc) {
-    svcStart = svc->start_handle;
-    svcEnd = svc->end_handle;
+    if (svcN < MAX_SVCS) {
+      svcs[svcN].start = svc->start_handle;
+      svcs[svcN].end = svc->end_handle;
+      svcs[svcN].uuid16 = ble_uuid_u16(&svc->uuid.u); // 0 bei 128-Bit-UUID
+      svcN++;
+    }
   } else {
     xSemaphoreGive(evSem); // BLE_HS_EDONE oder Fehler
   }
   return 0;
 }
 
-static int onChr(uint16_t, const struct ble_gatt_error *err, const struct ble_gatt_chr *chr, void *) {
+static int onChr(uint16_t, const struct ble_gatt_error *err, const struct ble_gatt_chr *chr, void *arg) {
   if (err->status == 0 && chr) {
-    chrHandle = chr->val_handle;
-    chrProps = chr->properties;
+    if (chrN < MAX_CHRS) {
+      chrs[chrN].svc = (uint16_t)(uintptr_t)arg;
+      chrs[chrN].chr = ble_uuid_u16(&chr->uuid.u);
+      chrs[chrN].handle = chr->val_handle;
+      chrs[chrN].props = chr->properties;
+      chrN++;
+    }
   } else {
     xSemaphoreGive(evSem);
   }
@@ -248,7 +283,10 @@ static bool scanAndConnect() {
     char a[18];
     BandMemory::addrToStr(cands[i].addr, a, sizeof(a));
     const char *mark = i == ch.index ? (remembered ? "  <- gemerktes Band" : "  <- gewaehlt") : "";
-    if (seen[i].name[0]) {
+    BandFamily fam = BandFam::fromName(seen[i].name);
+    if (seen[i].name[0] && fam != BandFamily::Unknown) {
+      ESP_LOG_LEVEL_LOCAL(lvl, TAG, "BLE:   %s  RSSI %d  Name \"%s\" (Familie %s laut Name)%s", a, seen[i].rssi, seen[i].name, BandFam::name(fam), mark);
+    } else if (seen[i].name[0]) {
       ESP_LOG_LEVEL_LOCAL(lvl, TAG, "BLE:   %s  RSSI %d  Name \"%s\"%s", a, seen[i].rssi, seen[i].name, mark);
     } else {
       ESP_LOG_LEVEL_LOCAL(lvl, TAG, "BLE:   %s  RSSI %d  (kein Name empfangen)%s", a, seen[i].rssi, mark);
@@ -257,7 +295,7 @@ static bool scanAndConnect() {
 
   switch (ch.reason) {
   case BandMemory::Reason::None:
-    ESP_LOGI(TAG, "BLE: kein Band gemerkt und kein Geraet der ELK/Lotus-Familie gefunden, naechster Versuch in 4 s");
+    ESP_LOGI(TAG, "BLE: kein Band gemerkt und kein Geraet einer unterstuetzten Bandfamilie gefunden, naechster Versuch in 4 s");
     return false;
   case BandMemory::Reason::RememberedMissing:
     if (ch.ignored) {
@@ -288,35 +326,68 @@ static bool scanAndConnect() {
   ESP_LOGI(TAG, "BLE: verbunden");
   // Band braucht 1 s nach dem Verbinden, bevor die Services gelesen werden.
   vTaskDelay(pdMS_TO_TICKS(1000));
-  svcStart = svcEnd = chrHandle = 0;
+  chrHandle = 0;
   chrProps = 0;
-  ble_uuid16_t svcUuid = BLE_UUID16_INIT(0xFFF0);
-  ble_uuid16_t chrUuid = BLE_UUID16_INIT(0xFFF3);
+  svcN = 0;
+  chrN = 0;
   xSemaphoreTake(evSem, 0);
 
-  if (ble_gattc_disc_svc_by_uuid(connHandle, &svcUuid.u, onSvc, nullptr) == 0) {
+  if (ble_gattc_disc_all_svcs(connHandle, onSvc, nullptr) == 0) {
     waitEv(5000);
   }
-  if (svcStart) {
+  for (int i = 0; i < svcN && connHandle != BLE_HS_CONN_HANDLE_NONE; i++) {
     xSemaphoreTake(evSem, 0);
-    if (ble_gattc_disc_chrs_by_uuid(connHandle, svcStart, svcEnd, &chrUuid.u, onChr, nullptr) == 0) {
+    if (ble_gattc_disc_all_chrs(connHandle, svcs[i].start, svcs[i].end, onChr, (void *)(uintptr_t)svcs[i].uuid16) == 0) {
       waitEv(5000);
     }
   }
-  // Legacy prueft canWriteNoResponse(): Schreiben ohne Antwort muss erlaubt sein
-  if (!chrHandle || !(chrProps & BLE_GATT_CHR_PROP_WRITE_NO_RSP)) {
-    ESP_LOGW(TAG, "BLE: Service 0xFFF0 oder Characteristic 0xFFF3 (ohne Antwort schreibbar) fehlt, trenne");
+  for (int i = 0; i < chrN; i++) {
+    ESP_LOGD(TAG, "BLE:   Service 0x%04X  Characteristic 0x%04X  Handle %u  Eigenschaften 0x%02X", chrs[i].svc, chrs[i].chr, chrs[i].handle,
+             chrs[i].props);
+  }
+  // Familie: Name ist nur Hinweis, die GATT-Struktur entscheidet
+  BandFamily hint = BandFam::fromName(seen[best].name);
+  BandFam::Match m;
+  bool found = BandFam::matchGatt(hint, chrs, chrN, m);
+  BandFam::ZenggeInfo zi;
+  if (found && m.family == BandFamily::Zengge && !BandFam::parseZenggeMfg(seen[best].mfg, seen[best].mfgLen, zi)) {
+    BandFam::parseZenggeName(seen[best].name, zi);
+  }
+  BandDriver drv = found ? BandDriver(m.family, zi) : BandDriver();
+  char desc[64];
+  drv.describe(desc, sizeof(desc));
+
+  if (!found || !drv.supported()) {
+    if (!found) {
+      ESP_LOGW(TAG, "BLE: kein bekanntes Schreibziel gefunden (%d Services, %d Characteristics; Liste auf Debug-Stufe), trenne", svcN, chrN);
+    } else {
+      ESP_LOGW(TAG, "BLE: Bandfamilie erkannt (%s), diese Variante wird nicht unterstuetzt, trenne", desc);
+    }
     if (connHandle != BLE_HS_CONN_HANDLE_NONE) {
       ble_gap_terminate(connHandle, BLE_ERR_REM_USER_CONN_TERM);
     }
     return false;
   }
-  if (!(chrProps & BLE_GATT_CHR_PROP_WRITE)) {
+  const BandFam::GattChr &c = chrs[m.index];
+  if (m.family != hint && hint != BandFamily::Unknown) {
+    ESP_LOGI(TAG, "BLE: Name deutet auf %s, GATT-Struktur auf %s; verwendet wird %s", BandFam::name(hint), BandFam::name(m.family),
+             BandFam::name(m.family));
+  }
+  if (m.family != BandFamily::Elk) {
+    ESP_LOGW(TAG, "BLE: Bandfamilie %s ist NICHT am Geraet getestet (Pakete aus Fremdquellen, siehe hardware/led-band/)", BandFam::name(m.family));
+  }
+  if (!(c.props & BandFam::PROP_WRITE)) {
     ESP_LOGW(TAG, "BLE: Band bietet kein Schreiben mit Bestaetigung an, es wird ohne Antwort geschrieben");
   }
-  ESP_LOGI(TAG, "BLE: Service 0xFFF0 / Characteristic 0xFFF3 gefunden (Handle %u, Eigenschaften 0x%02X: %s%s%s%s)", chrHandle, chrProps,
-           (chrProps & BLE_GATT_CHR_PROP_WRITE_NO_RSP) ? "Write-without-response " : "", (chrProps & BLE_GATT_CHR_PROP_WRITE) ? "Write " : "",
-           (chrProps & BLE_GATT_CHR_PROP_READ) ? "Read " : "", (chrProps & BLE_GATT_CHR_PROP_NOTIFY) ? "Notify" : "");
+  ESP_LOGI(TAG, "BLE: Bandfamilie %s, Service 0x%04X / Characteristic 0x%04X (Handle %u, Eigenschaften 0x%02X: %s%s%s%s)", desc, c.svc, c.chr, c.handle,
+           c.props, (c.props & BandFam::PROP_WRITE_NO_RSP) ? "Write-without-response " : "", (c.props & BandFam::PROP_WRITE) ? "Write " : "",
+           (c.props & BandFam::PROP_READ) ? "Read " : "", (c.props & BandFam::PROP_NOTIFY) ? "Notify" : "");
+  connDriver = drv;
+  chrProps = c.props;
+  chrHandle = c.handle;
+  xSemaphoreTake(gw.lock, portMAX_DELAY);
+  snprintf(gw.bandInfo, sizeof(gw.bandInfo), "%s", desc);
+  xSemaphoreGive(gw.lock);
 
   // Erste erfolgreiche Verbindung: Band dauerhaft merken (erst nach gefundenem Service, nicht schon beim Scan)
   if (!remembered) {
@@ -403,6 +474,7 @@ static void bleTask(void *) {
 
         if (scanAndConnect()) {
           s = gwSnapshot();
+          sched.setDriver(connDriver);
           sched.onConnected(s);
           gwSetBle(true);
           ready = true;
@@ -433,25 +505,33 @@ static void bleTask(void *) {
         // auf die Bestaetigung des vorigen Pakets warten (NimBLE begrenzt offene GATT-Vorgaenge)
       } else if (sched.next(s, cal, now, st)) {
         // Standard: mit Bestaetigung, sofern das Band "Write" anbietet; sonst bzw. mit "ble rsp off" ohne Antwort wie Legacy.
-        bool withRsp = gw.bleWriteRsp && (chrProps & BLE_GATT_CHR_PROP_WRITE);
+        // Bietet das Band nur "Write" an, wird immer mit Bestaetigung geschrieben.
+        bool canRsp = chrProps & BLE_GATT_CHR_PROP_WRITE;
+        bool withRsp = canRsp && (gw.bleWriteRsp || !(chrProps & BLE_GATT_CHR_PROP_WRITE_NO_RSP));
+        if (st.len == 0) {
+          // Familie kennt den Befehl nicht (sollte nicht vorkommen: der Scheduler fragt nur Unterstuetztes ab)
+          ESP_LOGW(TAG, "BLE: %s fuer Bandfamilie %s nicht verfuegbar, uebersprungen", cmdName(st.cmd), BandFam::name(sched.driver().family()));
+          sched.commit(st, true, s, now);
+          vTaskDelay(pdMS_TO_TICKS(25));
+          continue;
+        }
         if (withRsp) {
           writePending = true;
         }
-        int rc = withRsp ? ble_gattc_write_flat(connHandle, chrHandle, st.packet, sizeof(st.packet), onWriteRsp, (void *)(uintptr_t)now)
-                         : ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, sizeof(st.packet));
+        int rc = withRsp ? ble_gattc_write_flat(connHandle, chrHandle, st.packet, st.len, onWriteRsp, (void *)(uintptr_t)now)
+                         : ble_gattc_write_no_rsp_flat(connHandle, chrHandle, st.packet, st.len);
         if (rc != 0) {
           writePending = false;
         }
         bool ok = rc == 0;
         sched.commit(st, ok, s, now);
         char hex[2 * sizeof(st.packet) + 1];
-        packetHex(st.packet, sizeof(st.packet), hex, sizeof(hex));
+        packetHex(st.packet, st.len, hex, sizeof(hex));
 
         if (!ok) {
           ESP_LOGW(TAG, "BLE: %s schreiben fehlgeschlagen (%d), Paket %s", cmdName(st.cmd), rc, hex);
         } else if (st.cmd == BleScheduler::Cmd::Color) {
-          ESP_LOGI(TAG, "BLE: Farbe Schritt %d/%d -> %u,%u,%u%s, Paket %s", st.fadeStep, st.fadeN, st.packet[4], st.packet[5], st.packet[6],
-                   st.raw ? " (raw)" : "", hex);
+          ESP_LOGI(TAG, "BLE: Farbe Schritt %d/%d -> %u,%u,%u%s, Paket %s", st.fadeStep, st.fadeN, st.r, st.g, st.b, st.raw ? " (raw)" : "", hex);
         } else {
           ESP_LOGI(TAG, "BLE: %s gesendet, Paket %s", cmdName(st.cmd), hex);
         }

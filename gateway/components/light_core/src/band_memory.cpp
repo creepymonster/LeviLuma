@@ -1,4 +1,5 @@
 #include "band_memory.h"
+#include "band_family.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -58,16 +59,7 @@ BandMemory::Choice BandMemory::choose(const Candidate *c, int n) const {
 }
 
 bool BandMemory::nameMatches(const char *name) {
-  static const char *prefixes[] = {"ELK-BLEDDM", "ELK-BLEDOM", "ELK-BLEDOB", "MELK", "LEDBLE"};
-  if (!name) {
-    return false;
-  }
-  for (const char *p : prefixes) {
-    if (strncmp(name, p, strlen(p)) == 0) {
-      return true;
-    }
-  }
-  return false;
+  return BandFam::fromName(name) != BandFamily::Unknown;
 }
 
 bool BandMemory::sameAddr(const Addr &a, const Addr &b) {
