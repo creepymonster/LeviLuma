@@ -28,13 +28,13 @@ Kopf `69 96`, danach Länge/Befehl, keine Prüfsumme. Hex.
 
 | Befehl | Paket | Quelle | Im Gateway |
 |---|---|---|---|
-| Ein | `69 96 02 01 01` | bj_led Code (`TURN_ON_CMD`) | ja |
-| Ein (abweichend) | `69 96 06 01 01` | bj_led README; widerspricht dem Code, vermutlich Schreibfehler | nein |
+| Ein | `69 96 02 01 01` | bj_led Code (`TURN_ON_CMD`), siehe Hinweis unten | ja |
 | Aus | `69 96 02 01 00` | bj_led Code und README | ja |
 | Farbe R, G, B | `69 96 05 02 RR GG BB` | bj_led Code | ja |
 | Farbe mit Weiß | `69 96 05 02 RR GG BB WW` | bj_led README (Beispiele: Rot `7F 00 00 7F`, Weiß `FF FF FF FF`); das Band hat laut Quelle keine weiße LED, das letzte Byte kann entfallen | nein |
 | Effekt | `69 96 03 03 EE SS` (EE = Effekt `00`–`15`, SS = Geschwindigkeit `01` schnell bis `0A` langsam) | bj_led README und Code | nein |
 
+- **Ein, Widerspruch in der Quelle:** Das README von bj_led nennt `69 96 06 01 01`, der Code sendet `69 96 02 01 01`. Festlegung im Projekt: **Der Code gilt**, weil er tatsächlich ausgeführt wird und Dokumentation schneller veraltet. Die README-Variante wird nicht verwendet.
 - **Helligkeit:** Es gibt **kein Helligkeitspaket**. bj_led rechnet die Helligkeit in RGB ein.
 - **Status:** nicht lesbar (siehe Benachrichtigung oben). bj_led arbeitet deshalb „optimistisch“.
 - **Uhr/Timer:** laut Quelle aus den HCI-Mitschnitten ableitbar, aber nicht ausgewertet und nicht dokumentiert.
