@@ -20,10 +20,10 @@
 
 | | |
 |---|---|
-| Getesteter Commit | `68a0dfecb5c6340a2d4646a7615fbdf8f0544ed7` |
+| Getesteter Commit | `6654050fad43d80760bb80d5be28db6a871c6e7a` |
 | Ref | `refs/heads/main` (Auslöser: push) |
-| Testlauf gestartet | 2026-11-07 10:35:14 UTC (2026-11-07 11:35:14 CET) |
-| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/42364557821 |
+| Testlauf gestartet | 2026-11-07 16:31:26 UTC (2026-11-07 17:31:26 CET) |
+| CI-Lauf | https://github.com/creepymonster/LeviLuma/actions/runs/42391681047 |
 
 Der Bericht beschreibt den oben genannten Commit. Seine Übernahme in `tests/README.md` erfolgt in einem **separaten Folge-Commit** (Bot, `[skip ci]`), der nur diese Datei ändert; der Quellstand ist deshalb der genannte Commit, nicht der Berichts-Commit.
 
@@ -185,12 +185,12 @@ Gebaut von `.github/workflows/next.yml` (ESP-IDF in Container). Der Status wird 
 
 | Job | Status | Ergebnis |
 |---|---|---|
-| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
 | ESP-IDF Diagnose ESP-NOW (esp32s3) | completed | erfolgreich |
-| ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
-| ESP-IDF Diagnose ESP-NOW, alle Optionen (esp32s3) | completed | erfolgreich |
 | ESP-IDF Round Controller (esp32s3) | completed | erfolgreich |
 | ESP-IDF Gateway (esp32s3) | completed | erfolgreich |
+| ESP-IDF Controller ohne Zigbee (esp32c5) | completed | erfolgreich |
+| ESP-IDF Controller mit Zigbee (esp32c5) | completed | erfolgreich |
+| ESP-IDF Diagnose ESP-NOW, alle Optionen (esp32s3) | completed | erfolgreich |
 
 ## Hardwaretests
 
