@@ -103,7 +103,7 @@ Vier Seiten untereinander, **senkrecht wischen**. Punkte am rechten Rand zeigen 
    - Mitte: der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers. Zusammen mit den Statuspunkten ist er die einzige Zustandsanzeige; Statustexte gibt es bewusst nicht. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
 2. **Helligkeit:** großer Prozentwert und darunter ein **waagerechter Regler** wie in Legacy (1–100 %, Bereich aus dem Protokoll). Nur bei eingeschalteter, erreichbarer Lampe bedienbar, sonst gesperrt.
 3. **Farbe:** wie die Legacy-LCD-UI – die 15 Farben des Farbsets (`LeviPalette`) als Punkte auf einem Kreis, die aktive Farbe weiß umrandet, in der Mitte Name und Hex-Wert. **Tipp rechts = nächste Farbe, links = vorige**, am Ende wieder vorn. Kein freier RGB-Wähler. Nur bei eingeschalteter Lampe aktiv.
-4. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Liste „Gateways“, Eintrag wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
+4. **Gateway:** Name des gekoppelten Gateways. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Liste „Gateways“, Eintrag wählen → braucht das Gateway einen Schlüssel, wird er abgefragt.
 
 Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weckt nur. Nach 60 s springt die Ansicht zur Seite Ein/Aus.
 
