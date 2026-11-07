@@ -46,7 +46,7 @@ static lv_obj_t *bright, *brightTitle, *brightLbl;
 static lv_obj_t *colorTile, *palDots[LeviPalette::N], *colorName, *colorHex;
 static int colorSel = -1; // Index der bestaetigten Farbe im Farbset, -1 = eigene Farbe
 // Gateway
-static lv_obj_t *gwTile, *gwTitle, *gwInfo, *gwPaired, *gwUnpaired;
+static lv_obj_t *gwTile, *gwTitle, *gwPaired, *gwUnpaired;
 // Geheimer Zugang zur Gateway-Seite, solange ein Gateway gekoppelt ist
 static constexpr int SECRET_TAPS = 5;
 static constexpr uint32_t SECRET_WINDOW_MS = 3000;
@@ -421,7 +421,6 @@ static void buildGateway(lv_obj_t *tile) {
   lv_obj_set_style_text_font(gwTitle, &lv_font_montserrat_20, 0);
   lv_label_set_long_mode(gwTitle, LV_LABEL_LONG_MODE_DOTS);
   lv_obj_set_width(gwTitle, 170);
-  gwInfo = label(gwPaired, "", true);
   lv_obj_t *row = plainBox(gwPaired);
   lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
@@ -468,17 +467,8 @@ static void refreshGateway() {
   if (!paired) {
     return;
   }
+  // nur der Name: Statusdetails (online vor x s, Band verbunden, ID) haben eher verwirrt
   lv_label_set_text(gwTitle, view.name);
-  char seen[24], t[160];
-  if (view.lastSeenAgoMs == UINT32_MAX) {
-    snprintf(seen, sizeof(seen), "nie gesehen");
-  } else {
-    snprintf(seen, sizeof(seen), "vor %lu s", (unsigned long)(view.lastSeenAgoMs / 1000));
-  }
-  snprintf(t, sizeof(t), "%s, %s\nBand %s\nID ..%02X:%02X:%02X\n%s", view.online ? "online" : "offline", seen,
-           view.stateValid && (view.state.flags & LVP_STATE_BLE) ? "verbunden" : "getrennt", view.id[3], view.id[4], view.id[5],
-           view.hasKey ? "verschluesselt" : "ohne Schluessel");
-  lv_label_set_text(gwInfo, t);
 }
 
 // ---------------- Suche und Kopplung ----------------
@@ -569,13 +559,11 @@ static void buildSearchList() {
     if (!appView(i, v) || v.paired || !v.online) {
       continue;
     }
-    char line[48];
-    snprintf(line, sizeof(line), "%s%s", (v.caps & LVP_GW_KEY_REQUIRED) ? LV_SYMBOL_EYE_CLOSE " " : "", v.name);
     lv_obj_t *b = lv_button_create(searchList);
     lv_theme_shadcn_set_variant(b, LV_THEME_SHADCN_VARIANT_OUTLINE);
     lv_obj_set_width(b, LV_PCT(100));
     lv_obj_t *l = lv_label_create(b);
-    lv_label_set_text(l, line);
+    lv_label_set_text(l, v.name); // ohne Schluessel-Symbol: nach dem Schluessel wird beim Antippen gefragt
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_size(l, LV_PCT(100), lv_font_get_line_height(lv_obj_get_style_text_font(l, LV_PART_MAIN))); // einzeilig
     lv_obj_add_event_cb(b, gatewayPicked, LV_EVENT_CLICKED, (void *)(intptr_t)i);

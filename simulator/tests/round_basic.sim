@@ -44,7 +44,7 @@ shot-device round_color.bmp
 echo Gekoppelt: Gateway-Seite per Wischen nicht erreichbar
 drag 120 205 120 40 300
 expect-text "Weiss"
-expect-no-text "online, vor"
+expect-no-text @TRASH
 
 echo Geheimer Weg: auf Ein/Aus 5x schnell auf den Gateway-Namen tippen
 drag 120 40 120 205 300
@@ -55,8 +55,9 @@ click-text "SIM Wohnzimmer"
 click-text "SIM Wohnzimmer"
 click-text "SIM Wohnzimmer"
 click-text "SIM Wohnzimmer"
-expect-text "online, vor"
-expect-text "Band verbunden"
+expect-text @TRASH
+expect-no-text "online"
+expect-no-text "Band verbunden"
 click-text @REFRESH
 expect-text "Abgleich gestartet"
 click-close

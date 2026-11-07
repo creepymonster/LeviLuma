@@ -7,7 +7,7 @@ click-text "SIM Wohnzimmer"
 click-text "SIM Wohnzimmer"
 click-text "SIM Wohnzimmer"
 click-text "SIM Wohnzimmer"
-expect-text "online, vor"
+expect-text @TRASH
 
 echo Entkoppeln
 click-text @TRASH
@@ -110,6 +110,7 @@ click-text "SIM Kueche"
 click-text "SIM Kueche"
 click-text "SIM Kueche"
 click-text "SIM Kueche"
-expect-text "verschluesselt"
+expect-text "SIM Kueche"
+expect-text @TRASH
 expect-no-text "Suchen"
 quit
