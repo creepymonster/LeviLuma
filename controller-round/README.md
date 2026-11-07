@@ -94,14 +94,16 @@ Nebenläufigkeit wie beim RockBase-Controller: Der ESP-NOW-Callback kopiert nur 
 
 ## Bedienung
 
-Vier Seiten untereinander, **senkrecht wischen**. Vier Punkte am rechten Rand zeigen die aktuelle Seite.
+Vier Seiten untereinander, **senkrecht wischen**. Punkte am rechten Rand zeigen die aktuelle Seite.
+
+**Gateway-Seite bei Kopplung versteckt:** Ist ein Gateway gekoppelt, sind nur die Seiten 1–3 per Wischen erreichbar (drei Punkte), damit Kinder nicht versehentlich entkoppeln. Zugang: auf der Seite Ein/Aus **5× schnell (innerhalb von 3 s) auf den Gateway-Namen tippen**. Die Gateway-Seite erscheint dann sofort; beim Wegwischen und nach 60 s ohne Berührung ist sie wieder versteckt. Ohne Kopplung ist die Seite wie bisher normal erreichbar.
 
 1. **Ein/Aus:**
    - Oben: Gateway-Symbol mit Punkt (ESP-NOW-Verbindung grün/rot) und Glühbirne mit Punkt (Licht an grün, aus rot, unbekannt weiß), darunter der Gateway-Name.
    - Mitte: der **Ein/Aus-Schalter** – derselbe Theme-Schalter wie auf der Übersicht des RockBase-Controllers. Zusammen mit den Statuspunkten ist er die einzige Zustandsanzeige; Statustexte gibt es bewusst nicht. Während ein Befehl unterwegs ist, bleibt die Eingabe sichtbar; danach folgt der Schalter dem bestätigten Zustand.
 2. **Helligkeit:** großer Prozentwert und darunter ein **waagerechter Regler** wie in Legacy (1–100 %, Bereich aus dem Protokoll). Nur bei eingeschalteter, erreichbarer Lampe bedienbar, sonst gesperrt.
 3. **Farbe:** wie die Legacy-LCD-UI – die 15 Farben des Farbsets (`LeviPalette`) als Punkte auf einem Kreis, die aktive Farbe weiß umrandet, in der Mitte Name und Hex-Wert. **Tipp rechts = nächste Farbe, links = vorige**, am Ende wieder vorn. Kein freier RGB-Wähler. Nur bei eingeschalteter Lampe aktiv.
-4. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Gateway wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
+4. **Gateway:** Name, online/offline, zuletzt gesehen, Band verbunden/getrennt, ID (letzte drei Bytes), verschlüsselt ja/nein. ↻ = Verbindung erneut aufbauen (Erkennung + Zustandsabfrage), Mülleimer = Entkoppeln (mit Rückfrage). Ohne Kopplung: **Suchen** → Liste „Gateway“, Eintrag wählen (Auge-Symbol = Schlüssel nötig) → ggf. Schlüssel eingeben.
 
 Nach 20 s ohne Berührung geht die Beleuchtung aus; die nächste Berührung weckt nur. Nach 60 s springt die Ansicht zur Seite Ein/Aus.
 
