@@ -23,6 +23,8 @@ Zigbee:      FRITZ!Box --Zigbee--> C5 --ESP-NOW--> XIAO --BLE--> Leiste
 
 Alle Bilder stammen aus Host-Vorschauen: die echten Oberflächen-Quelltexte, gebaut gegen LVGL 9.6 mit nachgebildeten Daten. Sie sind **nicht vom Gerät**; Touch, Farben und Timing können abweichen.
 
+Alle Bilder (auch die des Simulators) erzeugt `tools/screenshots.sh`. Nach Änderungen an den Oberflächen auf `main` läuft es automatisch (`.github/workflows/screenshots.yml`) und legt die Bilder per Bot-Commit ab.
+
 ### RockBase-Controller (320×240)
 
 Erzeugt mit `tools/ui_preview/render.sh`, Ordner `screenshots/controller_320x240/`.
@@ -47,9 +49,9 @@ Erzeugt mit `tools/ui_preview/render.sh`, Ordner `screenshots/controller_320x240
 
 Erzeugt mit `controller-round/tools/preview/render.sh` (außerhalb des Kreises transparent), Ordner `screenshots/controller-round_240x240/`.
 
-| Ohne Gateway | Gateway-Seite ohne Kopplung | Gateway wählen |
+| Ohne Gateway | Gateway-Seite ohne Kopplung | Gateways |
 |---|---|---|
-| ![Ohne Gateway](screenshots/controller-round_240x240/01_unpaired.png) | ![Gateway-Seite ohne Kopplung](screenshots/controller-round_240x240/02_gateway_unpaired.png) | ![Gateway wählen](screenshots/controller-round_240x240/03_search.png) |
+| ![Ohne Gateway](screenshots/controller-round_240x240/01_unpaired.png) | ![Gateway-Seite ohne Kopplung](screenshots/controller-round_240x240/02_gateway_unpaired.png) | ![Gateways](screenshots/controller-round_240x240/03_search.png) |
 
 | Schlüsseleingabe | Ein/Aus, an | Helligkeit |
 |---|---|---|

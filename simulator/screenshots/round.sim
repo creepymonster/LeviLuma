@@ -1,0 +1,14 @@
+# Bilder fuer screenshots/simulator/ (Round): Ein/Aus und Farbe mit simuliertem Vorzustand
+# (SIM Wohnzimmer gekoppelt, an, 80 %, Koralle). Aufruf ueber tools/screenshots.sh, kein Test.
+expect-text "SIM Wohnzimmer" 10000
+expect-switch 0 on 8000
+wait 1500
+shot round_power.bmp
+drag 120 205 120 40 300
+expect-text "Helligkeit"
+drag 120 205 120 40 300
+expect-text "Koralle"
+expect-text "#FF6B6B"
+wait 800
+shot round_color.bmp
+quit

@@ -630,7 +630,7 @@ static void showSearch() {
   if (!appMayPair()) {
     return;
   }
-  lv_obj_t *scr = overlayScreen("Gateway");
+  lv_obj_t *scr = overlayScreen("Gateways");
   searchList = lv_obj_create(scr);
   lv_obj_set_size(searchList, 170, 120);
   lv_obj_align(searchList, LV_ALIGN_CENTER, 0, -4);
