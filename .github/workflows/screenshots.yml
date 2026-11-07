@@ -1,0 +1,83 @@
+name: Screenshots
+
+# Erzeugt alle Oberflaechen-Bilder neu (tools/screenshots.sh) und legt sie per Bot-Commit auf main ab:
+#   screenshots/controller_320x240/       RockBase-Controller (Host-Vorschau, echtes UI mit nachgebildeten Daten)
+#   screenshots/controller-round_240x240/ Round Controller (Host-Vorschau)
+#   screenshots/simulator/                Desktop-Simulator (Fensteraufnahmen, simulierte Gateways)
+# Keine Geraeteaufnahmen. Schleifen: der Bot-Commit aendert nur screenshots/, traegt "[skip ci]" und wird mit
+# GITHUB_TOKEN gepusht (loest keine Workflows aus). Kein Force-Push.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "controller/main/**"
+      - "controller/components/**"
+      - "controller/cmake/**"
+      - "controller/sdkconfig.defaults"
+      - "controller-round/main/**"
+      - "controller-round/components/**"
+      - "controller-round/cmake/**"
+      - "controller-round/tools/preview/**"
+      - "controller-round/sdkconfig.defaults"
+      - "shared/**"
+      - "simulator/**"
+      - "tools/ui_preview/**"
+      - "tools/screenshots.sh"
+      - ".github/workflows/screenshots.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Werkzeuge installieren (SDL2, Pillow)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libsdl2-dev
+          pip install --quiet pillow
+
+      - name: Screenshots erzeugen
+        run: tools/screenshots.sh
+
+      - name: Vorschau als Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+
+      - name: Screenshots im Repository ablegen
+        if: github.ref == 'refs/heads/main'
+        run: |
+          OUT="$RUNNER_TEMP/screenshots"
+          cp -r screenshots "$OUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin main
+            git checkout --quiet --force --detach origin/main
+            cp -r "$OUT"/. screenshots/
+            git add -A screenshots
+            if git diff --cached --quiet; then
+              echo "Keine Aenderungen an den Screenshots."
+              exit 0
+            fi
+            git commit --quiet -m "Screenshots für ${GITHUB_SHA::7} aktualisieren [skip ci]" \
+              -m "Automatisch erzeugt mit tools/screenshots.sh im CI-Lauf ${{ github.run_id }}. Grundlage: ${{ github.sha }}. Nur screenshots/, keine Geraeteaufnahmen."
+            # kein Force-Push: bei Wettlauf neu abgleichen
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push abgelehnt (Versuch $attempt)."
+            sleep 5
+          done
+          echo "::error::Screenshots konnten nicht nach main geschrieben werden (Branch-Schutz? Berechtigungen?). Bilder liegen im Artefakt screenshots."
+          exit 1

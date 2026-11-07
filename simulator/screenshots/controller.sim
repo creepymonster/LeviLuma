@@ -1,0 +1,13 @@
+# Bilder fuer screenshots/simulator/ (RockBase): Uebersicht und Detail mit simuliertem Vorzustand
+# (SIM Wohnzimmer gekoppelt, an, 80 %, Koralle). Aufruf ueber tools/screenshots.sh, kein Test.
+expect-text "SIM Wohnzimmer" 10000
+expect-text "An - 80 %" 10000
+expect-text "1/1 online"
+wait 1500
+shot controller_home.bmp
+click-text "SIM Wohnzimmer"
+expect-text "Koralle"
+expect-text "#FF6B6B"
+wait 500
+shot controller_detail.bmp
+quit

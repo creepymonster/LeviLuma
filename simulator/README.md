@@ -11,7 +11,7 @@ Nativer Desktop-Simulator (C++, CMake, SDL2) für die **Original-LVGL-Oberfläch
 
 ![Round Controller im Simulator](../screenshots/simulator/round_color.png)
 
-Bilder aus dem Simulator selbst (Fensteraufnahme per Testskript, `shot`). Rechts die Steuerleiste des Simulators. **Alle gezeigten Gateways, Zustände und Rahmen sind simuliert**; die Bilder stammen nicht vom Gerät. Farben, Touch und Zeitverhalten der echten Displays können abweichen.
+Bilder aus dem Simulator selbst (Fensteraufnahme per Skript `simulator/screenshots/*.sim`, `shot`; erzeugt von `tools/screenshots.sh` bzw. dem Workflow `screenshots.yml`). Rechts die Steuerleiste des Simulators. **Alle gezeigten Gateways, Zustände und Rahmen sind simuliert**; die Bilder stammen nicht vom Gerät. Farben, Touch und Zeitverhalten der echten Displays können abweichen.
 
 ## Architektur
 

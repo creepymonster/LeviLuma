@@ -18,7 +18,7 @@ expect-text "Kein Gateway"
 
 echo Suchen, Gateway mit Schluessel waehlen, falscher Schluessel
 click-text "Suchen"
-expect-text "=Gateway"
+expect-text "=Gateways"
 expect-text "SIM Kueche" 8000
 expect-text "SIM Wohnz" 8000
 # Liste baut sich neu auf, sobald alle Gateways ihre Daten gemeldet haben; erst danach waehlen

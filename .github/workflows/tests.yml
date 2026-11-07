@@ -168,8 +168,9 @@ jobs:
           for attempt in 1 2 3; do
             git fetch --quiet origin main
             # Veraltet: ist seit dem getesteten Commit etwas anderes als die README hinzugekommen, ueberlaesst dieser
-            # Lauf die Auswertung dem Lauf des neueren Stands.
-            if ! git diff --quiet "${{ github.sha }}" origin/main -- . ':(exclude)tests/README.md'; then
+            # Lauf die Auswertung dem Lauf des neueren Stands. Ausgenommen sind die Bot-Commits des Workflows
+            # screenshots.yml (nur screenshots/), die keinen eigenen Testlauf ausloesen.
+            if ! git diff --quiet "${{ github.sha }}" origin/main -- . ':(exclude)tests/README.md' ':(exclude)screenshots'; then
               echo "main enthaelt einen neueren Stand als ${{ github.sha }}; Auswertung wird vom neueren Lauf abgelegt."
               exit 0
             fi
